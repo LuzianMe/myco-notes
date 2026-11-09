@@ -86,6 +86,18 @@ repo/
 
 The notes are the files directly inside `myco-notes/`; `tools/`, `docs/` and `map/` are machinery, and the lint and map treat them accordingly. Trees made before 0.6.0 have `notes/`, `tools/`, `docs/` and `notes-map/` at the root; they keep working unchanged (no `MYCO_DIR` means that layout), and `tools/relocate` converts one in a reviewable step. Every folder can be renamed individually (`NOTES_DIR`, `TOOLS_DIR`, `DOCS_DIR`, `MAP_DIR`), for example a docs folder called `myco-docs`. Keep the folder name unmistakable: someone who sees `myco-notes/` knows at once what it belongs to.
 
+#### New folders in the root
+The root belongs to the project, so folders and files appear there that no one told the notes about. `notes-commit` does not stage them silently (a large or sensitive folder would be committed by accident). It stops, commits nothing, lists what is new (size, file types, a suggestion) and exits with code 3; the agent asks the owner and runs it again with `--folder NAME=MODE`:
+
+| Mode | Tracked by git | Lint and map | Recorded as | For |
+|---|---|---|---|---|
+| `add` | yes | read as notes | nothing | knowledge, mostly Markdown |
+| `ignorelint` | yes | skipped | `DATA_DIRS` | small reference files you want history for |
+| `ignoreall` | no | skipped | `DATA_DIRS` and `.gitignore` | inputs, outputs, downloads, large or sensitive files |
+| `later` | not this time | not this time | nothing | undecided; asked again at the next commit |
+
+`NEW_FOLDERS` in `.myco-notes.conf` sets the default: `ask` (the default) or one of the three modes, which are then applied without a question (and recorded). First-time setup asks the owner which they want. Folders inside the notes folder are notes by definition and are never asked about.
+
 ### 3.2 Read order
 
 Always the same, and written in the entry point: (1) working agreement, (2) sync tracker (what is pending, what is stale), (3) master record headline and open items, (4) the runbook entry for the task at hand, (5) the entity note and the latest handoffs. A newcomer should be productive after reading five files.
@@ -376,7 +388,7 @@ Paths are relative to the kit, which is the skill folder `skills/myco-notes/` (i
 
 | Method element | Tool or file |
 |---|---|
-| Bootstrap a tree (11.5); one folder for the notes, tools, docs and map; project data folders | `tools/bootstrap` (`--layout`, `--myco-dir`, `--data-dir`), `template/` |
+| Bootstrap a tree (11.5); one folder for the notes, tools, docs and map; project data folders | `tools/bootstrap` (`--layout`, `--myco-dir`, `--data-dir`, `--new-folders`), `template/` |
 | Move an older tree into the single folder, or rename the folder (3.1) | `tools/relocate` (dry run first; keeps your folder names; updates conf, hooks path and path references) |
 | Described commits, syntax checks, synced executed copies (7) | `tools/notes-commit`, `.myco-notes.conf` |
 | Secret refusal at commit time (8.2) | `tools/hooks/pre-commit` (versioned; activated by `git config core.hooksPath <tools folder>/hooks`), rules in `tools/secret-scan` |

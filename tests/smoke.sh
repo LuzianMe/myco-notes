@@ -76,6 +76,16 @@ chk "private key block is refused"      "! myco-notes/tools/notes-commit 'add a 
 git reset -q; rm -f myco-notes/key-test.md
 chk "tree is clean again"               "[ -z \"\$(git status --porcelain)\" ]"
 
+echo "new folders in the root"
+mkdir runbooks files_input; echo "# r" > runbooks/a.md; echo x > files_input/a.pdf
+head0="$(git rev-parse HEAD)"
+chk "ask: a new root folder stops the commit with exit 3" "myco-notes/tools/notes-commit 'new folders'; [ \$? = 3 ] && [ \"\$(git rev-parse HEAD)\" = $head0 ]"
+chk "the report names the folders and the choices" "myco-notes/tools/notes-commit 'new folders' | grep -q 'runbooks/' && myco-notes/tools/notes-commit 'new folders' | grep -q 'ignorelint'"
+chk "answers commit: add, ignoreall" "myco-notes/tools/notes-commit --folder runbooks=add --folder files_input=ignoreall 'Decide the new folders' >/dev/null && git ls-files | grep -q runbooks/a.md && ! git ls-files | grep -q files_input && git check-ignore -q files_input && grep -q 'files_input' .myco-notes.conf"
+rm -rf runbooks files_input; git rm -rq runbooks; git commit -qam "remove the folder test items"
+sed -i 's/^DATA_DIRS=.*/DATA_DIRS=""/' .myco-notes.conf; sed -i '/^\/files_input\/$/d' .gitignore; git commit -qam "reset the folder test"
+chk "tree is clean again after the folder test" "[ -z \"\$(git status --porcelain)\" ]"
+
 echo "lint"
 myco-notes/tools/notes-lint.py >/tmp/lint.$$ 2>&1; rc=$?
 chk "lint runs on a fresh tree (exit 0 or 1)" "[ $rc -le 1 ]"

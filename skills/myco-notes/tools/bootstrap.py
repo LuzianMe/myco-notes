@@ -3,12 +3,17 @@
 
   tools/bootstrap <target-dir> --name "Project name" [--owner "Name"] [--tz "MST (UTC-7)"] [--no-commit]
                   [--myco-dir myco-notes] [--layout nested|flat] [--data-dir files-input --data-dir files-output ...]
+                  [--new-folders ask|add|ignorelint|ignoreall]
 
 Layout (default nested): one folder, myco-notes/, holds the notes, tools/, docs/ and map/; only the files agents and git look for at the
 root (AGENTS.md, CLAUDE.md, .github/, .gitignore, .gitattributes, .myco-notes.conf) stay outside it, so the root stays free for the
 project's own folders. --layout flat gives the older arrangement (notes/, tools/, docs/ and notes-map/ at the root).
 --data-dir (repeatable) names a project folder that is not notes (inputs, outputs, attachments): it is created, gitignored, listed in
 the conf as DATA_DIRS and left out of the lint and the map.
+
+--new-folders sets what notes-commit does with a new folder or loose file in the root (NEW_FOLDERS in the conf): ask (default; it stops and the
+agent asks the owner), add (track it and lint it as notes), ignorelint (track it, skip the lint and the map), ignoreall (do not track, do not lint).
+An agent setting up a tree for a person asks them which one they want first.
 
 Copies template/ into <target-dir>, fills the {{PLACEHOLDERS}}, copies tools/ and docs/*.md, makes git use the versioned hooks
 (core.hooksPath = <tools folder>/hooks), and makes the baseline commit. The target must be empty or not exist.
@@ -42,6 +47,7 @@ def main():
     ap.add_argument("--layout", choices=("nested", "flat"), default="nested")
     ap.add_argument("--myco-dir", default="myco-notes")
     ap.add_argument("--data-dir", action="append", default=[])
+    ap.add_argument("--new-folders", choices=("ask", "add", "ignorelint", "ignoreall"), default="ask")
     a = ap.parse_args()
     owner = a.owner or _myco.git("config", "user.name").stdout.strip() or "owner"
 
@@ -80,7 +86,7 @@ def main():
 
     subs = (("{{PROJECT_NAME}}", a.name), ("{{OWNER}}", owner), ("{{TIMEZONE}}", a.tz), ("{{DATE}}", datetime.date.today().isoformat()),
             ("{{MYCO_DIR}}", lay["myco"]), ("{{NOTES_DIR}}", lay["notes"]), ("{{TOOLS_DIR}}", lay["tools"]), ("{{DOCS_DIR}}", lay["docs"]),
-            ("{{MAP_DIR}}", lay["map"]), ("{{DATA_DIRS}}", " ".join(data)))
+            ("{{MAP_DIR}}", lay["map"]), ("{{DATA_DIRS}}", " ".join(data)), ("{{NEW_FOLDERS}}", a.new_folders))
     tools_abs = os.path.normcase(at(lay["tools"]))
     for dp, dn, fn in os.walk(target):
         dn[:] = [d for d in dn if d != ".git" and os.path.normcase(os.path.join(dp, d)) != tools_abs]
@@ -131,6 +137,7 @@ Next steps:
   3. Set up an independent encrypted snapshot of the mirror and run {t}/restore-drill once.
   4. python3 {t}/build-notes-map.py   (navigable map with backlinks and history)
   5. Commit after every meaningful update:  {t}/notes-commit "what changed and why"
+     (New folders and files in the root: NEW_FOLDERS={a.new_folders} in .myco-notes.conf; with 'ask' notes-commit stops and lists them.)
   6. Sharing with a team (GitHub or GitHub Enterprise): see {d_}/TEAM.md; teammates run {t}/setup-clone after cloning.
   (On Windows in cmd or PowerShell write {t.replace('/', chr(92))}\\notes-commit; in Git Bash, WSL, macOS and Linux write {t}/notes-commit.)""")
     return 0

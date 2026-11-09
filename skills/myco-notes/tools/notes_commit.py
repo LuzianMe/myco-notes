@@ -8,9 +8,13 @@
   tools/notes-commit --branch my-change "message"      commit on that branch (created from the current one if new)
   tools/notes-commit --push "message"                  also git push the current branch to origin (sets the upstream)
   tools/notes-commit --pr "message"                    --push, then open a pull request with the GitHub CLI (gh pr create --fill)
+  tools/notes-commit --folder NAME=MODE "message"      decide what to do with a new root folder or file (MODE: add, ignorelint, ignoreall, later)
 
 Behaviour (configured in .myco-notes.conf at the repository root):
   - stages everything (respecting .gitignore); says "nothing to commit" and exits 0 when clean
+  - new folders and loose files in the repository root are not staged silently: NEW_FOLDERS in the conf says what to do
+    (ask = the default: commit nothing, print a report and exit 3 so the agent can ask the owner; add = track and treat as notes;
+    ignorelint = track but skip in the lint and the map; ignoreall = do not track, do not lint). Decisions are written to the conf and .gitignore
   - syntax-checks changed shell and python files before committing (CHECK_SH / CHECK_PY)
   - the pre-commit hook (<tools folder>/hooks/pre-commit) refuses commits that add secret-looking lines
   - adds AGENT_TRAILER unless --human
@@ -18,8 +22,10 @@ Behaviour (configured in .myco-notes.conf at the repository root):
   - team use: --branch / --push / --pr give each change its own branch and pull request (see docs/TEAM.md)
 """
 import argparse
+import collections
 import fnmatch
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -53,6 +59,118 @@ def is_shell_script(path, hooks_prefix="tools/hooks/"):
     return first.startswith(b"#!") and (b"sh" in first)
 
 
+MODES = ("add", "ignorelint", "ignoreall")
+CHOICES = MODES + ("later",)
+EXPLAIN = {
+    "add": "track it and treat it as notes (the lint and the map read it)",
+    "ignorelint": "track it (versioned), but the lint and the map skip it",
+    "ignoreall": "do not track it and do not lint it (data, ignored by git)",
+    "later": "leave it out of this commit; you are asked again next time",
+}
+OK_FILES = {"AGENTS.md", "CLAUDE.md", "README.md", ".gitignore", ".gitattributes", "CODEOWNERS", ".editorconfig"}
+OK_PREFIXES = (".myco-notes", "LICENSE", "NOTICE")
+OK_DIRS = {".github", ".agents", ".codex", ".claude", ".githooks"}
+SECRETISH = re.compile(r"(?i)(credential|secret|passw|token|id_rsa|id_ed25519|\.pfx$|\.p12$|\.ovpn$)")
+HINT = re.compile(r"(?i)(input|output|download|export|import|attach|upload|tmp|temp|scratch|dump|backup|cache|files?[-_])")
+BULKY = {".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".zip", ".7z", ".gz", ".tar", ".rar", ".png", ".jpg", ".jpeg", ".gif",
+         ".mp4", ".mov", ".csv", ".log", ".db", ".sqlite", ".bin", ".exe", ".msi", ".iso", ".eml", ".msg", ".pcap", ".har"}
+
+
+def new_items(lay):
+    """New folders and loose files in the repository root that git does not track yet and nothing in the configuration covers.
+    Returns {name: {"kind": "folder"|"file", "files": [paths]}}. Called from the repository root."""
+    exempt = OK_DIRS | {lay[k].split("/")[0] for k in ("notes", "tools", "docs", "map") if lay[k]} | {d for d in lay["data"] if "/" not in d}
+    tracked = {p.split("/")[0] for p in _myco.git("-c", "core.quotepath=off", "ls-files", "-z").stdout.split("\0") if p}
+    out = {}
+    for p in _myco.git("-c", "core.quotepath=off", "ls-files", "--others", "--exclude-standard", "-z").stdout.split("\0"):
+        if not p:
+            continue
+        top = p.split("/")[0]
+        if "/" in p:
+            if top in exempt or top in tracked:
+                continue
+            out.setdefault(top, {"kind": "folder", "files": []})["files"].append(p)
+        elif p not in OK_FILES and not p.startswith(OK_PREFIXES):
+            out[p] = {"kind": "file", "files": [p]}
+    return out
+
+
+def describe(info):
+    files = info["files"]
+    size = 0
+    for f in files:
+        try:
+            size += os.path.getsize(f)
+        except OSError:
+            pass
+    exts = collections.Counter((os.path.splitext(f)[1].lower() or "(none)") for f in files)
+    md = sum(1 for f in files if f.lower().endswith(".md"))
+    bulky = sum(1 for f in files if os.path.splitext(f)[1].lower() in BULKY)
+    n = len(files)
+    name = files[0].split("/")[0]
+    if any(SECRETISH.search(os.path.basename(f)) for f in files):
+        pick, why = "ignoreall", "some file names look like credentials or keys"
+    elif md and md * 2 >= n and size < 2 * 1024 * 1024:
+        pick, why = "add", "mostly Markdown"
+    elif size > 5 * 1024 * 1024:
+        pick, why = "ignoreall", "large"
+    elif bulky * 2 >= n:
+        pick, why = "ignoreall", "mostly documents, archives or data exports"
+    elif HINT.search(name):
+        pick, why = "ignoreall", "the name suggests inputs, outputs or downloads"
+    else:
+        pick, why = "ignorelint", "small mixed files: keep their history without checking them as notes"
+    return {"count": n, "size": size, "exts": exts.most_common(4), "md": md, "pick": pick, "why": why}
+
+
+def report_new(items, pending):
+    print("notes-commit: NEW at the repository root, and nothing was committed. Ask the owner what to do with each:\n")
+    for name in pending:
+        d = describe(items[name])
+        mix = ", ".join(f"{e} {c}" for e, c in d["exts"])
+        label = name + ("/" if items[name]["kind"] == "folder" else "")
+        what = "file" if items[name]["kind"] == "file" else f"folder: {d['count']} file{'s' if d['count'] != 1 else ''}"
+        print(f"  {label}  ({what}, {_myco.human_size(d['size'])}; {mix})")
+        print(f"      suggestion: {d['pick']} ({d['why']})")
+        for f in items[name]["files"][:4]:
+            print(f"      - {f}")
+        if len(items[name]["files"]) > 4:
+            print(f"      - ... and {len(items[name]['files']) - 4} more")
+    print("\nChoices:")
+    for m in CHOICES:
+        print(f"  {m:<11} {EXPLAIN[m]}")
+    args = " ".join(f"--folder {n}={describe(items[n])['pick']}" for n in pending)
+    print(f"\nThen run again with the answers, for example:\n  notes-commit {args} \"message\"")
+    print("(NAME=* answers for every new item at once.) To stop being asked, set NEW_FOLDERS=add, ignorelint or ignoreall in .myco-notes.conf.")
+    print("Exit code 3 means: waiting for the owner's decision. An agent must ask the owner and must not choose.")
+
+
+def apply_choice(root, lay, name, kind, mode):
+    """Record the decision in .myco-notes.conf, .gitignore and .myco-notes-lint-ignore (the caller stages everything afterwards)."""
+    if mode in ("add", "later"):
+        return
+    def append(path, line):
+        full = os.path.join(root, path)
+        old = open(full, encoding="utf-8").read() if os.path.exists(full) else ""
+        if line in old.splitlines():
+            return
+        with open(full, "a", encoding="utf-8", newline="") as fh:
+            fh.write(("" if old.endswith("\n") or not old else "\n") + line + "\n")
+    if kind == "folder":
+        cf = os.path.join(root, ".myco-notes.conf")
+        text = open(cf, encoding="utf-8").read()
+        if name not in lay["data"]:
+            with open(cf, "w", encoding="utf-8", newline="") as fh:
+                fh.write(_myco.set_conf_key(text, "DATA_DIRS", " ".join(lay["data"] + [name])))
+            lay["data"].append(name)
+        if mode == "ignoreall":
+            append(".gitignore", f"/{name}/")
+    elif mode == "ignoreall":
+        append(".gitignore", f"/{name}")
+    elif name.lower().endswith(".md"):   # ignorelint on a loose Markdown file: the lint reads it as a note unless told not to
+        append(".myco-notes-lint-ignore", "^" + re.escape(name) + ":")
+
+
 def main():
     _myco.utf8_console()
     ap = argparse.ArgumentParser(prog="notes-commit", add_help=False)
@@ -62,6 +180,7 @@ def main():
     ap.add_argument("--branch", default="")
     ap.add_argument("--push", action="store_true")
     ap.add_argument("--pr", action="store_true")
+    ap.add_argument("--folder", action="append", default=[])
     ap.add_argument("-h", "--help", action="store_true")
     ap.add_argument("message", nargs="*")
     a = ap.parse_args()
@@ -70,7 +189,7 @@ def main():
         return 0
     msg = " ".join(a.message).strip()
     if not msg:
-        print('usage: notes-commit [-p] [--human] [--tag NAME] [--branch NAME] [--push|--pr] "message"', file=sys.stderr)
+        print('usage: notes-commit [-p] [--human] [--tag NAME] [--branch NAME] [--push|--pr] [--folder NAME=MODE] "message"', file=sys.stderr)
         return 2
 
     root = _myco.toplevel(os.environ.get("NOTES_ROOT") or os.getcwd()) or _myco.toplevel(HERE)
@@ -91,7 +210,38 @@ def main():
                 fail(f"cannot switch to branch {a.branch}: {r.stderr.strip()}")
             print(f"notes-commit: on branch {a.branch}")
 
+    later = []
+    lay = _myco.layout(root, conf)
+    mode = (conf.get("NEW_FOLDERS") or "ask").strip().lower()
+    if mode not in ("ask",) + MODES:
+        fail(f"NEW_FOLDERS={mode!r} in .myco-notes.conf is not one of ask, add, ignorelint, ignoreall", 2)
+    given = {}
+    for spec in a.folder:
+        name, _, choice = spec.partition("=")
+        name, choice = (_myco._rel(name) or name.strip()), choice.strip().lower()
+        if choice not in CHOICES:
+            fail(f"--folder {spec}: the choice must be one of {', '.join(CHOICES)}", 2)
+        given[name] = choice
+    items = new_items(lay) if os.path.isfile(os.path.join(root, ".myco-notes.conf")) else {}
+    stray = [n for n in given if n != "*" and n not in items]
+    if stray:
+        fail(f"--folder {stray[0]}: no new folder or file with that name at the repository root (new now: {', '.join(items) or 'none'})", 2)
+    if items:
+        chosen = {n: given.get(n) or given.get("*") or (mode if mode != "ask" else None) for n in items}
+        pending = [n for n, c in chosen.items() if c is None]
+        if pending:
+            report_new(items, pending)
+            return 3
+        for n, c in chosen.items():
+            apply_choice(root, lay, n, items[n]["kind"], c)
+            print(f"notes-commit: new {items[n]['kind']} {n}: {c}")
+        later = [n for n, c in chosen.items() if c == "later"]
+
     _myco.git("add", "-A")
+    for n in later:
+        _myco.git("rm", "-r", "-q", "--cached", "--ignore-unmatch", "--", n)
+    if later:
+        print("notes-commit: left out of this commit (asked again next time): " + ", ".join(later))
     if _myco.git("diff", "--cached", "--quiet").returncode == 0:
         print("notes-commit: nothing to commit")
         return 0

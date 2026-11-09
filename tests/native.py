@@ -51,6 +51,14 @@ def pycache_dirs(root):
     return [dp for dp, dn, _fn in os.walk(root) if "__pycache__" in dn and ".git" not in dp.split(os.sep)]
 
 
+def _data_dirs(conf_text):
+    """The names listed in DATA_DIRS of a conf file's text."""
+    for line in conf_text.splitlines():
+        if line.startswith("DATA_DIRS="):
+            return line.split("=", 1)[1].strip().strip('"').split()
+    return []
+
+
 def main():
     tmp = tempfile.mkdtemp(prefix="myco-native-")
     try:
@@ -149,6 +157,75 @@ def main():
         check("tree is clean after the lint scenarios", git(proj, "status", "--porcelain")[1].strip() == "")
         check("no __pycache__ was left by the tools or the launchers", not pycache_dirs(proj), str(pycache_dirs(proj)))
 
+        print("new folders and loose files in the root (NEW_FOLDERS)")
+        NC = L(proj, "notes-commit", T)
+        conf_p = os.path.join(proj, ".myco-notes.conf")
+        head0 = git(proj, "rev-parse", "HEAD")[1].strip()
+        check("bootstrap writes NEW_FOLDERS=ask by default", "\nNEW_FOLDERS=ask\n" in read(conf_p))
+        write(os.path.join(proj, "runbooks", "a.md"), "# Runbook\n")
+        write(os.path.join(proj, "exports", "data.csv"), "a,b\n")
+        write(os.path.join(proj, "loose-export.xlsx"), "x")
+        write(os.path.join(proj, MY, "state.md"), "\n- a change next to new folders\n", "a")
+        rc, out = run(NC + ["Change next to new folders"], proj)
+        check("ask: stops with exit 3 and a report", rc == 3 and "runbooks/" in out and "exports/" in out and "loose-export.xlsx" in out and "ignoreall" in out and "suggestion:" in out, out)
+        check("ask: nothing was committed or staged", git(proj, "rev-parse", "HEAD")[1].strip() == head0 and git(proj, "diff", "--cached", "--quiet")[0] == 0)
+        check("ask: files already covered (data folders, the notes folder) are not listed", "files-input" not in out and MY + "/" not in out.split("Choices:")[0])
+        rc, out = run(NC + ["--folder", "nosuch=add", "x"], proj)
+        check("a name that is not new is refused", rc == 2 and "nosuch" in out, out)
+        rc, out = run(NC + ["--folder", "runbooks=maybe", "x"], proj)
+        check("a bad choice is refused", rc == 2 and "must be one of" in out, out)
+        rc, out = run(NC + ["--folder", "runbooks=add", "x"], proj)
+        check("a partial answer still stops", rc == 3 and "exports/" in out and "runbooks/" not in out.split("Choices:")[0], out)
+        write(os.path.join(proj, "loose-note.md"), "# Loose\nSee `gone-note.md`.\n")
+        rc, out = run(NC + ["--folder", "runbooks=add", "--folder", "exports=ignoreall", "--folder", "loose-export.xlsx=ignorelint", "--folder", "loose-note.md=ignorelint", "Decide the new items"], proj)
+        tracked = git(proj, "ls-files")[1].split("\n")
+        check("answers are applied and committed", rc == 0 and "Decide the new items" in out, out)
+        check("add: tracked", "runbooks/a.md" in tracked)
+        check("ignoreall: not tracked, in DATA_DIRS and .gitignore", not any(t.startswith("exports/") for t in tracked) and "exports" in _data_dirs(read(conf_p)) and git(proj, "check-ignore", "-q", "exports")[0] == 0)
+        check("ignorelint on a loose file: tracked", "loose-export.xlsx" in tracked and "loose-note.md" in tracked)
+        check("the change was committed together with the decision", MY + "/state.md" in git(proj, "show", "--stat", "--format=", "HEAD")[1].replace("\\", "/"))
+        out = run(lint, proj)[1]
+        check("ignorelint on a loose Markdown file: the lint skips it", "loose-note.md" not in out, out)
+        check("add: the lint reads the new notes folder", "runbooks/a.md" in out or "notes-lint:" in out)
+        write(os.path.join(proj, "later-dir", "x.md"), "# Later\nSee `gone-note.md`.\n")
+        rc, out = run(NC + ["--folder", "later-dir=later", "Later test"], proj)
+        check("later: nothing to commit, folder untracked, conf untouched", rc == 0 and "asked again" in out and not any(t.startswith("later-dir/") for t in git(proj, "ls-files")[1].split("\n")) and "later-dir" not in read(conf_p), out)
+        rc, out = run(NC + ["Later test again"], proj)
+        check("later: asked again next time", rc == 3 and "later-dir/" in out, out)
+        rc, out = run(NC + ["--folder", "*=ignorelint", "Wildcard answer"], proj)
+        check("NAME=* answers for everything and lint skips the folder", rc == 0 and "later-dir/x.md" in git(proj, "ls-files")[1] and "later-dir" in _data_dirs(read(conf_p)) and "later-dir" not in run(lint, proj)[1], out)
+        c0 = read(conf_p)
+        for mode in ("add", "ignorelint", "ignoreall"):
+            write(conf_p, c0.replace("NEW_FOLDERS=ask", "NEW_FOLDERS=" + mode))
+            write(os.path.join(proj, "auto-" + mode, "f.md"), "# f\n")
+            rc, out = run(NC + [f"Automatic {mode}"], proj)
+            t = git(proj, "ls-files", "auto-" + mode)[1].strip()
+            data = "auto-" + mode in _data_dirs(read(conf_p))
+            ig = git(proj, "check-ignore", "-q", "auto-" + mode)[0] == 0
+            want = {"add": (True, False, False), "ignorelint": (True, True, False), "ignoreall": (False, True, True)}[mode]
+            check(f"NEW_FOLDERS={mode}: no question, tracked/data/ignored = {want}", rc == 0 and "exit 3" not in out and (bool(t), data, ig) == want, out)
+            write(conf_p, c0)
+            git(proj, "commit", "-qam", "restore conf") if git(proj, "status", "--porcelain", ".myco-notes.conf")[1].strip() else None
+        write(conf_p, c0.replace("NEW_FOLDERS=ask", "NEW_FOLDERS=sometimes"))
+        write(os.path.join(proj, "bad-mode", "f.md"), "# f\n")
+        rc, out = run(NC + ["Bad mode"], proj)
+        check("an unknown NEW_FOLDERS value is refused", rc == 2 and "NEW_FOLDERS" in out, out)
+        write(conf_p, c0)
+        shutil.rmtree(os.path.join(proj, "bad-mode"))
+        git(proj, "add", "-A")
+        git(proj, "commit", "-qm", "settle the new-folder test")
+        check("tree is clean after the new-folder scenarios", git(proj, "status", "--porcelain")[1].strip() == "", git(proj, "status", "--porcelain")[1])
+        for d in ("runbooks", "exports", "later-dir", "auto-add", "auto-ignorelint", "auto-ignoreall"):
+            shutil.rmtree(os.path.join(proj, d), ignore_errors=True)
+        for f in ("loose-export.xlsx", "loose-note.md"):
+            if os.path.exists(os.path.join(proj, f)):
+                git(proj, "rm", "-q", "-f", f)
+        for d in ("runbooks", "later-dir", "auto-add", "auto-ignorelint"):
+            git(proj, "rm", "-r", "-q", "-f", "--ignore-unmatch", d)
+        git(proj, "commit", "-qm", "remove the new-folder test items")
+        write(conf_p, "\n".join(l for l in read(conf_p).split("\n") if not l.startswith("DATA_DIRS=")) + '\nDATA_DIRS="files-input files-output"\n')
+        git(proj, "commit", "-qam", "reset data folders") if git(proj, "status", "--porcelain")[1].strip() else None
+
         print("mirror and restore drill")
         mirror = os.path.join(tmp, "mirror")
         conf = os.path.join(proj, ".myco-notes.conf")
@@ -208,12 +285,15 @@ def main():
 
         print("flat layout still works (older trees, --layout flat)")
         flat = os.path.join(tmp, "flat")
-        rc, out = run(L(kit, "bootstrap") + [flat, "--name", "Old", "--tz", "UTC", "--layout", "flat"], tmp)
+        rc, out = run(L(kit, "bootstrap") + [flat, "--name", "Old", "--tz", "UTC", "--layout", "flat", "--new-folders", "add"], tmp)
         check("flat bootstrap runs", rc == 0 and all(os.path.isdir(os.path.join(flat, d)) for d in ("notes", "tools", "docs")), out)
         check("flat hooks path is tools/hooks", git(flat, "config", "core.hooksPath")[1].strip() == "tools/hooks")
         write(os.path.join(flat, "notes", "state.md"), "\n- flat change\n", "a")
         rc, out = run(L(flat, "notes-commit") + ["Flat layout change and why"], flat)
         check("flat notes-commit works", rc == 0 and "Flat layout change" in out, out)
+        check("bootstrap --new-folders writes the conf", "\nNEW_FOLDERS=add\n" in read(os.path.join(flat, ".myco-notes.conf")))
+        write(os.path.join(flat, "reference", "list.txt"), "x\n")
+        check("flat: NEW_FOLDERS=add commits a new root folder without asking", run(L(flat, "notes-commit") + ["Add a reference folder"], flat)[0] == 0 and "reference/list.txt" in git(flat, "ls-files")[1].replace("\\", "/"))
         rc, out = run([sys.executable, os.path.join(flat, "tools", "build-notes-map.py")], flat)
         check("flat map goes to notes-map", rc == 0 and os.path.exists(os.path.join(flat, "notes-map", "index.html")), out)
         shutil.rmtree(os.path.join(flat, "notes-map"))
