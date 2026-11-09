@@ -89,7 +89,7 @@ my-project/
 
 Set `NEW_FOLDERS=add`, `ignorelint` or `ignoreall` in `.myco-notes.conf` (or `bootstrap --new-folders`) to apply one answer every time without being asked. The first-time setup asks you which you want.
 
-Trees made with 0.5.x or earlier (notes/, tools/, docs/ at the root) keep working unchanged; `relocate` converts one:
+Trees made with 0.5.x or earlier (notes/, tools/, docs/ at the root) keep working unchanged; `relocate` converts one (and, on a tree that already has the single folder, refreshes its tools and docs from a newer kit):
 
 ```bash
 python3 <kit>/tools/relocate.py --root ~/projects/old-notes            # dry run: shows the moves and the path rewrites
