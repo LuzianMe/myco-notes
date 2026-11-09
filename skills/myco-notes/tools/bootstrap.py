@@ -2,9 +2,16 @@
 """bootstrap: create a new notes repository from the Myco Notes template.
 
   tools/bootstrap <target-dir> --name "Project name" [--owner "Name"] [--tz "MST (UTC-7)"] [--no-commit]
+                  [--myco-dir myco-notes] [--layout nested|flat] [--data-dir files-input --data-dir files-output ...]
+
+Layout (default nested): one folder, myco-notes/, holds the notes, tools/, docs/ and map/; only the files agents and git look for at the
+root (AGENTS.md, CLAUDE.md, .github/, .gitignore, .gitattributes, .myco-notes.conf) stay outside it, so the root stays free for the
+project's own folders. --layout flat gives the older arrangement (notes/, tools/, docs/ and notes-map/ at the root).
+--data-dir (repeatable) names a project folder that is not notes (inputs, outputs, attachments): it is created, gitignored, listed in
+the conf as DATA_DIRS and left out of the lint and the map.
 
 Copies template/ into <target-dir>, fills the {{PLACEHOLDERS}}, copies tools/ and docs/*.md, makes git use the versioned hooks
-(core.hooksPath = tools/hooks), and makes the baseline commit. The target must be empty or not exist.
+(core.hooksPath = <tools folder>/hooks), and makes the baseline commit. The target must be empty or not exist.
 """
 import argparse
 import datetime
@@ -15,10 +22,13 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 KIT = os.path.dirname(HERE)
+sys.dont_write_bytecode = True
 sys.path.insert(0, HERE)
 import _myco  # noqa: E402
 
 NOT_COPIED = {"bootstrap", "bootstrap.cmd", "bootstrap.py", "__pycache__"}
+TEXT_EXT = (".md", ".yml", ".yaml")
+TEXT_NAMES = {".myco-notes.conf", ".gitignore", "CODEOWNERS"}
 
 
 def main():
@@ -29,8 +39,21 @@ def main():
     ap.add_argument("--owner", default=None)
     ap.add_argument("--tz", default="UTC")
     ap.add_argument("--no-commit", action="store_true")
+    ap.add_argument("--layout", choices=("nested", "flat"), default="nested")
+    ap.add_argument("--myco-dir", default="myco-notes")
+    ap.add_argument("--data-dir", action="append", default=[])
     a = ap.parse_args()
     owner = a.owner or _myco.git("config", "user.name").stdout.strip() or "owner"
+
+    my = _myco._rel(a.myco_dir) if a.layout == "nested" else ""
+    if a.layout == "nested" and (not my or my.startswith(".")):
+        print("bootstrap: --myco-dir must be a plain folder name", file=sys.stderr)
+        return 2
+    data = [d for d in (_myco._rel(x) for x in a.data_dir) if d]
+    lay =_myco.layout("", {"MYCO_DIR": my} if my else {})   # same defaults every tool derives later
+
+    def at(rel):
+        return os.path.join(target, *rel.split("/"))
 
     target = os.path.abspath(a.target)
     if os.path.exists(target) and os.listdir(target):
@@ -38,20 +61,31 @@ def main():
         return 1
     os.makedirs(target, exist_ok=True)
 
-    shutil.copytree(os.path.join(KIT, "template"), target, dirs_exist_ok=True)
-    shutil.copytree(HERE, os.path.join(target, "tools"), dirs_exist_ok=True, ignore=lambda d, names: [n for n in names if n in NOT_COPIED])
+    tpl = os.path.join(KIT, "template")
+    for item in sorted(os.listdir(tpl)):
+        src = os.path.join(tpl, item)
+        if item == "notes":   # the template's notes folder lands in the notes folder of the chosen layout
+            shutil.copytree(src, at(lay["notes"]), dirs_exist_ok=True)
+        elif os.path.isdir(src):
+            shutil.copytree(src, os.path.join(target, item), dirs_exist_ok=True)
+        else:
+            shutil.copy2(src, os.path.join(target, item))
+    shutil.copytree(HERE, at(lay["tools"]), dirs_exist_ok=True, ignore=lambda d, names: [n for n in names if n in NOT_COPIED])
     docs = os.path.join(KIT, "docs")
-    os.makedirs(os.path.join(target, "docs"), exist_ok=True)
+    os.makedirs(at(lay["docs"]), exist_ok=True)
     if os.path.isdir(docs):
         for f in os.listdir(docs):
             if f.endswith(".md"):
-                shutil.copy2(os.path.join(docs, f), os.path.join(target, "docs", f))
+                shutil.copy2(os.path.join(docs, f), os.path.join(at(lay["docs"]), f))
 
-    subs = (("{{PROJECT_NAME}}", a.name), ("{{OWNER}}", owner), ("{{TIMEZONE}}", a.tz), ("{{DATE}}", datetime.date.today().isoformat()))
+    subs = (("{{PROJECT_NAME}}", a.name), ("{{OWNER}}", owner), ("{{TIMEZONE}}", a.tz), ("{{DATE}}", datetime.date.today().isoformat()),
+            ("{{MYCO_DIR}}", lay["myco"]), ("{{NOTES_DIR}}", lay["notes"]), ("{{TOOLS_DIR}}", lay["tools"]), ("{{DOCS_DIR}}", lay["docs"]),
+            ("{{MAP_DIR}}", lay["map"]), ("{{DATA_DIRS}}", " ".join(data)))
+    tools_abs = os.path.normcase(at(lay["tools"]))
     for dp, dn, fn in os.walk(target):
-        dn[:] = [d for d in dn if d != ".git"]
+        dn[:] = [d for d in dn if d != ".git" and os.path.normcase(os.path.join(dp, d)) != tools_abs]
         for f in fn:
-            if f.endswith(".md") or f == ".myco-notes.conf":
+            if f.endswith(TEXT_EXT) or f in TEXT_NAMES:
                 p = os.path.join(dp, f)
                 with open(p, encoding="utf-8", newline="") as fh:
                     s = fh.read()
@@ -60,9 +94,18 @@ def main():
                 with open(p, "w", encoding="utf-8", newline="") as fh:
                     fh.write(s)
 
+    if data:
+        for d in data:
+            os.makedirs(at(d), exist_ok=True)
+        with open(os.path.join(target, ".gitignore"), "a", encoding="utf-8", newline="") as fh:
+            fh.write("\n# Project data (inputs, outputs, attachments): not notes, not versioned. Delete a line to version that folder.\n")
+            fh.write("".join(f"{d}/\n" for d in data))
+        with open(os.path.join(target, "AGENTS.md"), "a", encoding="utf-8", newline="") as fh:
+            fh.write("- Project data folders (inputs and outputs, not notes; ignored by git): " + ", ".join(f"`{d}/`" for d in data) + ".\n")
+
     if not _myco.IS_WINDOWS:
-        for d in ("tools", os.path.join("tools", "hooks")):
-            full = os.path.join(target, d)
+        for d in (lay["tools"], lay["tools"] + "/hooks"):
+            full = at(d)
             for f in os.listdir(full):
                 p = os.path.join(full, f)
                 if os.path.isfile(p):
@@ -71,7 +114,7 @@ def main():
     if _myco.git("-C", target, "init", "-q", "-b", "main").returncode != 0:  # git older than 2.28
         _myco.git("-C", target, "init", "-q")
         _myco.git("-C", target, "symbolic-ref", "HEAD", "refs/heads/main")
-    _myco.git("-C", target, "config", "core.hooksPath", "tools/hooks")
+    _myco.git("-C", target, "config", "core.hooksPath", lay["tools"] + "/hooks")
     print(f"bootstrap: created {target}")
     if not a.no_commit:
         _myco.git("-C", target, "add", "-A")
@@ -80,15 +123,16 @@ def main():
             print(f"bootstrap: baseline commit failed ({r.stderr.strip()}); set git user.name and user.email, then commit", file=sys.stderr)
         else:
             print(_myco.git("-C", target, "log", "--oneline", "-1").stdout.strip())
-    print("""
+    n, t, d_ = lay["notes"], lay["tools"], lay["docs"]
+    print(f"""
 Next steps:
-  1. Edit notes/working-agreement.md and notes/state.md (headline facts, components).
-  2. Set MIRROR_TARGET in .myco-notes.conf and run tools/mirror-push (then a timer every few hours).
-  3. Set up an independent encrypted snapshot of the mirror and run tools/restore-drill once.
-  4. python3 tools/build-notes-map.py   (navigable map with backlinks and history)
-  5. Commit after every meaningful update:  tools/notes-commit "what changed and why"
-  6. Sharing with a team (GitHub or GitHub Enterprise): see docs/TEAM.md; teammates run tools/setup-clone after cloning.
-  (On Windows in cmd or PowerShell write tools\\notes-commit; in Git Bash, WSL, macOS and Linux write tools/notes-commit.)""")
+  1. Edit {n}/working-agreement.md and {n}/state.md (headline facts, components).
+  2. Set MIRROR_TARGET in .myco-notes.conf and run {t}/mirror-push (then a timer every few hours).
+  3. Set up an independent encrypted snapshot of the mirror and run {t}/restore-drill once.
+  4. python3 {t}/build-notes-map.py   (navigable map with backlinks and history)
+  5. Commit after every meaningful update:  {t}/notes-commit "what changed and why"
+  6. Sharing with a team (GitHub or GitHub Enterprise): see {d_}/TEAM.md; teammates run {t}/setup-clone after cloning.
+  (On Windows in cmd or PowerShell write {t.replace('/', chr(92))}\\notes-commit; in Git Bash, WSL, macOS and Linux write {t}/notes-commit.)""")
     return 0
 
 

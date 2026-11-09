@@ -1,6 +1,6 @@
 # Generated output (rebuilt by scripts; their sources are versioned)
 site/
-notes-map/
+{{MAP_DIR}}/
 __pycache__/
 *.pyc
 

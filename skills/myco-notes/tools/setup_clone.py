@@ -6,6 +6,7 @@ import shutil
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.dont_write_bytecode = True
 sys.path.insert(0, HERE)
 import _myco  # noqa: E402
 
@@ -16,10 +17,12 @@ def main():
     if not root:
         print("setup-clone: not inside a git repository", file=sys.stderr)
         return 1
-    _myco.git("-C", root, "config", "core.hooksPath", "tools/hooks")
+    lay = _myco.layout(root)
+    tools = lay["tools"]
+    _myco.git("-C", root, "config", "core.hooksPath", tools + "/hooks")
     if not _myco.IS_WINDOWS:
-        for d in ("tools", os.path.join("tools", "hooks")):
-            full = os.path.join(root, d)
+        for d in (tools, tools + "/hooks"):
+            full = os.path.join(root, *d.split("/"))
             for f in os.listdir(full):
                 p = os.path.join(full, f)
                 if os.path.isfile(p):
@@ -33,7 +36,7 @@ def main():
         print('setup-clone: set your identity first: git config user.name "Your Name"; git config user.email you@example.com', file=sys.stderr)
     if not shutil.which("gh"):
         print("note: gh (GitHub CLI) not found; 'notes-commit --pr' will print the branch instead of opening a pull request")
-    print('setup-clone: ready (hooks: tools/hooks). Next: read AGENTS.md, then work on a branch:  tools/notes-commit --branch my-change --pr "what changed and why"')
+    print(f'setup-clone: ready (hooks: {tools}/hooks). Next: read AGENTS.md, then work on a branch:  {tools}/notes-commit --branch my-change --pr "what changed and why"')
     return 0
 
 

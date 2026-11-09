@@ -4,12 +4,12 @@ description: Keep a project's knowledge in a versioned, secret-free, cross-refer
 license: Apache-2.0
 compatibility: Needs git and python 3.8+ (Linux, macOS, Windows). rsync and ssh only for a remote-host mirror. Agent-neutral; any coding agent that reads SKILL.md or AGENTS.md can use it.
 metadata:
-  version: "0.5.0"
+  version: "0.6.0"
 ---
 
 # Myco Notes
 
-**Kit location (KIT):** the folder that contains this `SKILL.md`. Resolve it from the path this skill was loaded from; it holds `docs/METHODOLOGY.md`, `template/` and `tools/`, and nothing else is needed. If you cannot tell where this file lives, look for a folder containing both `tools/bootstrap` and `docs/METHODOLOGY.md`; if there is none, ask the user. A project created with `bootstrap` gets its own copy of `tools/` and `docs/`, and the capture/audit steps below use the **project's** `tools/`. `tools/notes-commit` etc. are launchers for the Python scripts next to them; in Windows cmd or PowerShell write `tools\notes-commit`, or call `python tools/notes_commit.py` on any platform.
+**Kit location (KIT):** the folder that contains this `SKILL.md`. Resolve it from the path this skill was loaded from; it holds `docs/METHODOLOGY.md`, `template/` and `tools/`, and nothing else is needed. If you cannot tell where this file lives, look for a folder containing both `tools/bootstrap` and `docs/METHODOLOGY.md`; if there is none, ask the user. A project created with `bootstrap` gets its own copy of `tools/` and `docs/`, and the capture/audit steps below use the **project's** tools. Since 0.6.0 a new project keeps everything in one folder, `myco-notes/` (the notes themselves, `tools/`, `docs/` and the generated `map/`); older trees have `notes/`, `tools/`, `docs/` at the root. **Read the real folders from `.myco-notes.conf`** (`MYCO_DIR`, `NOTES_DIR`, `TOOLS_DIR`, `DOCS_DIR`, `MAP_DIR`, `DATA_DIRS`) and the project's `AGENTS.md`; below, `<notes>` and `<tools>` stand for those folders (`myco-notes` and `myco-notes/tools` by default). `<tools>/notes-commit` etc. are launchers for the Python scripts next to them; in Windows cmd or PowerShell write `myco-notes\tools\notes-commit`, or call `python <tools>/notes_commit.py` on any platform.
 
 Operational memory for long or large projects (infrastructure, platforms, data/ML systems, research, hardware): a Markdown tree with fixed file roles, dated evidence-based entries, explicit relations between files, a ledger of derived copies, git versioning, secret refusal and layered backup. Full method: `<KIT>/docs/METHODOLOGY.md` (also copied into each project). Starter files: `<KIT>/template/`. Tools: `<KIT>/tools/`.
 
@@ -21,32 +21,33 @@ Find out what this session may do: write files, run git, reach the network, run 
 ## Modes (pick the one that fits the request)
 
 ### 1. Capture (a change was just made)
-1. Read `AGENTS.md`, `notes/working-agreement.md`, `notes/sync-tracker.md` (pending list and the "what to update when X changes" matrix).
+1. Read `AGENTS.md`, `<notes>/working-agreement.md`, `<notes>/sync-tracker.md` (pending list and the "what to update when X changes" matrix).
 2. **Verify the live system** (query it; do not rely on memory or on a script's own "ok").
 3. **Read each file immediately before editing it**, then edit in place. Never regenerate a whole file.
 4. Update the notes the matrix names: master record (`state.md`: inventory/current state and a dated changelog entry), `runbook.md` (a "How do I ...?" entry and, for mistakes, a lesson), entity note, plan/backlog, verification guide. Entry formats are in `docs/METHODOLOGY.md` section 4: why, what changed with exact names/paths/ids/versions, backup and undo, how it was tested with numbers, mistakes and lessons, follow-ups.
-5. Copy every new or changed deployed file into `notes/scripts/` (bundles get a README).
-6. Run `tools/notes-lint.py`; fix errors and relevant warnings.
-7. Commit: `tools/notes-commit "what changed and why"` (one logical change per commit; commit after every update big enough to matter, before ending the turn).
+5. Copy every new or changed deployed file into `<notes>/scripts/` (bundles get a README).
+6. Run `<tools>/notes-lint.py`; fix errors and relevant warnings.
+7. Commit: `<tools>/notes-commit "what changed and why"` (one logical change per commit; commit after every update big enough to matter, before ending the turn).
 8. Add ONE line to the sync log in `sync-tracker.md`, move the last-synced date of each ledger target really updated, and write anything not done under Pending (never mark a copy synced if it was not).
-9. Mirror/push and rebuild views if configured (`notes-commit -p`, `tools/build-notes-map.py`).
+9. Mirror/push and rebuild views if configured (`notes-commit -p`, `<tools>/build-notes-map.py`).
 10. Report in two layers: short steps while working; at the end a brief summary (what was done, how verified, what the owner must do).
 
 ### 2. Audit ("update everything", "read the notes thoroughly", before a handover)
 Read the pending list and every note; verify every stated fact live; correct stale statements (mark "was true on <date>", do not erase history); refresh derived copies in order (notes, mirror, map, search/knowledge base, offline media, diagrams, agent memory); run the verification script, `notes-lint.py` and a secret scan; write the sync-log line with counts and with what could not be done; commit with a tag (`notes-commit --tag audit-<date> "..."`); report what changed, the status and what needs a human.
 
-### 3. Bootstrap (new project)
-`python3 "<KIT>/tools/bootstrap.py" <dir> --name "Project" --owner "Name" --tz "<zone>"` (`python` or `py -3` on Windows), then fill `notes/working-agreement.md` and `notes/state.md`, set `MIRROR_TARGET` in `.myco-notes.conf`, run `tools/mirror-push`, set up an independent encrypted snapshot of the mirror, run `tools/restore-drill` once.
+### 3. Bootstrap (new project) and layout changes
+`python3 "<KIT>/tools/bootstrap.py" <dir> --name "Project" --owner "Name" --tz "<zone>" [--data-dir files-input --data-dir files-output]` (`python` or `py -3` on Windows), then fill `myco-notes/working-agreement.md` and `myco-notes/state.md`, set `MIRROR_TARGET` in `.myco-notes.conf`, run `myco-notes/tools/mirror-push`, set up an independent encrypted snapshot of the mirror, run `myco-notes/tools/restore-drill` once. `--data-dir` names project folders that are not notes (inputs, outputs, attachments): they are created, gitignored and skipped by the lint and the map. `--layout flat` gives the older arrangement.
+**Existing tree in the older flat layout, or a folder rename:** `python3 "<KIT>/tools/relocate.py" --root <project>` is a dry run that prints the moves and the path references it would rewrite; show it to the owner, then add `--apply` (on a clean git tree), review `git diff --stat`, run the project's `notes-lint.py`, commit with `notes-commit`. It keeps the folder names the tree uses, refreshes the project's tools and docs from the kit, and updates `.myco-notes.conf`, `.gitignore` and `core.hooksPath`. Run it from the kit, not from the project's own tools folder.
 
 ### 4. Merge (another session or person left a handoff)
-Read the handoff in `notes/plans/`, check `git status` and last-modified times for concurrent edits, merge each fact into its canonical file in small atomic edits (re-read before each write), then update the handoff's merge-status block. In a shared repository (several people or agents, a hosting service), work on a branch and open a pull request instead of committing to main: `tools/notes-commit --branch NAME --pr "message"`; CI (`tools/ci-check`) scans for secrets and lints; a human merges. Set-up and conflict handling: `<KIT>/docs/TEAM.md`.
+Read the handoff in `<notes>/plans/`, check `git status` and last-modified times for concurrent edits, merge each fact into its canonical file in small atomic edits (re-read before each write), then update the handoff's merge-status block. In a shared repository (several people or agents, a hosting service), work on a branch and open a pull request instead of committing to main: `<tools>/notes-commit --branch NAME --pr "message"`; CI (`<tools>/ci-check`) scans for secrets and lints; a human merges. Set-up and conflict handling: `<KIT>/docs/TEAM.md`.
 
 ### 5. Restore drill / review
-`tools/restore-drill <restored dir or archive>`; or run `tools/notes-lint.py` and report the weak spots found.
+`<tools>/restore-drill <restored dir or archive>`; or run `<tools>/notes-lint.py` and report the weak spots found.
 
 ### 6. Resume and hand off (start and end of a session)
-**Resume:** read the entry point, `notes/working-agreement.md`, the pending list in `notes/sync-tracker.md`, the newest handoff in `notes/plans/` and `git log -5`; say in three lines what is current, what is unfinished and what is waiting on a person. Do not list pending items to the owner unless asked or unless one blocks the task.
-**Hand off:** before the session ends, commit, add the sync-log line, and write anything unfinished or undecided under Pending (or a handoff file in `notes/plans/` when another person or agent will continue), including the exact next command.
+**Resume:** read the entry point, `<notes>/working-agreement.md`, the pending list in `<notes>/sync-tracker.md`, the newest handoff in `<notes>/plans/` and `git log -5`; say in three lines what is current, what is unfinished and what is waiting on a person. Do not list pending items to the owner unless asked or unless one blocks the task.
+**Hand off:** before the session ends, commit, add the sync-log line, and write anything unfinished or undecided under Pending (or a handoff file in `<notes>/plans/` when another person or agent will continue), including the exact next command.
 
 ## Guard rails (always)
 - **No secrets** in notes, commits, logs or chat: write where a secret lives, never its value. The commit hook and the map builder refuse obvious cases; do not rely on them.
@@ -57,10 +58,10 @@ Read the handoff in `notes/plans/`, check `git status` and last-modified times f
 - **Never use `.bak`-style copies for files inside the repository**; git is the history. Use dated copy-suffix backups only for files outside it, before changing them.
 - A file with unsynced consequences gets a "NOT synced" clause in the sync log.
 
-If the project has notes but no `tools/` folder yet, copy it from the kit (`cp -r "<KIT>/tools" ./tools`, leave out `bootstrap`) and run `git config core.hooksPath tools/hooks`.
+If the project has notes but no tools folder yet, copy it from the kit into the project's tools folder (`cp -r "<KIT>/tools" <tools>`, leave out `bootstrap`) and run `git config core.hooksPath <tools>/hooks`.
 
 ## Files this skill expects (created by `bootstrap`)
-`AGENTS.md`/`CLAUDE.md`; `notes/working-agreement.md`; `notes/state.md`; `notes/runbook.md`; `notes/sync-tracker.md`; `notes/plans/backlog.md`; `notes/logs/`; `notes/scripts/`; `notes/verification/verification.md`; `notes/archive/`; `.myco-notes.conf`; `tools/`.
+`AGENTS.md`/`CLAUDE.md`; `<notes>/working-agreement.md`; `<notes>/state.md`; `<notes>/runbook.md`; `<notes>/sync-tracker.md`; `<notes>/plans/backlog.md`; `<notes>/logs/`; `<notes>/scripts/`; `<notes>/verification/verification.md`; `<notes>/archive/`; `.myco-notes.conf`; `<tools>/`; `<docs>/` (`<notes>` is `myco-notes` by default, so these are `myco-notes/state.md` and so on).
 
 ## Configuration
-`.myco-notes.conf` (shell syntax): `NOTES_DIR`, `AGENT_TRAILER` (co-author line for commits made by an agent), `SYNC_GLOBS`/`SYNC_CMD` (keep the live copy of executed files equal to the committed copy), `CHECK_SH`/`CHECK_PY`, `MIRROR_TARGET`, `POST_PUSH_CMDS`, `SECRET_ALLOW_FILE`. Optional `.myco-notes-map.json` (groups, hints, title) and `.myco-notes-lint-ignore` (regexes of findings to drop).
+`.myco-notes.conf` (shell syntax): the layout (`MYCO_DIR`, `NOTES_DIR`, `TOOLS_DIR`, `DOCS_DIR`, `MAP_DIR`, `DATA_DIRS`, `HISTORY_DIRS`), the lint limits (`MAX_NOTE_KB`, `ENTRY_WARN_KB`), `AGENT_TRAILER` (co-author line for commits made by an agent), `SYNC_GLOBS`/`SYNC_CMD` (keep the live copy of executed files equal to the committed copy), `CHECK_SH`/`CHECK_PY`, `MIRROR_TARGET`, `POST_PUSH_CMDS`, `SECRET_ALLOW_FILE`. Optional `.myco-notes-map.json` (groups, hints, title) and `.myco-notes-lint-ignore` (regexes of findings to drop).

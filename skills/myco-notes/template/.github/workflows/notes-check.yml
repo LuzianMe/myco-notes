@@ -1,5 +1,5 @@
-# Checks every change to the notes: secret scan of the added lines + notes-lint (tools/ci-check).
-# Make the check named "notes-check" (this job) a required status check in the branch protection of main (see docs/TEAM.md).
+# Checks every change to the notes: secret scan of the added lines + notes-lint ({{TOOLS_DIR}}/ci-check).
+# Make the check named "notes-check" (this job) a required status check in the branch protection of main (see {{DOCS_DIR}}/TEAM.md).
 # GitHub Enterprise Server: use a runner label your instance has, and make sure actions/checkout is available to it.
 name: notes-check
 on:
@@ -19,4 +19,4 @@ jobs:
         shell: bash
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-        run: bash tools/ci-check "$BASE_SHA"
+        run: bash {{TOOLS_DIR}}/ci-check "$BASE_SHA"

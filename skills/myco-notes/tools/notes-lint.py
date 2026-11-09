@@ -9,12 +9,21 @@ Checks
   ledger    sync-tracker rows without a last-synced date or a refresh method
   secrets   secret-looking strings (same patterns as the pre-commit hook)
   orphans   notes that no other note mentions by file name (info only)
+  size      notes larger than MAX_NOTE_KB (default 100) and an AGENTS.md near or over the 32 KiB some agents load (warns from ENTRY_WARN_KB, default 24)
 
 Usage:  tools/notes-lint.py [--root DIR] [--quiet] [--strict]
 Exit:   0 clean, 1 warnings, 2 errors (secrets). --strict turns warnings into exit 1 even for info-only runs of 'due'.
 Ignore: put regular expressions (one per line) in .myco-notes-lint-ignore; a finding whose text matches is dropped.
+Layout (.myco-notes.conf): the generated map folder and DATA_DIRS (project data that is not notes) are not read as notes; the folders in
+        HISTORY_DIRS (default "archive logs", inside the notes folder) are records, so references, follow-up dates, size and orphans are not
+        checked there (secrets always are).
 """
 import argparse, datetime, os, re, subprocess, sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.dont_write_bytecode = True
+sys.path.insert(0, HERE)
+import _myco  # noqa: E402
 
 SKIP_DIRS = {".git", "site", "notes-map", "node_modules", "__pycache__"}
 SECRET_PATTERNS = [
@@ -36,35 +45,32 @@ def repo_root(start):
         return os.path.abspath(start)
 
 
-def read_conf(root):
-    conf = {}
-    p = os.path.join(root, ".myco-notes.conf")
-    if os.path.exists(p):
-        for line in open(p, encoding="utf-8"):
-            m = re.match(r'^\s*([A-Z_]+)=("?)(.*?)\2\s*(#.*)?$', line)
-            if m:
-                conf[m.group(1)] = m.group(3)
-    return conf
-
-
-def walk_md(root):
-    out = []
+def walk(root, skip_rel):
+    """Yield (relative folder, file names), leaving out SKIP_DIRS by name and the folders in skip_rel by relative path."""
     for dp, dn, fn in os.walk(root):
-        dn[:] = sorted(d for d in dn if d not in SKIP_DIRS)
-        for f in sorted(fn):
-            if f.endswith(".md"):
-                out.append(os.path.relpath(os.path.join(dp, f), root).replace(os.sep, "/"))
-    return out
+        reldir = os.path.relpath(dp, root).replace(os.sep, "/")
+        dn[:] = sorted(d for d in dn if d not in SKIP_DIRS and (d if reldir == "." else reldir + "/" + d) not in skip_rel)
+        yield reldir, sorted(fn)
 
 
-def all_files(root):
+def walk_md(root, skip_rel):
+    return [(f if reldir == "." else reldir + "/" + f) for reldir, fn in walk(root, skip_rel) for f in fn if f.endswith(".md")]
+
+
+def all_files(root, skip_rel):
     names, paths = set(), set()
-    for dp, dn, fn in os.walk(root):
-        dn[:] = [d for d in dn if d not in SKIP_DIRS]
+    for reldir, fn in walk(root, skip_rel):
         for f in fn:
             names.add(f)
-            paths.add(os.path.relpath(os.path.join(dp, f), root).replace(os.sep, "/"))
+            paths.add(f if reldir == "." else reldir + "/" + f)
     return names, paths
+
+
+def num(conf, key, default):
+    try:
+        return float(conf.get(key) or default)
+    except ValueError:
+        return float(default)
 
 
 def main():
@@ -79,14 +85,18 @@ def main():
     ap.add_argument("--strict", action="store_true")
     a = ap.parse_args()
     root = repo_root(a.root)
-    conf = read_conf(root)
+    conf = _myco.load_conf(root)
+    lay = _myco.layout(root, conf)
+    docs_prefix, map_prefix = lay["docs"] + "/", lay["map"] + "/"
+    history = tuple(lay["notes"] + "/" + d + "/" for d in lay["history"])
+    max_kb, entry_warn_kb = num(conf, "MAX_NOTE_KB", 100), num(conf, "ENTRY_WARN_KB", 24)
     ignore = []
     ip = os.path.join(root, ".myco-notes-lint-ignore")
     if os.path.exists(ip):
         ignore = [re.compile(l.strip()) for l in open(ip, encoding="utf-8") if l.strip() and not l.startswith("#")]
     today = datetime.date.today()
-    md_files = walk_md(root)
-    names, paths = all_files(root)
+    md_files = walk_md(root, {lay["map"], *lay["data"]})
+    names, paths = all_files(root, {lay["map"]})
     top_dirs = {p.split("/")[0] for p in paths if "/" in p}
     findings = []   # (level, file, line, text)
 
@@ -104,6 +114,14 @@ def main():
     for rel, text in texts.items():
         lines = text.split("\n")
         in_code = False
+        is_hist = rel.startswith(history)
+        kb = len(text.encode("utf-8")) / 1024
+        if rel == "AGENTS.md" and kb > 32:
+            add("WARN", rel, 1, f"{kb:.0f} KB is over the 32 KiB that Codex and some other agents load; the rest is silently cut off. Move detail into notes and keep this file short")
+        elif rel == "AGENTS.md" and kb > entry_warn_kb:
+            add("WARN", rel, 1, f"{kb:.0f} KB is close to the 32 KiB some agents load (Codex); keep this file short and point to notes")
+        elif not is_hist and kb > max_kb:
+            add("WARN", rel, 1, f"{kb:.0f} KB is large (limit {max_kb:.0f}): keep current state here and move narrative to logs or the archive (method, section 3.3)")
         # refs, due, secrets, headings
         seen_heads = {}
         for i, line in enumerate(lines, 1):
@@ -116,12 +134,12 @@ def main():
                     break
             if in_code:
                 continue
-            for tok in re.findall(r"`([^`\n]+)`", line):
+            for tok in ([] if is_hist else re.findall(r"`([^`\n]+)`", line)):
                 tok = tok.lstrip("@")
                 if any(c in tok for c in " *<>{}$|()[]") or tok.startswith(("/", "~", "http", "./", "../", ".")):
                     continue
-                if rel.startswith(("docs/", "template/")):
-                    continue                      # method documentation and templates use illustrative names
+                if rel.startswith((docs_prefix, "template/")) or tok.startswith(map_prefix):
+                    continue                      # method documentation and templates use illustrative names; the map is generated
                 if tok.endswith(".md"):
                     base = os.path.basename(tok)
                     ok = (tok in paths or os.path.normpath(os.path.join(os.path.dirname(rel), tok)) in paths
@@ -135,7 +153,7 @@ def main():
                 elif "/" in tok and tok.split("/")[0] in top_dirs and re.search(r"\.[A-Za-z0-9]{1,5}$", tok):
                     if tok not in paths and os.path.normpath(os.path.join(os.path.dirname(rel), tok)) not in paths:
                         add("WARN", rel, i, f"reference to missing file `{tok}`")
-            if re.match(r"^\s*(- \*\*|\d+\.\s+\*\*)\s*\d{4}-\d{2}-\d{2}", line) or "DONE" in line or "~~" in line:
+            if is_hist or re.match(r"^\s*(- \*\*|\d+\.\s+\*\*)\s*\d{4}-\d{2}-\d{2}", line) or "DONE" in line or "~~" in line:
                 pass
             else:
                 for m in re.finditer(rf"\b(after|about|due|review-by|waiting until|on or after)\s+({DATE})\b", line):
@@ -155,7 +173,7 @@ def main():
         # fresh
         head = "\n".join(lines[:12])
         hm = re.search(rf"Last updated\s+({DATE})", head)
-        if hm:
+        if hm and not is_hist:
             cl = re.search(r"^#{1,3}\s+.*changelog.*$", text, re.M | re.I)
             entries = [e for e in re.findall(rf"^- \*\*({DATE})", text[cl.end():] if cl else "", re.M) if e <= (today + datetime.timedelta(days=1)).isoformat()]
             if entries and max(entries) > hm.group(1):
@@ -191,7 +209,7 @@ def main():
     # orphans (info)
     entry = {"AGENTS.md", "CLAUDE.md", "README.md"}
     for rel in md_files:
-        if mentions[rel] == 0 and os.path.basename(rel) not in entry and not rel.startswith((".github/", "docs/", "template/")):
+        if mentions[rel] == 0 and os.path.basename(rel) not in entry and not rel.startswith((".github/", docs_prefix, "template/") + history):
             add("INFO", rel, 1, "no other note mentions this file by name")
 
     order = {"ERROR": 0, "WARN": 1, "INFO": 2}

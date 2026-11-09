@@ -55,70 +55,81 @@ echo "bootstrap (from the copied skill folder only)"
 "$kit/tools/bootstrap" "$tmp/proj" --name "Demo" --owner "Tester" --tz "UTC" >/dev/null 2>&1
 cd "$tmp/proj" || exit 1
 chk "baseline commit exists"            "git log --oneline | grep -q Baseline"
-chk "placeholders filled"               "! grep -rq '{{' AGENTS.md notes .myco-notes.conf"
-chk "hooks path is versioned"           "[ \"\$(git config core.hooksPath)\" = tools/hooks ]"
-chk "bootstrap not copied into tree" "[ ! -e tools/bootstrap ]"
+chk "placeholders filled"               "! grep -rq '{{' AGENTS.md myco-notes/working-agreement.md myco-notes/state.md .myco-notes.conf"
+chk "hooks path is versioned"           "[ \"\$(git config core.hooksPath)\" = myco-notes/tools/hooks ]"
+chk "bootstrap not copied into tree" "[ ! -e myco-notes/tools/bootstrap ]"
 
 echo "notes-commit"
-echo "- **$(date +%F) (test change):** added a thing, tested, undo: revert." >> notes/state.md
-chk "commit with message"               "tools/notes-commit 'Record the test change and why' | grep -q 'Record the test change'"
-chk "clean tree says nothing to commit" "tools/notes-commit 'again' | grep -q 'nothing to commit'"
-printf '#!/bin/bash\nif then\n' > notes/scripts/broken.sh
-chk "syntax error blocks the commit"    "! tools/notes-commit 'broken script'"
-rm notes/scripts/broken.sh
+echo "- **$(date +%F) (test change):** added a thing, tested, undo: revert." >> myco-notes/state.md
+chk "commit with message"               "myco-notes/tools/notes-commit 'Record the test change and why' | grep -q 'Record the test change'"
+chk "clean tree says nothing to commit" "myco-notes/tools/notes-commit 'again' | grep -q 'nothing to commit'"
+printf '#!/bin/bash\nif then\n' > myco-notes/scripts/broken.sh
+chk "syntax error blocks the commit"    "! myco-notes/tools/notes-commit 'broken script'"
+rm myco-notes/scripts/broken.sh
 
 echo "pre-commit hook"
-printf 'api_key = AbCdEfGhIjKlMnOpQrStUvWx12\n' > notes/secret-test.md
-chk "secret is refused"                 "! tools/notes-commit 'add a secret'"
-git reset -q; rm -f notes/secret-test.md
-printf -- '-----BEGIN RSA PRIVATE KEY-----\nabc\n' > notes/key-test.md
-chk "private key block is refused"      "! tools/notes-commit 'add a key'"
-git reset -q; rm -f notes/key-test.md
+printf 'api_key = AbCdEfGhIjKlMnOpQrStUvWx12\n' > myco-notes/secret-test.md
+chk "secret is refused"                 "! myco-notes/tools/notes-commit 'add a secret'"
+git reset -q; rm -f myco-notes/secret-test.md
+printf -- '-----BEGIN RSA PRIVATE KEY-----\nabc\n' > myco-notes/key-test.md
+chk "private key block is refused"      "! myco-notes/tools/notes-commit 'add a key'"
+git reset -q; rm -f myco-notes/key-test.md
 chk "tree is clean again"               "[ -z \"\$(git status --porcelain)\" ]"
 
 echo "lint"
-tools/notes-lint.py >/tmp/lint.$$ 2>&1; rc=$?
+myco-notes/tools/notes-lint.py >/tmp/lint.$$ 2>&1; rc=$?
 chk "lint runs on a fresh tree (exit 0 or 1)" "[ $rc -le 1 ]"
-printf '\n## 3. One\n## 3. Two\nSee `missing-note.md`. Pending, review-by 2020-01-01.\n' >> notes/runbook.md
-tools/notes-lint.py >/tmp/lint.$$ 2>&1; rc=$?
+printf '\n## 3. One\n## 3. Two\nSee `missing-note.md`. Pending, review-by 2020-01-01.\n' >> myco-notes/runbook.md
+myco-notes/tools/notes-lint.py >/tmp/lint.$$ 2>&1; rc=$?
 chk "lint finds duplicate heading"      "grep -q 'duplicate heading number 3' /tmp/lint.$$"
 chk "lint finds missing reference"      "grep -q 'missing note' /tmp/lint.$$"
 chk "lint finds passed follow-up date"  "grep -q 'has passed' /tmp/lint.$$"
-git checkout -q -- notes/runbook.md
+git checkout -q -- myco-notes/runbook.md
 rm -f /tmp/lint.$$
 
 echo "map"
-chk "map builds"                        "python3 tools/build-notes-map.py && [ -f notes-map/index.html ]"
-chk "page has history"                  "grep -q 'History' notes-map/p/notes-state.html"
-chk "map is gitignored"                 "git check-ignore -q notes-map"
-printf 'token = ABCDEFGHIJKLMNOPQRSTUVWXYZ123456\n' > notes/leak.md
-chk "map refuses a secret"              "! python3 tools/build-notes-map.py"
-rm -f notes/leak.md
+chk "map builds"                        "python3 myco-notes/tools/build-notes-map.py && [ -f myco-notes/map/index.html ]"
+chk "page has history"                  "grep -q 'History' myco-notes/map/p/myco-notes-state.html"
+chk "map is gitignored"                 "git check-ignore -q myco-notes/map"
+printf 'token = ABCDEFGHIJKLMNOPQRSTUVWXYZ123456\n' > myco-notes/leak.md
+chk "map refuses a secret"              "! python3 myco-notes/tools/build-notes-map.py"
+rm -f myco-notes/leak.md
 
 echo "mirror and restore drill"
 sed "s|^MIRROR_TARGET=.*|MIRROR_TARGET=\"$tmp/mirror\"|" .myco-notes.conf > .myco-notes.conf.new && mv .myco-notes.conf.new .myco-notes.conf
 git add -A; git commit -q -m "Configure mirror"
-chk "mirror push"                       "tools/mirror-push | grep -q 'mirror: pushed'"
+chk "mirror push"                       "myco-notes/tools/mirror-push | grep -q 'mirror: pushed'"
 chk "mirror contains .git"              "[ -d $tmp/mirror/.git ]"
-chk "restore drill passes"              "tools/restore-drill $tmp/mirror | grep -q 'fsck: OK'"
+chk "restore drill passes"              "myco-notes/tools/restore-drill $tmp/mirror | grep -q 'fsck: OK'"
 
 echo "team setup (branches, CI check, per-clone setup)"
-chk "team files exist in the bootstrapped tree" "[ -f .github/workflows/notes-check.yml ] && [ -f .github/CODEOWNERS ] && [ -f .github/pull_request_template.md ] && [ -f docs/TEAM.md ]"
-chk "workflow runs tools/ci-check"      "grep -q 'tools/ci-check' .github/workflows/notes-check.yml"
+chk "team files exist in the bootstrapped tree" "[ -f .github/workflows/notes-check.yml ] && [ -f .github/CODEOWNERS ] && [ -f .github/pull_request_template.md ] && [ -f myco-notes/docs/TEAM.md ]"
+chk "workflow runs myco-notes/tools/ci-check"      "grep -q 'myco-notes/tools/ci-check' .github/workflows/notes-check.yml"
 git clone -q "$tmp/proj" "$tmp/clone"
 chk "hooks path is not cloned"          "[ -z \"\$(git -C $tmp/clone config core.hooksPath)\" ]"
-chk "setup-clone activates the hook in a fresh clone" "(cd $tmp/clone && tools/setup-clone >/dev/null 2>&1 && [ \"\$(git config core.hooksPath)\" = tools/hooks ])"
+chk "setup-clone activates the hook in a fresh clone" "(cd $tmp/clone && myco-notes/tools/setup-clone >/dev/null 2>&1 && [ \"\$(git config core.hooksPath)\" = myco-notes/tools/hooks ])"
 base="$(git rev-parse HEAD)"
-echo "- team test line" >> notes/plans/backlog.md
-chk "notes-commit --branch creates the branch" "tools/notes-commit --branch feat-a 'Team test change and why' >/dev/null && [ \"\$(git symbolic-ref --short HEAD)\" = feat-a ]"
-chk "ci-check passes on a clean change"  "tools/ci-check $base"
-printf 'api_key = AbCdEfGhIjKlMnOpQrStUvWx12\n' > notes/leak2.md
+echo "- team test line" >> myco-notes/plans/backlog.md
+chk "notes-commit --branch creates the branch" "myco-notes/tools/notes-commit --branch feat-a 'Team test change and why' >/dev/null && [ \"\$(git symbolic-ref --short HEAD)\" = feat-a ]"
+chk "ci-check passes on a clean change"  "myco-notes/tools/ci-check $base"
+printf 'api_key = AbCdEfGhIjKlMnOpQrStUvWx12\n' > myco-notes/leak2.md
 git switch -q -c feat-leak; git add -A; git commit -q --no-verify -m "bypass the hook"
-chk "ci-check catches a secret committed with --no-verify" "! tools/ci-check $base"
+chk "ci-check catches a secret committed with --no-verify" "! myco-notes/tools/ci-check $base"
 git switch -q main
 git init -q --bare "$tmp/remote.git"; git remote add origin "$tmp/remote.git"
-echo "- push test line" >> notes/plans/backlog.md
-chk "notes-commit --push publishes the branch" "tools/notes-commit --branch feat-b --push 'Push test and why' >/dev/null 2>&1 && git ls-remote --heads origin feat-b | grep -q feat-b"
-chk "--pr is documented in the usage"   "tools/notes-commit --help | grep -q -- '--pr'"
+echo "- push test line" >> myco-notes/plans/backlog.md
+chk "notes-commit --push publishes the branch" "myco-notes/tools/notes-commit --branch feat-b --push 'Push test and why' >/dev/null 2>&1 && git ls-remote --heads origin feat-b | grep -q feat-b"
+chk "--pr is documented in the usage"   "myco-notes/tools/notes-commit --help | grep -q -- '--pr'"
+
+chk "no __pycache__ left in the project by the tools" "[ -z \"\$(find . -name __pycache__ -not -path './.git/*')\" ]"
+
+echo "flat layout and relocate (older trees keep working; relocate moves them)"
+"$kit/tools/bootstrap" "$tmp/flat" --name "Old" --tz "UTC" --layout flat >/dev/null 2>&1
+chk "flat tree has notes/ tools/ docs/ at the root" "[ -d $tmp/flat/notes ] && [ -d $tmp/flat/tools ] && [ -d $tmp/flat/docs ] && [ \"\$(git -C $tmp/flat config core.hooksPath)\" = tools/hooks ]"
+chk "flat lint and map work"             "(cd $tmp/flat && tools/notes-lint.py >/dev/null; [ \$? -le 1 ] && python3 tools/build-notes-map.py && [ -f notes-map/index.html ])"
+rm -rf "$tmp/flat/notes-map"
+chk "relocate dry run changes nothing"   "\"$kit/tools/relocate\" --root $tmp/flat | grep -q 'dry run' && [ -d $tmp/flat/notes ]"
+chk "relocate --apply moves the tree"    "\"$kit/tools/relocate\" --root $tmp/flat --apply >/dev/null && [ -f $tmp/flat/myco-notes/state.md ] && [ ! -e $tmp/flat/notes ] && [ \"\$(git -C $tmp/flat config core.hooksPath)\" = myco-notes/tools/hooks ]"
+chk "moved tree: lint clean and commit works" "(cd $tmp/flat && myco-notes/tools/notes-lint.py --quiet | grep -q ' 0 warnings' && myco-notes/tools/notes-commit 'Moved to the single folder layout' | grep -q 'Moved to')"
 
 echo; echo "passed $pass, failed $fail"; [ "$fail" = 0 ]

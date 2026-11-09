@@ -14,6 +14,7 @@ import tempfile
 import zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.dont_write_bytecode = True
 sys.path.insert(0, HERE)
 import _myco  # noqa: E402
 
@@ -78,7 +79,8 @@ def main():
     for f in ("AGENTS.md", "CLAUDE.md"):
         if os.path.isfile(os.path.join(repo, f)):
             print(f"  entry point present: {f}")
-    if os.path.isfile(os.path.join(repo, "notes", "sync-tracker.md")):
+    notes_dir = _myco.layout(repo)["notes"]
+    if os.path.isfile(os.path.join(repo, *notes_dir.split("/"), "sync-tracker.md")):
         print("  tracker present")
     else:
         print("  tracker MISSING")

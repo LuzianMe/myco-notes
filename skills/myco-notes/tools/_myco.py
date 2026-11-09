@@ -60,6 +60,45 @@ def load_conf(root):
     return conf
 
 
+def _rel(p):
+    """A repository-relative folder name written with forward slashes and no leading or trailing slash."""
+    return (p or "").strip().replace("\\", "/").strip("/")
+
+
+def layout(root, conf=None):
+    """Folder layout from .myco-notes.conf, as repository-relative paths with forward slashes.
+
+    No MYCO_DIR (trees made before 0.6.0): notes/, tools/, docs/ and notes-map/ at the repository root.
+    MYCO_DIR=myco-notes: that one folder holds the notes themselves plus tools/, docs/ and map/.
+    NOTES_DIR, TOOLS_DIR, DOCS_DIR and MAP_DIR each override one folder; DATA_DIRS lists project folders that are not notes;
+    HISTORY_DIRS (inside the notes folder) holds records that are not re-checked for dates and references.
+    """
+    conf = load_conf(root) if conf is None else conf
+    my = _rel(conf.get("MYCO_DIR"))
+
+    def pick(key, legacy, nested):
+        return _rel(conf.get(key)) or (nested if my else legacy)
+
+    return {
+        "myco": my,
+        "notes": pick("NOTES_DIR", "notes", my),
+        "tools": pick("TOOLS_DIR", "tools", my + "/tools"),
+        "docs": pick("DOCS_DIR", "docs", my + "/docs"),
+        "map": pick("MAP_DIR", "notes-map", my + "/map"),
+        "data": [d for d in (_rel(x) for x in conf.get("DATA_DIRS", "").split()) if d],
+        "history": [d for d in (_rel(x) for x in conf.get("HISTORY_DIRS", "archive logs").split()) if d],
+    }
+
+
+def set_conf_key(text, key, value):
+    """Return the conf text with KEY set to value: the first uncommented KEY= line is replaced, otherwise the line is appended."""
+    new = f'{key}="{value}"' if (" " in value) else f"{key}={value}"
+    pat = re.compile(rf"^[ \t]*{re.escape(key)}=.*$", re.M)
+    if pat.search(text):
+        return pat.sub(lambda _m: new, text, count=1)
+    return text + ("" if text.endswith("\n") or not text else "\n") + new + "\n"
+
+
 def run_shell(cmd, cwd, timeout=None):
     """Run a command line from the configuration: bash on Linux and macOS, the platform shell (cmd.exe) on Windows."""
     args = cmd if IS_WINDOWS else ["bash", "-c", cmd]

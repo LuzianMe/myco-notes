@@ -61,23 +61,30 @@ A tree is made of files with distinct **roles**. Use all of them for a large pro
 
 ### 3.1 Suggested layout
 
+One folder holds everything the method adds, so the repository root stays free for the project's own folders. The default name is `myco-notes/` (configurable: `MYCO_DIR` in `.myco-notes.conf`). Only the files that agents, git and the hosting service look for at the root stay outside it.
+
 ```
 repo/
-  README.md or AGENTS.md          entry point (read order + key rules)
-  notes/
+  AGENTS.md  CLAUDE.md             entry point (read order + key rules); CLAUDE.md contains only @AGENTS.md
+  .github/  .gitignore  .gitattributes  .myco-notes.conf     (must stay at the root)
+  myco-notes/
     working-agreement.md
-    state.md                      master record
-    runbook.md                    how-to + lessons
-    sync-tracker.md               ledger + matrix + pending + sync log
-    <entity>.md ...               one per component
-    logs/<effort>.md              feature logs
-    plans/backlog.md, plans/*.md  plans, decisions, research, session handoffs
-    archive/
-    scripts/                      deployed artifacts, bundles with READMEs
-    verification/                 health/test guide + script
-  tools/                          commit helper, hooks, publish, lint, map builder
-  .gitignore                      generated output, backups, caches
+    state.md                       master record
+    runbook.md                     how-to + lessons
+    sync-tracker.md                ledger + matrix + pending + sync log
+    <entity>.md ...                one per component
+    logs/<effort>.md               feature logs (history: not re-checked for dates and references)
+    plans/backlog.md, plans/*.md   plans, decisions, research, session handoffs
+    archive/                       old detail (history)
+    scripts/                       deployed artifacts, bundles with READMEs
+    verification/                  health/test guide + script
+    tools/                         commit helper, hooks, lint, map builder, relocate (the kit's code)
+    docs/                          this method and the team guide (the kit's documents)
+    map/                           generated map (gitignored)
+  files-input/  files-output/ ...  the project's own data folders (DATA_DIRS: not notes, gitignored)
 ```
+
+The notes are the files directly inside `myco-notes/`; `tools/`, `docs/` and `map/` are machinery, and the lint and map treat them accordingly. Trees made before 0.6.0 have `notes/`, `tools/`, `docs/` and `notes-map/` at the root; they keep working unchanged (no `MYCO_DIR` means that layout), and `tools/relocate` converts one in a reviewable step. Every folder can be renamed individually (`NOTES_DIR`, `TOOLS_DIR`, `DOCS_DIR`, `MAP_DIR`), for example a docs folder called `myco-docs`. Keep the folder name unmistakable: someone who sees `myco-notes/` knows at once what it belongs to.
 
 ### 3.2 Read order
 
@@ -85,7 +92,7 @@ Always the same, and written in the entry point: (1) working agreement, (2) sync
 
 ### 3.3 Size discipline
 
-Large files cost reader attention (and AI context). Keep the master record to current state plus short changelog pointers; move long narrative into effort logs, entity notes or the archive; let version control hold the sequence. Split a file when it passes roughly 100 to 150 KB or when its sections have different update rhythms. Every large file starts with a short summary and a table of contents-like heading structure so a reader can load only a section.
+Large files cost reader attention (and AI context). Keep the master record to current state plus short changelog pointers; move long narrative into effort logs, entity notes or the archive; let version control hold the sequence. Split a file when it passes roughly 100 to 150 KB or when its sections have different update rhythms (the lint warns above `MAX_NOTE_KB`, default 100, and warns when `AGENTS.md` nears the 32 KiB that Codex and some other agents load). Records in the folders listed in `HISTORY_DIRS` (default `archive` and `logs`) say what was true when they were written, so the lint does not re-check their references and follow-up dates; secrets are checked everywhere. Every large file starts with a short summary and a table of contents-like heading structure so a reader can load only a section.
 
 ## 4. Entry formats (templates)
 
@@ -325,7 +332,7 @@ Restore the latest snapshot into a scratch directory; run `git fsck` and `git lo
 | Writing a file before reading it | overwrote a tracker once | read-before-write rule |
 | Same fact in many files without a registry | divergence | canonical home, "see <file>", dependency matrix |
 | Secrets "just for now" in a note | permanent in history | location pointers, hook, publication gate |
-| Hooks and helper scripts living only outside the repository | lost on restore | keep in `tools/` with an installer |
+| Hooks and helper scripts living only outside the repository | lost on restore | keep in the tools folder with an installer |
 | Memory tied to a folder or tool profile | new sessions start blind | repository entry point file |
 | Duplicate section numbers after appending sections | confusing references | lint heading uniqueness |
 | Backups never restored | unknown validity | restore drills |
@@ -365,16 +372,17 @@ Design rules for the tools: idempotent; skip quietly when nothing changed (hash 
 
 ## 17. Where the tools in this kit implement the method
 
-Paths are relative to the kit, which is the skill folder `skills/myco-notes/` (it is self-contained: `docs/`, `template/`, `tools/` and `SKILL.md` travel together).
+Paths are relative to the kit, which is the skill folder `skills/myco-notes/` (it is self-contained: `docs/`, `template/`, `tools/` and `SKILL.md` travel together). In a project the tools and docs live in its tools and docs folders (`myco-notes/tools`, `myco-notes/docs` by default).
 
 | Method element | Tool or file |
 |---|---|
-| Bootstrap a tree (11.5) | `tools/bootstrap`, `template/` |
+| Bootstrap a tree (11.5); one folder for the notes, tools, docs and map; project data folders | `tools/bootstrap` (`--layout`, `--myco-dir`, `--data-dir`), `template/` |
+| Move an older tree into the single folder, or rename the folder (3.1) | `tools/relocate` (dry run first; keeps your folder names; updates conf, hooks path and path references) |
 | Described commits, syntax checks, synced executed copies (7) | `tools/notes-commit`, `.myco-notes.conf` |
-| Secret refusal at commit time (8.2) | `tools/hooks/pre-commit` (versioned; activated by `git config core.hooksPath tools/hooks`), rules in `tools/secret-scan` |
+| Secret refusal at commit time (8.2) | `tools/hooks/pre-commit` (versioned; activated by `git config core.hooksPath <tools folder>/hooks`), rules in `tools/secret-scan` |
 | Server-side gate that a contributor cannot bypass (8.2, 18) | `tools/ci-check`, `template/.github/workflows/notes-check.yml` |
 | Per-clone setup, branches and pull requests (18) | `tools/setup-clone`, `tools/notes-commit --branch/--push/--pr`, `docs/TEAM.md` |
-| Lint: references, numbering, freshness, due dates, ledger, secrets (9, 10) | `tools/notes-lint.py` |
+| Lint: references, numbering, freshness, due dates, ledger, secrets, size (3.3, 9, 10) | `tools/notes-lint.py` (`HISTORY_DIRS`, `DATA_DIRS`, `MAX_NOTE_KB`, `ENTRY_WARN_KB`) |
 | Relation map, backlinks, history, publication gate (9, 8.2) | `tools/build-notes-map.py` |
 | Mirror (8.4) | `tools/mirror-push` |
 | Restore drill (8.4, 11.6) | `tools/restore-drill` |

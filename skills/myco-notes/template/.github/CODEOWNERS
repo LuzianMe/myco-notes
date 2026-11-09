@@ -1,5 +1,5 @@
 # Who must review changes (GitHub: Settings > Branches > "Require review from Code Owners").
 # Replace with real users or teams, then remove the leading '#'.
 # *                         @your-org/notes-maintainers
-# /notes/working-agreement.md   @your-org/notes-maintainers
-# /tools/                       @your-org/notes-maintainers
+# /{{NOTES_DIR}}/working-agreement.md   @your-org/notes-maintainers
+# /{{TOOLS_DIR}}/                       @your-org/notes-maintainers

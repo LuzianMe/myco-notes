@@ -12,7 +12,7 @@
 Behaviour (configured in .myco-notes.conf at the repository root):
   - stages everything (respecting .gitignore); says "nothing to commit" and exits 0 when clean
   - syntax-checks changed shell and python files before committing (CHECK_SH / CHECK_PY)
-  - the pre-commit hook (tools/hooks/pre-commit) refuses commits that add secret-looking lines
+  - the pre-commit hook (<tools folder>/hooks/pre-commit) refuses commits that add secret-looking lines
   - adds AGENT_TRAILER unless --human
   - after the commit, if a changed file matches SYNC_GLOBS, runs SYNC_CMD so the live copy equals the committed copy
   - team use: --branch / --push / --pr give each change its own branch and pull request (see docs/TEAM.md)
@@ -25,6 +25,7 @@ import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.dont_write_bytecode = True
 sys.path.insert(0, HERE)
 import _myco  # noqa: E402
 
@@ -41,8 +42,8 @@ def shell_syntax_ok(path):
     return subprocess.run(["bash", "-n", path]).returncode == 0
 
 
-def is_shell_script(path):
-    if path.endswith(".sh") or path.startswith("tools/hooks/"):
+def is_shell_script(path, hooks_prefix="tools/hooks/"):
+    if path.endswith(".sh") or path.startswith(hooks_prefix):
         return True
     try:
         with open(path, "rb") as fh:
@@ -79,6 +80,7 @@ def main():
     conf = _myco.load_conf(root)
     check_sh, check_py = conf.get("CHECK_SH", "1") == "1", conf.get("CHECK_PY", "1") == "1"
     trailer, sync_globs, sync_cmd = conf.get("AGENT_TRAILER", ""), conf.get("SYNC_GLOBS", "").split(), conf.get("SYNC_CMD", "")
+    hooks_prefix = _myco.layout(root, conf)["tools"] + "/hooks/"
 
     if a.branch:
         cur = _myco.git("symbolic-ref", "-q", "--short", "HEAD").stdout.strip()
@@ -102,7 +104,7 @@ def main():
                     compile(fh.read(), f, "exec")
             except (SyntaxError, ValueError) as e:
                 fail(f"syntax error in {f} ({e}), not committing")
-        elif check_sh and os.path.isfile(f) and is_shell_script(f):
+        elif check_sh and os.path.isfile(f) and is_shell_script(f, hooks_prefix):
             if not shell_syntax_ok(f):
                 fail(f"syntax error in {f}, not committing")
 

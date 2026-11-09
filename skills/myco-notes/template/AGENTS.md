@@ -5,28 +5,28 @@ This repository holds the **notes** of {{PROJECT_NAME}}: the single source of tr
 > Claude Code reads `CLAUDE.md`; Codex and many other agents read `AGENTS.md`. Keep this file as the real content and make `CLAUDE.md` contain only the line `@AGENTS.md` (or a symlink). If your agent looks for another filename, make that file a one-line pointer to this one (the exact syntax depends on the agent). Keep this file small: some agents cap the instructions they load (Codex: 32 KiB in total).
 
 ## Read order (about five files)
-1. `notes/working-agreement.md` : how to work here (approvals, safety rules, things never to do).
-2. `notes/sync-tracker.md` : what is pending, what is stale, which copies are behind, the "what to update when X changes" matrix.
-3. `notes/state.md` : the master record (headline facts, open items).
-4. `notes/runbook.md` : the how-to for the task at hand, and the lessons list.
-5. The entity note or newest handoff for what you will touch (`notes/*.md`, `notes/plans/`).
+1. `{{NOTES_DIR}}/working-agreement.md` : how to work here (approvals, safety rules, things never to do).
+2. `{{NOTES_DIR}}/sync-tracker.md` : what is pending, what is stale, which copies are behind, the "what to update when X changes" matrix.
+3. `{{NOTES_DIR}}/state.md` : the master record (headline facts, open items).
+4. `{{NOTES_DIR}}/runbook.md` : the how-to for the task at hand, and the lessons list.
+5. The entity note or newest handoff for what you will touch (`{{NOTES_DIR}}/*.md`, `{{NOTES_DIR}}/plans/`).
 
 ## The five rules that must never be missed
 1. **Verify the live system before writing a fact; read a file just before you edit it** (never rewrite a file from memory).
-2. **Update the notes in the same session as the change**, using the matrix in the tracker, then commit: `tools/notes-commit "what changed and why"`. Commit after every update that is big enough to matter.
+2. **Update the notes in the same session as the change**, using the matrix in the tracker, then commit: `{{TOOLS_DIR}}/notes-commit "what changed and why"`. Commit after every update that is big enough to matter.
 3. **No secrets in this repository, ever.** Write where a secret lives, never its value. The commit hook will refuse obvious cases; do not rely on it.
 4. **Ask before changing, deleting or publishing anything**, say how to undo it, and keep a backup or a commit to return to.
 5. **Be honest in the notes**: date everything ({{TIMEZONE}}), mark what is not verified, and never mark a copy "synced" that was not. Put what is still pending in the tracker.
 
 ## Tools
-- `tools/notes-commit "message"` : stage, check, commit (add `-p` to push the mirror).
-- `tools/notes-lint.py` : reference, heading, freshness, ledger and secret checks.
-- `tools/build-notes-map.py` : generate the navigable map with backlinks and history.
-- `tools/mirror-push`, `tools/restore-drill` : second copy and proof it can be restored.
-- Shared repository: run `tools/setup-clone` once after cloning; change notes on a branch (`tools/notes-commit --branch NAME --pr "message"`); CI (`tools/ci-check`) must pass; see `docs/TEAM.md`.
-- Method: `docs/METHODOLOGY.md` (if present) or the Myco Notes method it was copied from.
+- `{{TOOLS_DIR}}/notes-commit "message"` : stage, check, commit (add `-p` to push the mirror).
+- `{{TOOLS_DIR}}/notes-lint.py` : reference, heading, freshness, ledger and secret checks.
+- `{{TOOLS_DIR}}/build-notes-map.py` : generate the navigable map with backlinks and history.
+- `{{TOOLS_DIR}}/mirror-push`, `{{TOOLS_DIR}}/restore-drill` : second copy and proof it can be restored.
+- Shared repository: run `{{TOOLS_DIR}}/setup-clone` once after cloning; change notes on a branch (`{{TOOLS_DIR}}/notes-commit --branch NAME --pr "message"`); CI (`{{TOOLS_DIR}}/ci-check`) must pass; see `{{DOCS_DIR}}/TEAM.md`.
+- Method: `{{DOCS_DIR}}/METHODOLOGY.md` (if present) or the Myco Notes method it was copied from.
 
 ## Project facts an agent needs immediately
 - Time zone for all dates: {{TIMEZONE}}.
-- Notes root: `notes/`. Deployed files are mirrored in `notes/scripts/`.
+- Notes root: `{{NOTES_DIR}}/`. Deployed files are mirrored in `{{NOTES_DIR}}/scripts/`. Tools: `{{TOOLS_DIR}}/`; method and team guide: `{{DOCS_DIR}}/`; generated map (not versioned): `{{MAP_DIR}}/`.
 - Owner / contact for decisions: {{OWNER}}.

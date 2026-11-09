@@ -3,7 +3,7 @@
 Created {{DATE}}. One place that says which copies of the project's documentation exist, when each was last brought in line with reality, how to refresh it, and what is pending. Times are {{TIMEZONE}}. No secrets in this file.
 
 ## Rules (follow at the end of every session that changed something)
-1. After a change, update the notes it touches (see the matrix below), commit with `tools/notes-commit "what and why"`, then add ONE line to the sync log and move the "last synced" date of each target you really updated.
+1. After a change, update the notes it touches (see the matrix below), commit with `{{TOOLS_DIR}}/notes-commit "what and why"`, then add ONE line to the sync log and move the "last synced" date of each target you really updated.
 2. If a target could not be updated (media not available, machine asleep, a password needed, the owner's yes missing), write it under **Pending** with what is needed. Never mark something synced that was not.
 3. At the start of a session read this file with `working-agreement.md` and `state.md`; ask the owner about pending items that need them, once per session.
 4. No copy-suffix files (`.bak`, `-old`) for files in this repository; history is git. Copy-suffix backups are for files OUTSIDE the repository, before changing them.
@@ -13,9 +13,9 @@ Created {{DATE}}. One place that says which copies of the project's documentatio
 | Target | What it is | Last synced | How to refresh | Status |
 |---|---|---|---|---|
 | Core notes | `state.md`, `runbook.md`, entity notes, `plans/` | {{DATE}} (baseline) | edit the files; verify facts live first | in sync |
-| Mirror | second copy of this repository on another machine/disk | not set up | `tools/mirror-push` | pending |
+| Mirror | second copy of this repository on another machine/disk | not set up | `{{TOOLS_DIR}}/mirror-push` | pending |
 | Independent snapshots | encrypted, versioned backup of the mirror | not set up | backup job | pending |
-| Notes map | generated navigable view | not built | `python3 tools/build-notes-map.py` | pending |
+| Notes map | generated navigable view | not built | `python3 {{TOOLS_DIR}}/build-notes-map.py` | pending |
 | Offline encrypted copy | disaster-recovery media with checksum manifest | not set up | refresh script + `SHA256SUMS` | pending |
 | Search index / knowledge base | AI-readable copy (state its allow-list of files) | not set up | loader | pending |
 

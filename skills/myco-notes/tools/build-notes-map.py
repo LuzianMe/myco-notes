@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """build-notes-map: generate a navigable static view of the notes (index, one page per note, backlinks, git history).
 
-  tools/build-notes-map.py [--root DIR] [--out DIR]        default out: <root>/notes-map  (gitignored, rebuilt on demand)
+  tools/build-notes-map.py [--root DIR] [--out DIR]        default out: the map folder of .myco-notes.conf (myco-notes/map, or notes-map in older trees; gitignored, rebuilt on demand)
 
 What it produces
   index.html        notes grouped by purpose, live search, the 15 latest commits
@@ -9,24 +9,35 @@ What it produces
   raw/<slug>.md     the original files
 Relations are file-name mentions: a note that writes `runbook.md` in backticks (or plain text) mentions that note.
 It refuses to build if any note contains a secret-looking string (publication gate).
-Optional config: .myco-notes-map.json  {"title": "...", "groups": [{"id","name","blurb","prefixes":["notes/plans/"]}], "hints": {"notes/state.md": "one line"}}
+Optional config: .myco-notes-map.json  {"title": "...", "groups": [{"id","name","blurb","prefixes":["myco-notes/plans/"]}], "hints": {"myco-notes/state.md": "one line"}}
+Folders: the notes folder, docs folder and map folder come from .myco-notes.conf (see tools/_myco.py layout); DATA_DIRS (project data that is not notes) are left out.
 Needs only the Python standard library; if the 'markdown' package is installed pages are rendered nicely, otherwise as preformatted text.
 """
 import argparse, datetime, html, json, os, re, shutil, subprocess, sys
 
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.dont_write_bytecode = True
+sys.path.insert(0, HERE)
+import _myco  # noqa: E402
+
 SKIP_DIRS = {".git", "site", "notes-map", "node_modules", "__pycache__"}
 SECRET = re.compile(r"BEGIN [A-Z ]*PRIVATE KEY|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|xox[baprs]-[A-Za-z0-9-]{10,}|sk-[A-Za-z0-9]{32,}|"
                     r"(?i:(password|passwd|passphrase|secret|token|api[_-]?key|psk))[\"']?\s*[:=]\s*[\"']?[A-Za-z0-9+/_=-]{20,}")
-DEFAULT_GROUPS = [
-    ("start", "Start here", "Read in this order: entry point, working agreement, tracker, master record, runbook.", ["AGENTS.md", "CLAUDE.md", "README.md", "notes/working-agreement.md", "notes/sync-tracker.md", "notes/state.md", "notes/runbook.md"]),
-    ("plans", "Plans, backlog and decisions", "What is parked, planned, waiting or decided.", ["notes/plans/"]),
-    ("logs", "Effort logs and incidents", "Chronological records of large efforts and incidents.", ["notes/logs/"]),
-    ("verify", "Verification", "Health check and test procedures.", ["notes/verification/"]),
-    ("artifacts", "Deployed artifacts", "Repository copies of what runs elsewhere (READMEs of bundles).", ["notes/scripts/"]),
-    ("archive", "Archive", "Old detail kept for history.", ["notes/archive/"]),
-    ("docs", "Method", "How the notes are kept.", ["docs/"]),
-    ("other", "Other notes", "Everything else (entity notes and new files appear here automatically).", []),
-]
+def default_groups(lay):
+    n = lay["notes"] + "/"
+    start = ["AGENTS.md", "CLAUDE.md", "README.md"] + [n + f for f in ("working-agreement.md", "sync-tracker.md", "state.md", "runbook.md")]
+    return [
+        ("start", "Start here", "Read in this order: entry point, working agreement, tracker, master record, runbook.", start),
+        ("plans", "Plans, backlog and decisions", "What is parked, planned, waiting or decided.", [n + "plans/"]),
+        ("logs", "Effort logs and incidents", "Chronological records of large efforts and incidents.", [n + "logs/"]),
+        ("verify", "Verification", "Health check and test procedures.", [n + "verification/"]),
+        ("artifacts", "Deployed artifacts", "Repository copies of what runs elsewhere (READMEs of bundles).", [n + "scripts/"]),
+        ("archive", "Archive", "Old detail kept for history.", [n + "archive/"]),
+        ("docs", "Method", "How the notes are kept.", [lay["docs"] + "/"]),
+        ("other", "Other notes", "Everything else (entity notes and new files appear here automatically).", []),
+    ]
+
+
 CSS = """:root{--bg:#f4f6f8;--panel:#fff;--fg:#1c252c;--muted:#5d6b76;--line:#d3dadf;--accent:#0b6e6e;--code:#f1f4f6}
 @media (prefers-color-scheme:dark){:root{--bg:#12171b;--panel:#1a2126;--fg:#e3e9ed;--muted:#93a3ae;--line:#2b363e;--accent:#4fc3c3;--code:#161c20}}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 system-ui,sans-serif}a{color:var(--accent)}
@@ -62,14 +73,16 @@ def main():
     ap.add_argument("--out", default=None)
     a = ap.parse_args()
     root = sh(["git", "rev-parse", "--show-toplevel"], a.root).strip() or os.path.abspath(a.root)
-    out = a.out or os.path.join(root, "notes-map")
+    lay = _myco.layout(root)
+    out = a.out or os.path.join(root, *lay["map"].split("/"))
+    skip_rel = {lay["map"], *lay["data"]}
     cfg = {}
     cp = os.path.join(root, ".myco-notes-map.json")
     if os.path.exists(cp):
         cfg = json.load(open(cp, encoding="utf-8"))
     title = cfg.get("title") or (os.path.basename(root) + " notes")
     hints = cfg.get("hints", {})
-    groups = [(g["id"], g["name"], g.get("blurb", ""), g.get("prefixes", [])) for g in cfg["groups"]] if "groups" in cfg else DEFAULT_GROUPS
+    groups = [(g["id"], g["name"], g.get("blurb", ""), g.get("prefixes", [])) for g in cfg["groups"]] if "groups" in cfg else default_groups(lay)
     try:
         import markdown as md_lib
     except Exception:
@@ -77,7 +90,8 @@ def main():
 
     files = []
     for dp, dn, fn in os.walk(root):
-        dn[:] = sorted(d for d in dn if d not in SKIP_DIRS and not os.path.relpath(os.path.join(dp, d), root).replace(os.sep, "/").startswith("template"))
+        dn[:] = sorted(d for d in dn if d not in SKIP_DIRS and os.path.relpath(os.path.join(dp, d), root).replace(os.sep, "/") not in skip_rel
+                       and not os.path.relpath(os.path.join(dp, d), root).replace(os.sep, "/").startswith("template"))
         for f in sorted(fn):
             if f.endswith(".md"):
                 files.append(os.path.relpath(os.path.join(dp, f), root).replace(os.sep, "/"))
