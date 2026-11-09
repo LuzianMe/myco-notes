@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.0
+- **New folders and files in the root are no longer committed silently.** `notes-commit` finds new root folders and loose files that nothing in the configuration covers, and by default (`NEW_FOLDERS=ask`) commits nothing, prints a report (file count, size, file types, a suggestion) and exits with code 3, so the agent can ask the owner. The owner answers per item with `notes-commit --folder NAME=MODE` (`NAME=*` for all): `add` (track it, lint it as notes), `ignorelint` (track it, skip the lint and the map: recorded in `DATA_DIRS`), `ignoreall` (do not track, do not lint: `DATA_DIRS` and `.gitignore`) or `later` (leave it out of this commit, ask again next time). The decision is written to `.myco-notes.conf`, `.gitignore` or `.myco-notes-lint-ignore` for you and committed with the change.
+- **`NEW_FOLDERS` in `.myco-notes.conf`** sets a default: `ask` (the default), or `add`, `ignorelint`, `ignoreall` to apply one answer without a question (it is still recorded). `bootstrap --new-folders` sets it.
+- **First-time setup asks.** `SKILL.md` tells the agent to ask the owner which default they want (and which folders are project data) before running `bootstrap`, and to ask once for an existing tree whose conf has no `NEW_FOLDERS` line.
+- Not asked about: folders inside the notes folder, `DATA_DIRS`, the generated map, `.github`, `.agents`, `.codex`, `.claude`, and the entry files (`AGENTS.md`, `CLAUDE.md`, `README.md`, `LICENSE*`, `.myco-notes*`, `.gitignore`, `.gitattributes`). Anything git already tracks, or `.gitignore` already covers, is never asked about.
+- Behaviour change for existing trees: after updating the tools, a root folder that is untracked today is asked about once (answer `add` for the old behaviour, or set `NEW_FOLDERS=add`).
+- Only `notes-commit` is gated; a plain `git add -A` is not.
+- Tests: `tests/native.py` 84 checks, `tests/smoke.sh` with the new-folder checks added; both cover ask, each answer, `later`, the wildcard, every `NEW_FOLDERS` value and the flat layout.
+
 ## 0.6.0
 - **One folder for everything.** New trees keep the notes, `tools/`, `docs/` and the generated `map/` inside one folder, `myco-notes/`; only the files agents, git and the host look for at the root (`AGENTS.md`, `CLAUDE.md`, `.github/`, `.gitignore`, `.gitattributes`, `.myco-notes.conf`) stay outside it. The root is left for the project's own folders. Configurable with `MYCO_DIR` (and `NOTES_DIR`, `TOOLS_DIR`, `DOCS_DIR`, `MAP_DIR` per folder). `bootstrap --layout flat` and trees without `MYCO_DIR` keep the older layout.
 - **`tools/relocate`** moves an older tree into the single folder, or renames the folder: dry run by default, keeps the folder names a tree uses (for example a docs folder called `myco-docs`), rewrites the path references that name real paths, updates the conf, `.gitignore` and `core.hooksPath`, and refreshes the project's tools and docs from the kit.

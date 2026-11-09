@@ -78,6 +78,17 @@ my-project/
   files-input/ ...   your own folders (--data-dir: not notes, gitignored, skipped by the lint and the map)
 ```
 
+**New folders in the root.** `notes-commit` does not silently add a folder or file that appears in the root. By default (`NEW_FOLDERS=ask`) it stops, commits nothing, lists what is new and exits with code 3; your agent asks you and runs it again with your answer:
+
+| Answer | Tracked | Lint and map | For |
+|---|---|---|---|
+| `add` | yes | read as notes | knowledge, mostly Markdown |
+| `ignorelint` | yes | skipped | small reference files you want history for |
+| `ignoreall` | no | skipped | inputs, outputs, downloads, large or sensitive files |
+| `later` | not this time | not this time | undecided, asked again next time |
+
+Set `NEW_FOLDERS=add`, `ignorelint` or `ignoreall` in `.myco-notes.conf` (or `bootstrap --new-folders`) to apply one answer every time without being asked. The first-time setup asks you which you want.
+
 Trees made with 0.5.x or earlier (notes/, tools/, docs/ at the root) keep working unchanged; `relocate` converts one:
 
 ```bash
