@@ -101,6 +101,7 @@ echo "map"
 chk "map builds"                        "python3 myco-notes/tools/build-notes-map.py && [ -f myco-notes/map/index.html ]"
 chk "page has history"                  "grep -q 'History' myco-notes/map/p/myco-notes-state.html"
 chk "map is gitignored"                 "git check-ignore -q myco-notes/map"
+chk "map also builds the mycelium view and links it" "[ -f myco-notes/map/graph.html ] && grep -q graph.html myco-notes/map/index.html && grep -q 'id=\"data\"' myco-notes/map/graph.html"
 printf 'token = ABCDEFGHIJKLMNOPQRSTUVWXYZ123456\n' > myco-notes/leak.md
 chk "map refuses a secret"              "! python3 myco-notes/tools/build-notes-map.py"
 rm -f myco-notes/leak.md

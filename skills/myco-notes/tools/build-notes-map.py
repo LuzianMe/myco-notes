@@ -7,6 +7,8 @@ What it produces
   index.html        notes grouped by purpose, live search, the 15 latest commits
   p/<slug>.html     each note rendered, with table of contents, 'mentions' and 'mentioned by' chips and its recent git history
   raw/<slug>.md     the original files
+  graph.html        the mycelium view: notes as a living network (mentions, groups, freshness, follow-ups gone stale, missing references) with a
+                    timeline that replays the git history; one self-contained file, opens by double-click; only titles, paths and commit subjects
 Relations are file-name mentions: a note that writes `runbook.md` in backticks (or plain text) mentions that note.
 It refuses to build if any note contains a secret-looking string (publication gate).
 Optional config: .myco-notes-map.json  {"title": "...", "groups": [{"id","name","blurb","prefixes":["myco-notes/plans/"]}], "hints": {"myco-notes/state.md": "one line"}}
@@ -19,6 +21,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.dont_write_bytecode = True
 sys.path.insert(0, HERE)
 import _myco  # noqa: E402
+import notes_graph  # noqa: E402
 
 SKIP_DIRS = {".git", "site", "notes-map", "node_modules", "__pycache__"}
 SECRET = re.compile(r"BEGIN [A-Z ]*PRIVATE KEY|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|xox[baprs]-[A-Za-z0-9-]{10,}|sk-[A-Za-z0-9]{32,}|"
@@ -171,11 +174,12 @@ def main():
     rec = ("<div class='recent'><h2>Recent changes</h2><ul>%s</ul></div>" % "".join(f"<li><code>{h}</code> {dt} &middot; {html.escape(s)}</li>" for h, dt, s in recent)) if recent else ""
     built = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     index = (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(title)}</title><style>{CSS}</style></head><body><div class="wrap">'
-             f'<h1>{html.escape(title)}</h1><p class="sub">{len(info)} notes. Built {built}. Search filters the list; open a note to see what it mentions, what mentions it and how it changed.</p>'
+             f'<h1>{html.escape(title)}</h1><p class="sub">{len(info)} notes. Built {built}. Search filters the list; open a note to see what it mentions, what mentions it and how it changed. <a href="graph.html">Open the mycelium view</a> (graph and timeline).</p>'
              f'<p><input id="q" type="search" placeholder="Search names, titles, hints..." aria-label="Search notes"></p>{"".join(sections)}{rec}</div>'
              "<script>const q=document.getElementById('q');q.addEventListener('input',()=>{const t=q.value.toLowerCase();document.querySelectorAll('.note').forEach(n=>{n.style.display=n.dataset.s.includes(t)?'':'none'});document.querySelectorAll('.grp').forEach(g=>{g.style.display=[...g.querySelectorAll('.note')].some(n=>n.style.display!=='none')?'':'none'})})</script></body></html>")
     open(os.path.join(out, "index.html"), "w", encoding="utf-8").write(index)
-    print(f"notes map: {len(info)} notes, {sum(len(d['out']) for d in info.values())} relations -> {out}/index.html")
+    gn, ge, gc = notes_graph.build(root, lay, info, groups, out, title, sh, datetime.date.today().isoformat(), built)
+    print(f"notes map: {len(info)} notes, {sum(len(d['out']) for d in info.values())} relations -> {out}/index.html; graph: {gn} nodes, {ge} links, {gc} commits -> {out}/graph.html")
 
 
 if __name__ == "__main__":

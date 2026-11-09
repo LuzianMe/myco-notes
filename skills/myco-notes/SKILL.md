@@ -4,7 +4,7 @@ description: Keep a project's knowledge in a versioned, secret-free, cross-refer
 license: Apache-2.0
 compatibility: Needs git and python 3.8+ (Linux, macOS, Windows). rsync and ssh only for a remote-host mirror. Agent-neutral; any coding agent that reads SKILL.md or AGENTS.md can use it.
 metadata:
-  version: "0.7.0"
+  version: "0.8.0"
 ---
 
 # Myco Notes
@@ -29,7 +29,7 @@ Find out what this session may do: write files, run git, reach the network, run 
 6. Run `<tools>/notes-lint.py`; fix errors and relevant warnings.
 7. Commit: `<tools>/notes-commit "what changed and why"` (one logical change per commit; commit after every update big enough to matter, before ending the turn). **If it exits with code 3** it found a new folder or loose file in the repository root and committed nothing: show the owner its report, ask what to do with each item (`add`, `ignorelint`, `ignoreall` or `later`, explained in the report), never choose for them, then run it again with `--folder NAME=MODE` for each (see `NEW_FOLDERS` below).
 8. Add ONE line to the sync log in `sync-tracker.md`, move the last-synced date of each ledger target really updated, and write anything not done under Pending (never mark a copy synced if it was not).
-9. Mirror/push and rebuild views if configured (`notes-commit -p`, `<tools>/build-notes-map.py`).
+9. Mirror/push and rebuild views if configured (`notes-commit -p`, `<tools>/build-notes-map.py`, which also writes the mycelium view `<map>/graph.html`: the notes as a network with a timeline that replays the git history; point the owner to it when they ask to see how the notes connect or grew).
 10. Report in two layers: short steps while working; at the end a brief summary (what was done, how verified, what the owner must do).
 
 ### 2. Audit ("update everything", "read the notes thoroughly", before a handover)

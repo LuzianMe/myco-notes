@@ -22,7 +22,7 @@ This repository holds the **notes** of {{PROJECT_NAME}}: the single source of tr
 - `{{TOOLS_DIR}}/notes-commit "message"` : stage, check, commit (add `-p` to push the mirror).
 - If `notes-commit` stops with exit code 3 and lists new folders or files in the root, it committed nothing: ask the owner what to do with each (add as notes, track but skip the lint, ignore completely, or later) and run it again with `--folder NAME=MODE`; never choose for them. `NEW_FOLDERS` in `.myco-notes.conf` sets a default.
 - `{{TOOLS_DIR}}/notes-lint.py` : reference, heading, freshness, ledger and secret checks.
-- `{{TOOLS_DIR}}/build-notes-map.py` : generate the navigable map with backlinks and history.
+- `{{TOOLS_DIR}}/build-notes-map.py` : generate the navigable map with backlinks and history, plus `graph.html`, the notes as a network with a timeline replay.
 - `{{TOOLS_DIR}}/mirror-push`, `{{TOOLS_DIR}}/restore-drill` : second copy and proof it can be restored.
 - Shared repository: run `{{TOOLS_DIR}}/setup-clone` once after cloning; change notes on a branch (`{{TOOLS_DIR}}/notes-commit --branch NAME --pr "message"`); CI (`{{TOOLS_DIR}}/ci-check`) must pass; see `{{DOCS_DIR}}/TEAM.md`.
 - Method: `{{DOCS_DIR}}/METHODOLOGY.md` (if present) or the Myco Notes method it was copied from.
