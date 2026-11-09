@@ -45,6 +45,11 @@ def repo_root(start):
         return os.path.abspath(start)
 
 
+def join_rel(rel, tok):
+    """tok resolved against the folder of the note `rel`, as a repository path with forward slashes (also on Windows)."""
+    return os.path.normpath(os.path.join(os.path.dirname(rel), tok)).replace(os.sep, "/")
+
+
 def walk(root, skip_rel):
     """Yield (relative folder, file names), leaving out SKIP_DIRS by name and the folders in skip_rel by relative path."""
     for dp, dn, fn in os.walk(root):
@@ -142,7 +147,7 @@ def main():
                     continue                      # method documentation and templates use illustrative names; the map is generated
                 if tok.endswith(".md"):
                     base = os.path.basename(tok)
-                    ok = (tok in paths or os.path.normpath(os.path.join(os.path.dirname(rel), tok)) in paths
+                    ok = (tok in paths or join_rel(rel, tok) in paths
                           or (base == tok and base in names))
                     if ok:
                         for other in md_files:
@@ -151,7 +156,7 @@ def main():
                     else:
                         add("WARN", rel, i, f"reference to missing note `{tok}`")
                 elif "/" in tok and tok.split("/")[0] in top_dirs and re.search(r"\.[A-Za-z0-9]{1,5}$", tok):
-                    if tok not in paths and os.path.normpath(os.path.join(os.path.dirname(rel), tok)) not in paths:
+                    if tok not in paths and join_rel(rel, tok) not in paths:
                         add("WARN", rel, i, f"reference to missing file `{tok}`")
             if is_hist or re.match(r"^\s*(- \*\*|\d+\.\s+\*\*)\s*\d{4}-\d{2}-\d{2}", line) or "DONE" in line or "~~" in line:
                 pass
