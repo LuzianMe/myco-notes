@@ -86,6 +86,7 @@ def main():
         check("AGENTS.md names the new paths", MY + "/working-agreement.md" in read(os.path.join(proj, "AGENTS.md")) and T + "/notes-commit" in read(os.path.join(proj, "AGENTS.md")))
         check("data folders are gitignored", git(proj, "check-ignore", "-q", "files-input")[0] == 0 and git(proj, "check-ignore", "-q", "files-output")[0] == 0)
 
+        NC = L(proj, "notes-commit", T)
         print("notes-commit")
         write(os.path.join(proj, MY, "state.md"), "\n- native test change\n", "a")
         rc, out = run(L(proj, "notes-commit", T) + ["Record the native test change and why"], proj)
@@ -122,6 +123,37 @@ def main():
         check("map builds inside the one folder", rc == 0 and os.path.exists(os.path.join(proj, MY, "map", "index.html")), out)
         check("map is gitignored", git(proj, "check-ignore", "-q", MY + "/map")[0] == 0)
         check("map is not read as notes by the lint", "map/" not in run(lint, proj)[1])
+
+        print("mycelium view (graph.html)")
+        import json, re as _re
+        def graph_data(root_dir, map_dir):
+            h = read(os.path.join(root_dir, *map_dir.split("/"), "graph.html"))
+            return h, json.loads(_re.search(r'<script id="data" type="application/json">(.*?)</script>', h, _re.S).group(1).replace("<\\/", "</"))
+        write(os.path.join(proj, MY, "plans", "graph-test.md"), "# Graph Test Note\nSee `state.md`. The unique phrase is zebra-unique-phrase-8812 and `no-such-note.md` is missing.\n")
+        rc, out = run(NC + ["Add a note for the graph test"], proj)
+        git(proj, "mv", MY + "/plans/graph-test.md", MY + "/plans/graph-renamed.md")
+        write(os.path.join(proj, MY, "plans", "graph-renamed.md"), "\nMore text.\n", "a")
+        rc, out = run(NC + ["Rename and touch the graph test note"], proj)
+        rc, out = run([sys.executable, os.path.join(proj, MY, "tools", "build-notes-map.py")], proj)
+        check("the map build also writes graph.html", rc == 0 and "graph:" in out and os.path.exists(os.path.join(proj, MY, "map", "graph.html")), out)
+        h, g = graph_data(proj, MY + "/map")
+        nodes = {n["rel"]: n for n in g["nodes"]}
+        gn = nodes.get(MY + "/plans/graph-renamed.md")
+        check("every note is a node, with title and path only", gn is not None and gn["title"] == "Graph Test Note" and len(g["nodes"]) >= 8, str(sorted(nodes)))
+        check("the text of a note is not written into the page", "zebra-unique-phrase-8812" not in h and "More text" not in h)
+        check("a mention becomes a link", any({g["nodes"][e[0]]["rel"], g["nodes"][e[1]]["rel"]} == {MY + "/plans/graph-renamed.md", MY + "/state.md"} for e in g["edges"]), str(g["edges"][:5]))
+        check("a missing reference is shown", gn is not None and gn.get("miss") == ["no-such-note.md"], str(gn))
+        check("the history is replayed across a rename", gn is not None and gn["b"] < gn["l"] and len(g["commits"]) >= 3 and g["commits"][gn["b"]]["s"].startswith("Add a note for the graph test"), str((gn, [c["s"] for c in g["commits"]])))
+        check("the page needs no network", not _re.search(r'(src|href)="https?:', h) and h.count("</script>") == 2 and "%%" not in h)
+        node = shutil.which("node")
+        if node:
+            code = _re.search(r"<script>\n\(function.*?</script>", h, _re.S).group(0)[len("<script>\n"):-len("</script>")]
+            write(os.path.join(tmp, "graph-check.js"), code)
+            check("the script is valid JavaScript", run([node, "--check", os.path.join(tmp, "graph-check.js")], tmp)[0] == 0)
+        git(proj, "rm", "-q", MY + "/plans/graph-renamed.md")
+        run(NC + ["Remove the graph test note"], proj)
+        shutil.rmtree(os.path.join(proj, MY, "map"), ignore_errors=True)
+        check("the map folder is still gitignored and the tree clean", git(proj, "status", "--porcelain")[1].strip() == "", git(proj, "status", "--porcelain")[1])
 
         print("lint: data folders, history folders, size")
         write(os.path.join(proj, "files-input", "case.md"), "See `missing-case.md`. Follow-up after 2020-01-01.\napi_key = AbCdEfGhIjKlMnOpQrStUvWx12\n")

@@ -396,6 +396,7 @@ Paths are relative to the kit, which is the skill folder `skills/myco-notes/` (i
 | Per-clone setup, branches and pull requests (18) | `tools/setup-clone`, `tools/notes-commit --branch/--push/--pr`, `docs/TEAM.md` |
 | Lint: references, numbering, freshness, due dates, ledger, secrets, size (3.3, 9, 10) | `tools/notes-lint.py` (`HISTORY_DIRS`, `DATA_DIRS`, `MAX_NOTE_KB`, `ENTRY_WARN_KB`) |
 | Relation map, backlinks, history, publication gate (9, 8.2) | `tools/build-notes-map.py` |
+| The relations as a network, freshness, stale follow-ups, missing references, replay of the history (9, 10) | `tools/build-notes-map.py` writes `graph.html` (`tools/notes_graph.py`, `tools/graph-template.html`) |
 | Mirror (8.4) | `tools/mirror-push` |
 | Restore drill (8.4, 11.6) | `tools/restore-drill` |
 | Entry point for agents (12) | `template/AGENTS.md` (+ `CLAUDE.md` containing `@AGENTS.md`) |

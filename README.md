@@ -29,7 +29,7 @@ Mycelium is the underground network of threads (hyphae) that connects the trees 
 | `tools/notes-commit` | One command to commit with a described message: syntax checks, optional AI co-author trailer, optional sync of executed files, optional mirror push, optional milestone tag, and for teams `--branch`, `--push`, `--pr`. |
 | `tools/hooks/pre-commit`, `tools/secret-scan` | Refuse commits whose added lines look like secrets (versioned; activated with `core.hooksPath`; the same rules run in CI). |
 | `tools/notes-lint.py` | Finds missing references, duplicate heading numbers, stale "last updated" headers, passed follow-up dates, incomplete ledger rows, secrets, oversized notes and an `AGENTS.md` that is too big for the agents that cut it off. Records in `archive/` and `logs/` are not re-checked for dates and references. |
-| `tools/build-notes-map.py` | Builds a static, searchable map: notes grouped by purpose, **who mentions whom**, backlinks, per-note git history, recent commits. Refuses to build if a note contains a secret. |
+| `tools/build-notes-map.py` | Builds a static, searchable map: notes grouped by purpose, **who mentions whom**, backlinks, per-note git history, recent commits, and the **mycelium view** (`graph.html`): the notes as a living network with a timeline that replays the git history. Refuses to build if a note contains a secret. |
 | `tools/mirror-push`, `tools/restore-drill` | A second copy of the repository, and proof that it can be restored. |
 | `tools/bootstrap` | Creates a new notes repository from the template in one command, with everything in one `myco-notes/` folder and optional project data folders (`--data-dir`). |
 | `tools/relocate` | Moves an older tree (notes/, tools/, docs/ at the root) into the single folder, or renames that folder: dry run first, keeps your folder names, rewrites the path references. |
@@ -96,6 +96,16 @@ python3 <kit>/tools/relocate.py --root ~/projects/old-notes            # dry run
 python3 <kit>/tools/relocate.py --root ~/projects/old-notes --apply    # then review git diff, run the lint, commit
 ```
 
+## The mycelium view
+
+`build-notes-map.py` also writes `myco-notes/map/graph.html`: one self-contained page (no server, no network, no libraries) that opens by double-click and draws the notes as a mycelium.
+
+- **Notes are nodes, mentions are hyphae**: the threads are the same file-name mentions the map uses for backlinks. Notes with many backlinks are bigger; the entry notes (`AGENTS.md`, working agreement, tracker, state, runbook) grow as mushrooms; each group of notes is a color and clusters into a colony; history folders (`archive/`, `logs/`) sit dimmed at the edge.
+- **Health you can see**: recently changed notes glow; notes with passed follow-up dates wilt (amber, dashed ring); a reference to a note that does not exist ends in a dashed stub with a `?`; a note nobody mentions drifts alone like a spore.
+- **Timeline replay**: press Replay (or Space) and the network grows commit by commit from the first commit to now; renames are followed, new and changed notes let out a ring. Drag the slider to jump anywhere in the history. `graph.html#replay` starts the replay on its own, handy for recording a clip.
+- **Explore**: hover to light up a note's threads, click for its details (mentions, mentioned by, last change, follow-ups, missing references) and a link to its map page, search with Enter to fly to a match, click a group in the legend to hide it, wheel to zoom, drag to pan, double-click or Fit to see everything, Theme for light and dark (it follows the system by default).
+- Only titles, paths, counts and commit subjects go into the page, never the text of a note; the map's secret gate still applies. A note list in the page keeps it usable with a keyboard or a screen reader, and `prefers-reduced-motion` turns the animation off.
+
 ## Quick start (without an agent)
 
 ```bash
@@ -106,7 +116,7 @@ cd ~/projects/my-project
 # edit myco-notes/working-agreement.md and myco-notes/state.md, then:
 myco-notes/tools/notes-commit "Describe the first real change and why"
 python3 myco-notes/tools/notes-lint.py
-python3 myco-notes/tools/build-notes-map.py && xdg-open myco-notes/map/index.html
+python3 myco-notes/tools/build-notes-map.py && xdg-open myco-notes/map/index.html   # and myco-notes/map/graph.html for the mycelium view
 ```
 
 The notes map is nicer with `pip install markdown` but works without it.
