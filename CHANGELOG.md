@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.1
+- **`relocate` now updates a project that already uses the single folder.** Until now it said "nothing to do" for such a tree, so a project kept the tools it was created with. Run from a newer kit (`python <kit>/tools/relocate.py --root PROJECT`) it lists the new and changed files in the project's tools and docs (a Windows checkout's CRLF line endings do not count as a change), and `--apply` copies them (never `bootstrap`, the notes, `.myco-notes.conf` or `AGENTS.md`), refreshes the hooks path and shows the lint before and after. It then prints what else to check: set `NEW_FOLDERS` if the conf lacks it, and add the exit-code-3 rule to `AGENTS.md` if it is missing. Run from the project's own tools folder it says there is no newer kit.
+- `SKILL.md` documents the update flow. Tests: `tests/native.py` 102 checks (refresh dry run, CRLF, apply, protected files, second run, the refreshed tools build the graph).
+
 ## 0.8.0
 - **The mycelium view.** `build-notes-map.py` now also writes `graph.html` in the map folder (`myco-notes/map/graph.html`): the notes drawn as a living network in one self-contained page (no server, no network, no libraries; double-click to open). Notes are nodes, the file-name mentions between them are hyphae, the entry notes are mushrooms, groups are colonies, `archive/` and `logs/` are dimmed compost at the edge. Recently changed notes glow, notes with passed follow-up dates wilt, references to notes that do not exist end in a `?` stub, unmentioned notes drift alone.
 - **Timeline replay** of the git history (renames followed): the network grows commit by commit, a slider jumps anywhere, `graph.html#replay` starts it automatically. Hover, click for details and a link to the note's map page, search, group filter, zoom and pan, light and dark theme, reduced-motion respected, a plain list of all notes for keyboard and screen-reader use.

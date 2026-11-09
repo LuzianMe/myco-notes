@@ -4,6 +4,10 @@
   python3 <kit>/tools/relocate.py --root PROJECT [--myco-dir myco-notes] [--apply] [--no-refresh]
   tools/relocate [--myco-dir myco-notes] [--apply]            (from the project's own tools folder, on Linux and macOS)
 
+Updating a tree that already uses the single folder: run the same command from a newer kit. There is nothing to move, so it only refreshes the
+project's tools and docs from that kit (dry run lists the new and changed files; --apply copies them; never bootstrap, never your notes, conf or
+AGENTS.md) and tells you what else is worth checking (NEW_FOLDERS in the conf, the AGENTS.md rule about exit code 3).
+
 Before 0.6.0 a notes tree had notes/, tools/, docs/ and notes-map/ at the repository root. The single-folder layout puts the notes
 themselves, tools/, docs/ and map/ inside one folder (default myco-notes/), so the root stays free for the project's own folders.
 The same command renames the folder when the tree already uses it (--myco-dir new-name).
@@ -104,8 +108,7 @@ def main():
     umbrella = bool(old["myco"]) and all(under(old[k], old["myco"]) for k in ("notes", "tools", "docs", "map"))
     if umbrella:
         if old["myco"] == my:
-            print(f"relocate: the tree already uses {my}/ ; nothing to do")
-            return 0
+            return refresh_only(root, old, conf, a, self_run)
         new = {k: my + old[k][len(old["myco"]):] for k in ("notes", "tools", "docs", "map")}
         moves = [(old["myco"], my)]
         pairs = [(old["myco"] + "/", my + "/")]
@@ -254,6 +257,86 @@ relocate: done, nothing committed. Next:
   4. Delete the old generated map folder ({old['map']}/) if it is still there, and update anything outside this repository that names the old
      paths (mirror or sync commands, scheduled jobs, CI settings, other tools).
   Undo before committing: git restore --staged --worktree . and remove {my}/ if it is left over.""")
+    return 0
+
+
+def same_text(a, b):
+    """Files are the same when their bytes match, ignoring a Windows checkout's CRLF line endings."""
+    try:
+        with open(a, "rb") as fa, open(b, "rb") as fb:
+            return fa.read().replace(b"\r\n", b"\n") == fb.read().replace(b"\r\n", b"\n")
+    except OSError:
+        return False
+
+
+def kit_version():
+    try:
+        m = re.search(r'^\s*version:\s*"?([0-9][^"\s]*)"?\s*$', open(os.path.join(KIT, "SKILL.md"), encoding="utf-8").read().split("---")[1], re.M)
+        return m.group(1) if m else "unknown"
+    except (OSError, IndexError):
+        return "unknown"
+
+
+def refresh_only(root, old, conf, a, self_run):
+    """The tree already has the layout: refresh its tools and docs from this kit (dry run unless --apply)."""
+    my = old["myco"]
+    if a.no_refresh or self_run:
+        why = "--no-refresh" if a.no_refresh else "this is the project's own tools folder, so there is no newer kit to copy from; run relocate.py from a newer kit folder"
+        print(f"relocate: the tree already uses {my}/ ; nothing to do ({why})")
+        return 0
+    plan = []                      # (kit file, project file, label)
+    for src_dir, dst_rel, only_md in ((HERE, old["tools"], False), (os.path.join(KIT, "docs"), old["docs"], True)):
+        if not os.path.isdir(src_dir):
+            continue
+        for dp, dn, fn in os.walk(src_dir):
+            dn[:] = [d for d in dn if d not in NOT_COPIED]
+            for f in sorted(fn):
+                if f in NOT_COPIED or (only_md and not f.endswith(".md")) or (only_md and dp != src_dir):
+                    continue
+                rel = os.path.relpath(os.path.join(dp, f), src_dir).replace(os.sep, "/")
+                plan.append((os.path.join(dp, f), absp(root, dst_rel + "/" + rel), dst_rel + "/" + rel))
+    new_f = [p for p in plan if not os.path.exists(p[1])]
+    changed = [p for p in plan if os.path.exists(p[1]) and not same_text(p[0], p[1])]
+    same = len(plan) - len(new_f) - len(changed)
+    print(f"relocate: {'APPLYING' if a.apply else 'dry run (nothing is changed; add --apply to do it)'}")
+    print(f"  project: {root}")
+    print(f"  the tree already uses {my}/ ; nothing to move. Refreshing tools and docs from this kit (version {kit_version()}).")
+    print(f"  new files ({len(new_f)}):" + "".join(f"\n    + {p[2]}" for p in new_f[:40]))
+    print(f"  changed files ({len(changed)}):" + "".join(f"\n    ~ {p[2]}" for p in changed[:60]))
+    print(f"  unchanged: {same}. Not touched: bootstrap, your notes, .myco-notes.conf, AGENTS.md, .gitignore.")
+    print(f"  lint before: {lint_summary(root, old['tools'])}")
+    if a.apply:
+        for src, dst, _label in new_f + changed:
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            shutil.copy2(src, dst)
+        _myco.git("-C", root, "config", "core.hooksPath", old["tools"] + "/hooks")
+        if not _myco.IS_WINDOWS:
+            for d in (old["tools"], old["tools"] + "/hooks"):
+                full = absp(root, d)
+                if os.path.isdir(full):
+                    for f in os.listdir(full):
+                        p = os.path.join(full, f)
+                        if os.path.isfile(p):
+                            os.chmod(p, os.stat(p).st_mode | 0o111)
+        print(f"  lint after : {lint_summary(root, old['tools'])}")
+    if not new_f and not changed:
+        print("\nrelocate: tools and docs are already the same as this kit; nothing to refresh.")
+    tips = []
+    if "NEW_FOLDERS" not in conf:
+        tips.append("NEW_FOLDERS is not set in .myco-notes.conf, so notes-commit stops and asks about every new root folder or file (the default, ask). Ask the owner whether they want ask, add, ignorelint or ignoreall and add the line.")
+    try:
+        agents = open(os.path.join(root, "AGENTS.md"), encoding="utf-8").read()
+    except OSError:
+        agents = ""
+    if agents and "exit code 3" not in agents:
+        tips.append("AGENTS.md does not tell agents what to do when notes-commit exits with code 3 (new root folders). Add the bullet from the kit's template/AGENTS.md (the one starting 'If notes-commit stops with exit code 3').")
+    print("\nrelocate: " + ("done, nothing committed. Next:" if a.apply else "this was a dry run. With --apply it copies the files above, then:"))
+    print(f"  1. git status and git diff --stat; run {old['tools']}/notes-lint.py and python3 {old['tools']}/build-notes-map.py (it writes the graph view too).")
+    print(f"  2. Commit: {old['tools']}/notes-commit \"Update the Myco Notes tools and docs to {kit_version()}\"")
+    for i, t in enumerate(tips, 3):
+        print(f"  {i}. {t}")
+    if a.apply:
+        print("  Undo before committing: git restore --staged --worktree . and delete any new untracked tool files listed above.")
     return 0
 
 
