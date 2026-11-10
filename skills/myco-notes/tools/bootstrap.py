@@ -74,8 +74,8 @@ def main():
             shutil.copytree(src, at(lay["notes"]), dirs_exist_ok=True)
         elif os.path.isdir(src):
             shutil.copytree(src, os.path.join(target, item), dirs_exist_ok=True)
-        else:
-            shutil.copy2(src, os.path.join(target, item))
+        else:   # template/gitattributes becomes the tree's .gitattributes (in the kit it must not apply to the kit's own files)
+            shutil.copy2(src, os.path.join(target, "." + item if item == "gitattributes" else item))
     shutil.copytree(HERE, at(lay["tools"]), dirs_exist_ok=True, ignore=lambda d, names: [n for n in names if n in NOT_COPIED])
     docs = os.path.join(KIT, "docs")
     os.makedirs(at(lay["docs"]), exist_ok=True)

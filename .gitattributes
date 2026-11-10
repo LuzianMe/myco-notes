@@ -1,5 +1,5 @@
-# Keep shell launchers and hooks with Unix line endings on every platform (a CRLF shebang line breaks them on Windows);
-# Windows batch launchers keep CRLF.
-* text=auto eol=lf
-*.cmd text eol=crlf
-*.bat text eol=crlf
+# Store every file exactly as committed and never convert line endings (the plugin directory refuses attributes that rewrite
+# file contents). The shell launchers and hooks are committed with LF and the Windows .cmd launchers with CRLF, so each works
+# as checked out on every platform, also with core.autocrlf=true. New notes trees get the normalising rules from
+# skills/myco-notes/template/gitattributes, which bootstrap installs as their .gitattributes.
+* -text
