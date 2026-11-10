@@ -6,7 +6,7 @@ This repository is a kit, not a notes tree. Do not confuse it with the notes tre
 - `skills/myco-notes/` : the whole product, **self-contained** (a skill-only installer delivers just this folder). `SKILL.md`, `tools/`, `docs/METHODOLOGY.md`, `template/`. Nothing in it may refer to files outside the folder or to an environment variable.
 - `.claude-plugin/` : Claude Code plugin and marketplace manifests (the plugin root is the repository root).
 - `tests/smoke.sh` : the test. Run it before every commit; all checks must pass. `.github/workflows/test.yml` runs it on Linux and macOS for every push and pull request.
-- `examples/` : sample entries for readers.
+- `examples/` : sample entries for readers; `examples/demo/build_demo.py` builds the made-up demo tree behind the README screenshots and the live demo (`.github/workflows/demo.yml` publishes its map on GitHub Pages). Images for the README live in `.github/assets/`.
 
 ## Rules
 1. **One copy of everything.** Do not duplicate tools or docs for a second agent; add installation instructions instead.

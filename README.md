@@ -2,6 +2,29 @@
 
 *Linked, versioned, secret-free project notes for you and your AI agents.*
 
+[![test](https://github.com/LuzianMe/myco-notes/actions/workflows/test.yml/badge.svg)](https://github.com/LuzianMe/myco-notes/actions/workflows/test.yml) [![live demo](https://img.shields.io/badge/live%20demo-mycelium%20view-3fbfa8)](https://luzianme.github.io/myco-notes/graph.html) [![license](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+
+**Your AI agent forgets everything between sessions. Your notes should not.** Myco Notes keeps a project's knowledge in plain Markdown and git, and keeps it **true**: every change is written down with its evidence, every note says which notes it depends on, nothing secret gets committed, and nothing is deleted, only superseded.
+
+![The notes of a demo project growing commit by commit in the mycelium view: notes appear as glowing nodes and threads grow between the notes that mention each other](.github/assets/mycelium-replay.gif)
+
+*A made-up project's notes growing commit by commit. **[Open the live demo](https://luzianme.github.io/myco-notes/graph.html)** to click around it, or browse [its notes map](https://luzianme.github.io/myco-notes/).*
+
+**Install in Claude Code** (other agents: [Install](#install)):
+```
+/plugin marketplace add LuzianMe/myco-notes
+/plugin install myco-notes@myco-notes
+```
+Then ask: *"start a Myco Notes tree for my project"*.
+
+- **Capture, not chores:** after each change the agent updates the right notes (master record, runbook, entity notes) and commits them with a described message.
+- **Stays accurate:** a lint finds broken references, passed follow-up and review dates, stale headers and oversized notes; `resume` briefs the next session in a fixed budget; `asof` shows what the notes said on any date.
+- **Safe by default:** a commit hook and CI refuse anything that looks like a secret; notes say where a secret lives, never its value.
+- **See how it connects:** a static map with backlinks, and the mycelium view above, which replays the git history and shows wilting (overdue) notes and missing references.
+- **Plain files:** Markdown, git and Python 3.8+ standard library. Linux, macOS and Windows. Works with any agent, or none.
+
+## Where it comes from
+
 A method, a starter tree and a small set of tools for keeping a project's knowledge **accurate, secure, versioned and connected**, for engineers who run large or long projects (infrastructure, platforms, data and ML systems, research, hardware) alone, in teams, or together with AI coding agents.
 
 It started as the operational memory of a long-running, AI-operated engineering project, where the notes had to work for an operator that forgets everything between sessions. If the notes are good enough for that operator, they are good enough for a new teammate, an auditor, or you next year.
@@ -111,7 +134,7 @@ python3 <kit>/tools/relocate.py --root ~/projects/old-notes --apply    # then re
 |---|---|---|
 | ![Close-up of tapered threads ending in small buds on the rim of the notes](.github/assets/graph-hyphae.webp) | ![The same tree in the light theme](.github/assets/graph-light.webp) | ![The network after 12 of 23 commits](.github/assets/graph-replay.webp) |
 
-*Screenshots of a made-up demo tree ("Greenhouse Sensors").*
+*Screenshots of a made-up demo tree ("Greenhouse Sensors"), built by `examples/demo/build_demo.py`; the same tree is the [live demo](https://luzianme.github.io/myco-notes/graph.html), rebuilt from `main` on every change to the kit.*
 
 - **Notes are nodes, mentions are hyphae**: the threads are the same file-name mentions the map uses for backlinks. Notes with many backlinks are bigger, and the few most-mentioned notes of the project are its hubs (two soft rings and a label, chosen by mentions; the entry and method notes every tree has are never hubs); each group of notes is a color and clusters into a colony; history folders (`archive/`, `logs/`) sit dimmed at the edge.
 - **Threads have a direction**: a hypha grows out of the note that writes the mention, broad at its base, and thins toward the note it names, where it ends in a small bud on the rim. Two notes that mention each other share an even thread with a bud at both ends. While a thread is lit, sap flows the same way, and during a replay a new thread grows along its length instead of fading in.

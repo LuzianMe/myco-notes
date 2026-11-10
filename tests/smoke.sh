@@ -2,6 +2,7 @@
 # Smoke test: bootstrap a tree in a temporary folder and exercise the tools. Exit 0 = all passed.
 set -u
 kit="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+repo="$kit"   # the repository root (kit is later pointed at a skill-only copy)
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 pass=0; fail=0
 ok()   { echo "  PASS $1"; pass=$((pass+1)); }
@@ -153,5 +154,9 @@ rm -rf "$tmp/flat/notes-map"
 chk "relocate dry run changes nothing"   "\"$kit/tools/relocate\" --root $tmp/flat | grep -q 'dry run' && [ -d $tmp/flat/notes ]"
 chk "relocate --apply moves the tree"    "\"$kit/tools/relocate\" --root $tmp/flat --apply >/dev/null && [ -f $tmp/flat/myco-notes/state.md ] && [ ! -e $tmp/flat/notes ] && [ \"\$(git -C $tmp/flat config core.hooksPath)\" = myco-notes/tools/hooks ]"
 chk "moved tree: lint clean and commit works" "(cd $tmp/flat && myco-notes/tools/notes-lint.py --quiet | grep -q ' 0 warnings' && myco-notes/tools/notes-commit 'Moved to the single folder layout' | grep -q 'Moved to')"
+
+echo "demo tree (README screenshots and the live demo)"
+chk "build_demo makes the tree, its map and the mycelium view" "python3 $repo/examples/demo/build_demo.py $tmp/demo | grep -q 'graph: 30 nodes' && [ -f $tmp/demo/myco-notes/map/graph.html ] && [ \"\$(git -C $tmp/demo rev-list --count HEAD)\" -ge 20 ]"
+chk "the demo tree is lint-clean apart from its two staged warnings" "(cd $tmp/demo && myco-notes/tools/notes-lint.py --quiet | grep -q ' 0 errors, 2 warnings')"
 
 echo; echo "passed $pass, failed $fail"; [ "$fail" = 0 ]
