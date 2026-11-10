@@ -105,10 +105,19 @@ python3 <kit>/tools/relocate.py --root ~/projects/old-notes --apply    # then re
 
 `build-notes-map.py` also writes `myco-notes/map/graph.html`: one self-contained page (no server, no network, no libraries) that opens by double-click and draws the notes as a mycelium.
 
+![The mycelium view of a demo notes tree in the dark theme, with one note selected: its threads light up and the panel lists what it mentions and what mentions it](.github/assets/graph-dark.webp)
+
+| Threads grow from the note that writes the mention and end in a bud on the note it names | Light theme; a wilting note (dashed ring) and a missing reference (`?`) | Halfway through the replay of the git history |
+|---|---|---|
+| ![Close-up of tapered threads ending in small buds on the rim of the notes](.github/assets/graph-hyphae.webp) | ![The same tree in the light theme](.github/assets/graph-light.webp) | ![The network after 12 of 23 commits](.github/assets/graph-replay.webp) |
+
+*Screenshots of a made-up demo tree ("Greenhouse Sensors").*
+
 - **Notes are nodes, mentions are hyphae**: the threads are the same file-name mentions the map uses for backlinks. Notes with many backlinks are bigger, and the few most-mentioned notes of the project are its hubs (two soft rings and a label, chosen by mentions; the entry and method notes every tree has are never hubs); each group of notes is a color and clusters into a colony; history folders (`archive/`, `logs/`) sit dimmed at the edge.
+- **Threads have a direction**: a hypha grows out of the note that writes the mention, broad at its base, and thins toward the note it names, where it ends in a small bud on the rim. Two notes that mention each other share an even thread with a bud at both ends. While a thread is lit, sap flows the same way, and during a replay a new thread grows along its length instead of fading in.
 - **Health you can see**: recently changed notes glow; notes with passed follow-up dates wilt (amber, dashed ring); a reference to a note that does not exist ends in a dashed stub with a `?`; a note nobody mentions drifts alone like a spore.
 - **Timeline replay**: press Replay (or Space) and the network grows commit by commit from the first commit to now; renames are followed, new and changed notes let out a ring. Drag the slider to jump anywhere in the history. `graph.html#replay` starts the replay on its own, handy for recording a clip.
-- **Explore**: hover to light up a note's threads, click for its details (mentions, mentioned by, last change, follow-ups, missing references) and a link to its map page, search with Enter to fly to a match, click a group in the legend to hide it, wheel to zoom, drag to pan, double-click or Fit to see everything, Theme for light and dark (it follows the system by default).
+- **Explore**: hover to light up a note's threads, click for its details (mentions and mentioned by, each with its own list of notes, last change, follow-ups, missing references) and a link to its map page, search with Enter to fly to a match, click a group in the legend to hide it, wheel to zoom, drag to pan, double-click or Fit to see everything, Theme for light and dark (it follows the system by default).
 - **On a phone** the header shrinks to the title, the counts and four buttons (Find opens the search and the legend), the replay bar is one row of controls and one line of text (tap the line to read the whole commit message), the network is stretched to fill the height, and during a replay the nodes move slowly and settle instead of shaking.
 - A note past its `review_after` or `valid_until` date wilts, like one with a passed follow-up date.
 - Only titles, paths, counts and commit subjects go into the page, never the text of a note; the map's secret gate still applies. A note list in the page keeps it usable with a keyboard or a screen reader, and `prefers-reduced-motion` turns the animation off.

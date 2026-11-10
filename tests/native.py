@@ -152,6 +152,17 @@ def main():
         check("every note is a node, with title and path only", gn is not None and gn["title"] == "Graph Test Note" and len(g["nodes"]) >= 8, str(sorted(nodes)))
         check("the text of a note is not written into the page", "zebra-unique-phrase-8812" not in h and "More text" not in h)
         check("a mention becomes a link", any({g["nodes"][e[0]]["rel"], g["nodes"][e[1]]["rel"]} == {MY + "/plans/graph-renamed.md", MY + "/state.md"} for e in g["edges"]), str(g["edges"][:5]))
+        def weight(src, dst):   # an edge is [a, b, weight a->b, weight b->a]
+            for e in g["edges"]:
+                ra, rb = g["nodes"][e[0]]["rel"], g["nodes"][e[1]]["rel"]
+                if (ra, rb) == (src, dst):
+                    return e[2]
+                if (rb, ra) == (src, dst):
+                    return e[3]
+            return None
+        check("a link keeps its direction (who mentions whom)", (weight(MY + "/plans/graph-renamed.md", MY + "/state.md") or 0) > 0 and weight(MY + "/state.md", MY + "/plans/graph-renamed.md") == 0 and (weight(MY + "/plans/graph-a.md", MY + "/plans/graph-hub.md") or 0) > 0,
+              str(g["edges"][:8]))
+        check("the threads are drawn with a direction", "e.dir" in h and "Mentioned by" in h)
         check("a missing reference is shown", gn is not None and gn.get("miss") == ["no-such-note.md"], str(gn))
         check("the history is replayed across a rename", gn is not None and gn["b"] < gn["l"] and len(g["commits"]) >= 3 and g["commits"][gn["b"]]["s"].startswith("Add a note for the graph test"), str((gn, [c["s"] for c in g["commits"]])))
         hubs = {n["rel"] for n in g["nodes"] if n["hub"]}

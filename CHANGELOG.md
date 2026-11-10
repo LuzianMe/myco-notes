@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.0
+- **Mycelium view, direction**: the threads now show who mentions whom, in the view's own vocabulary instead of arrowheads. A hypha leaves the note that writes the mention broad and thins toward the note it names, ending in a small swollen tip (a bud) on its rim; two notes that mention each other share an even thread with a bud at both ends. On a lit thread the sap flows from the mentioning note to the mentioned one, and during a replay a new thread grows from its source instead of fading in. The detail panel lists "Mentions" and "Mentioned by" separately (it had one mixed list).
+- **Method**: section 9 says the relation map's edges have a direction and a view should show it. Version 2.2 of the document.
+- **README**: screenshots of the mycelium view (dark with a selected note, a close-up of the threads, light theme, mid-replay), taken from a made-up demo tree.
+- Tests: `tests/native.py` checks that an edge keeps its direction and that the page draws it.
+
 ## 0.9.0
 - **`tools/resume`**: a start-of-session briefing capped at a character budget (default 6000, `--budget`, `RESUME_BUDGET`). It prints the repository state, the sync tracker's pending list, the master record's headline facts and open items, notes past a review or follow-up date, the newest handoff and the last commits. Items are whole or left out, never cut, and the footer counts what was left out. `SKILL.md` uses it in the resume mode and the audit mode.
 - **Optional freshness header** on any note (`---` block: `last_confirmed`, `review_after`, `valid_from`, `valid_until`, `supersedes`, `superseded_by`, ISO dates, no YAML library). `notes-lint.py` reports a passed `review_after`, a `valid_until` that has passed outside the history folders, an old `last_confirmed` without a `review_after` (`STALE_DAYS`, default 365), reversed or malformed dates, and missing `supersedes`/`superseded_by` targets. The map shows the header as a "Freshness" line instead of rendering it, and the mycelium view wilts a note past its review date. Method: section 10.1.

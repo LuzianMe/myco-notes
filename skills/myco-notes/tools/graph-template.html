@@ -30,7 +30,7 @@ input[type=search]:focus-visible,button:focus-visible,a:focus-visible,input[type
 #panel[hidden]{display:none}#panel h2{font-size:16px;margin:0 0 2px;padding-right:22px}#panel .rel{color:var(--muted);font:12px ui-monospace,Menlo,Consolas,monospace;word-break:break-all}
 #panel dl{margin:10px 0;display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:13px}#panel dt{color:var(--muted)}#panel dd{margin:0}
 #panel .warn{color:#e6a45c}#panel .open{display:inline-block;margin:4px 0 8px;color:var(--accent)}
-#panel .nb{display:flex;flex-wrap:wrap;gap:4px}#panel .nb button{font:inherit;font-size:12px;padding:1px 8px;border-radius:99px;border:1px solid var(--line);background:transparent;color:var(--fg);cursor:pointer}
+#panel .side{color:var(--muted);font-size:12px;margin:8px 0 4px}#panel .nb{display:flex;flex-wrap:wrap;gap:4px}#panel .nb button{font:inherit;font-size:12px;padding:1px 8px;border-radius:99px;border:1px solid var(--line);background:transparent;color:var(--fg);cursor:pointer}
 #close{position:absolute;top:8px;right:8px;border:0;background:transparent;color:var(--muted);font-size:18px;cursor:pointer;line-height:1}
 #time{padding:10px 14px;display:grid;grid-template-columns:auto 1fr;gap:8px 10px;align-items:center}
 #time[hidden]{display:none}
@@ -121,8 +121,9 @@ NODES.forEach(function(n,i){
   n.low=(n.name+" "+n.title+" "+n.rel).toLowerCase();adj.push([]);
 });
 D.edges.forEach(function(e,k){
-  var a=NODES[e[0]],b=NODES[e[1]],o={a:a,b:b,w:e[2]+e[3],k:k,off:(hash(k)-.5)*.34};
-  E.push(o);adj[a.i].push({n:b,e:o});adj[b.i].push({n:a,e:o});
+  /* dir: 1 = a mentions b, -1 = b mentions a, 0 = they mention each other */
+  var a=NODES[e[0]],b=NODES[e[1]],o={a:a,b:b,w:e[2]+e[3],k:k,off:(hash(k)-.5)*.34,dir:e[2]&&e[3]?0:e[2]?1:-1};
+  E.push(o);adj[a.i].push({n:b,e:o,out:e[2]>0,inn:e[3]>0});adj[b.i].push({n:a,e:o,out:e[3]>0,inn:e[2]>0});
 });
 var cur=NC;                                   /* commits applied: 0..NC */
 var hov=-1,sel=-1,match=null,alpha=1,playing=false,acc=0,ripples=[];
@@ -222,6 +223,55 @@ function curve(e,t){
   var x1=e.a.x,y1=e.a.y,x2=e.b.x,y2=e.b.y,mx=(x1+x2)/2-(y2-y1)*e.off,my=(y1+y2)/2+(x2-x1)*e.off;
   var u=1-t;return {x:u*u*x1+2*u*t*mx+t*t*x2,y:u*u*y1+2*u*t*my+t*t*y2,mx:mx,my:my};
 }
+/* A hypha grows out of the note that writes the mention and reaches the note it names: it leaves its source broad, thins
+   as it goes and ends in a small swollen tip (a hyphal tip) on the rim of the target. Two notes that mention each other are
+   joined by an even thread with a tip at both ends, like two hyphae that met and fused. A new thread grows along its length
+   instead of fading in. Everything is in screen pixels. */
+function srad(n){return n.r*Math.max(.7,Math.min(1.6,cam.k))}
+function hyphaPath(e){
+  var P=[],N=16,s,p;
+  for(s=0;s<=N;s++){p=curve(e,s/N);P.push([sx(p.x),sy(p.y)])}
+  return clipEnd(clipEnd(P,srad(e.b)+1.5).reverse(),srad(e.a)+1.5).reverse();   /* from the rim of a to the rim of b */
+}
+function clipEnd(P,r){   /* drop the points inside the circle of radius r around the last point, ending exactly on its rim */
+  var c=P[P.length-1],k=P.length-1;
+  while(k>0&&Math.hypot(P[k-1][0]-c[0],P[k-1][1]-c[1])<r)k--;
+  if(k===0)return [P[0],P[0]];
+  var p=P[k-1],q=P[k],dp=Math.hypot(p[0]-c[0],p[1]-c[1]),dq=Math.hypot(q[0]-c[0],q[1]-c[1]),f=dp-dq>1e-6?(dp-r)/(dp-dq):1;
+  return P.slice(0,k).concat([[p[0]+(q[0]-p[0])*f,p[1]+(q[1]-p[1])*f]]);
+}
+function strand(P,upto,w0,w1){   /* fill the path P up to the length `upto`, half-width going from w0 to w1 over the whole length; returns the end point */
+  var L=[0],i;for(i=1;i<P.length;i++)L.push(L[i-1]+Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1]));
+  var tot=L[L.length-1]||1,Q=[P[0]];
+  for(i=1;i<P.length;i++){if(L[i]<upto){Q.push(P[i]);continue}var f=(upto-L[i-1])/((L[i]-L[i-1])||1);Q.push([P[i-1][0]+(P[i][0]-P[i-1][0])*f,P[i-1][1]+(P[i][1]-P[i-1][1])*f]);break}
+  if(Q.length<2)return null;
+  var lft=[],rgt=[],d=0;
+  for(i=0;i<Q.length;i++){
+    var A=Q[Math.max(0,i-1)],B=Q[Math.min(Q.length-1,i+1)],dx=B[0]-A[0],dy=B[1]-A[1],m=Math.hypot(dx,dy)||1;
+    if(i)d+=Math.hypot(Q[i][0]-Q[i-1][0],Q[i][1]-Q[i-1][1]);
+    var hw=w0+(w1-w0)*Math.min(1,d/tot);lft.push([Q[i][0]-dy/m*hw,Q[i][1]+dx/m*hw]);rgt.push([Q[i][0]+dy/m*hw,Q[i][1]-dx/m*hw]);
+  }
+  cx.beginPath();cx.moveTo(lft[0][0],lft[0][1]);
+  for(i=1;i<lft.length;i++)cx.lineTo(lft[i][0],lft[i][1]);
+  for(i=rgt.length-1;i>=0;i--)cx.lineTo(rgt[i][0],rgt[i][1]);
+  cx.closePath();cx.fill();
+  return Q[Q.length-1];
+}
+function tip(p,r){cx.beginPath();cx.arc(p[0],p[1],r,0,6.3);cx.fill()}
+function hypha(e,w,grow,col,tipCol){
+  var P=hyphaPath(e);if(P.length<2)return;
+  var tot=0,i;for(i=1;i<P.length;i++)tot+=Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1]);
+  if(tot<2)return;
+  var tr=.9+w*.9;cx.fillStyle=col;
+  if(e.dir===0){   /* each side grows half the way; the two meet in the middle */
+    var R=P.slice().reverse(),h=w*.5;
+    strand(P,tot*grow/2+.5,h,h);var q=strand(R,tot*grow/2+.5,h,h);
+    cx.fillStyle=tipCol;if(grow<1){if(q)tip(q,tr*.8)}else{tip(P[P.length-1],tr);tip(P[0],tr)}
+  }else{
+    var S=e.dir>0?P:P.slice().reverse(),end=strand(S,tot*grow,w*1.15,w*.12);
+    if(end){cx.fillStyle=tipCol;tip(end,tr)}
+  }
+}
 function label(txt,x,y,bold){
   cx.font=(bold?"600 ":"")+"12px system-ui,Segoe UI,sans-serif";cx.textAlign="center";cx.lineWidth=3.5;cx.strokeStyle=T.halo;cx.fillStyle=T.text;
   cx.strokeText(txt,x,y);cx.fillText(txt,x,y);
@@ -234,10 +284,10 @@ function draw(now){
     if(!edgeVis(e))return;
     var a=Math.min(e.a.ap,e.b.ap);if(a<=0)return;
     var hot=focus>=0&&(e.a.i===focus||e.b.i===focus),d=Math.min(dim(e.a),dim(e.b));
-    var c=curve(e,.5),w=Math.min(2.6,.6+Math.sqrt(e.w)*.45);
-    cx.beginPath();cx.moveTo(sx(e.a.x),sy(e.a.y));cx.quadraticCurveTo(sx(c.mx),sy(c.my),sx(e.b.x),sy(e.b.y));
-    cx.strokeStyle="rgba("+T.hypha+","+((hot?.85:.26)*a*(hot?1:Math.max(d,.35))).toFixed(3)+")";cx.lineWidth=(hot?w*1.5:w)*Math.min(1.4,cam.k+.3);cx.stroke();
-    if(hot&&!reduce){for(var s=0;s<2;s++){var u=((t*.00035+e.k*.37+s*.5)%1),p=curve(e,u);cx.fillStyle="rgba("+T.hypha+",.95)";cx.beginPath();cx.arc(sx(p.x),sy(p.y),2.1,0,6.3);cx.fill()}}
+    var w=Math.min(2.6,.6+Math.sqrt(e.w)*.45)*(hot?1.5:1)*Math.min(1.4,cam.k+.3),al=(hot?.85:.26)*Math.min(1,a*2)*(hot?1:Math.max(d,.35));
+    hypha(e,w,a,"rgba("+T.hypha+","+al.toFixed(3)+")","rgba("+T.hypha+","+Math.min(1,al*3).toFixed(3)+")");
+    /* on a lit thread, sap flows from the note that mentions to the note it names (both ways on a fused thread) */
+    if(hot&&!reduce&&a>=1){for(var s=0;s<2;s++){var u=((t*.00035+e.k*.37+s*.5)%1),back=e.dir<0||(e.dir===0&&s===1),p=curve(e,back?1-u:u);cx.fillStyle="rgba("+T.hypha+",.95)";cx.beginPath();cx.arc(sx(p.x),sy(p.y),2.1,0,6.3);cx.fill()}}
   });
   /* notes */
   var order=NODES.filter(function(n){return n.vis&&n.ap>0}).sort(function(a,b){return (a.hub?1:0)-(b.hub?1:0)});
@@ -358,10 +408,12 @@ function select(i){
   if(!n.in&&!n.out)row("Links","none: no note mentions this one");
   panel.appendChild(dl);
   var a=el("a","open","Open the note →");a.href="p/"+n.id+".html";panel.appendChild(a);
-  if(adj[i].length){panel.appendChild(el("div","rel","Connected to"));var nb=el("div","nb");
-    adj[i].slice().sort(function(p,q){return q.e.w-p.e.w}).slice(0,14).forEach(function(m){
+  [["out","Mentions →"],["inn","Mentioned by ←"]].forEach(function(side){
+    var list=adj[i].filter(function(m){return m[side[0]]});if(!list.length)return;
+    panel.appendChild(el("div","side",side[1]));var nb=el("div","nb");
+    list.sort(function(p,q){return q.e.w-p.e.w}).slice(0,14).forEach(function(m){
       var b=el("button",null,m.n.name.replace(/\.md$/,""));b.addEventListener("click",function(){select(m.n.i);focusOn(m.n.i)});nb.appendChild(b)});
-    panel.appendChild(nb)}
+    panel.appendChild(nb)});
 }
 function focusOn(i){var n=NODES[i];autoFit=false;cam.tx=n.x;cam.ty=n.y;cam.tk=Math.max(cam.tk,1.4)}
 var q=document.getElementById("q");
