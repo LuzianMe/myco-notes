@@ -104,9 +104,11 @@ def main():
         m = SECRET.search(text)
         if m:
             sys.exit(f"REFUSING to build: {rel} looks like it contains a secret near: {m.group(0)[:30]}...")
-        h1 = re.search(r"^#\s+(.+)$", text, re.M)
+        fm, fm_end = _myco.frontmatter(text)      # optional freshness header (method 10.1): shown as a line, not rendered as text
+        shown = "\n".join(text.split("\n")[fm_end:]) if fm_end else text
+        h1 = re.search(r"^#\s+(.+)$", shown, re.M)
         ttl = re.sub(r"[`*_]", "", h1.group(1)).strip() if h1 else os.path.basename(rel)
-        body = text[h1.end():] if h1 else text
+        body = shown[h1.end():] if h1 else shown
         para = next((l.strip() for l in body.split("\n") if l.strip() and not l.lstrip().startswith(("#", "|", "```", ">", "-", "*"))), "")
         para = re.sub(r"[`*_]|\[([^\]]+)\]\([^)]*\)", lambda mm: mm.group(1) or "", para)
         group = "other"
@@ -114,7 +116,7 @@ def main():
             if any(rel == p or (p.endswith("/") and rel.startswith(p)) for p in prefixes):
                 group = gid
                 break
-        info[rel] = dict(id=slug(rel), rel=rel, name=os.path.basename(rel), title=ttl, group=group, text=text, out={}, inn={},
+        info[rel] = dict(id=slug(rel), rel=rel, name=os.path.basename(rel), title=ttl, group=group, text=text, shown=shown, fm={k: v[0] for k, v in fm.items()}, out={}, inn={},
                          hint=hints.get(rel) or (para[:170] + ("..." if len(para) > 170 else "")),
                          mtime=os.path.getmtime(os.path.join(root, rel)), size=len(text.encode("utf-8")))
     by_name = {}
@@ -140,13 +142,15 @@ def main():
     for rel, d in info.items():
         if md_lib:
             m = md_lib.Markdown(extensions=["tables", "fenced_code", "toc", "sane_lists"])
-            body = m.convert(d["text"]); toc = m.toc
+            body = m.convert(d["shown"]); toc = m.toc
             body = re.sub(r"<code>([^<]+)</code>", lambda mm: (f'<a href="{byid[info[linkable[mm.group(1)]]["id"]]["id"]}.html"><code>{mm.group(1)}</code></a>'
                           if mm.group(1) in linkable and linkable[mm.group(1)] != rel else mm.group(0)), body)
         else:
-            body, toc = "<pre>" + html.escape(d["text"]) + "</pre>", ""
+            body, toc = "<pre>" + html.escape(d["shown"]) + "</pre>", ""
         chips = lambda mp, cls: "".join(f'<a class="chip" href="{i}.html">{html.escape(byid[i]["name"])} <small>{n}</small></a>' for i, n in sorted(mp.items(), key=lambda kv: -kv[1]))
         relh = ""
+        fr = [(k, d["fm"][k]) for k in ("last_confirmed", "review_after", "valid_from", "valid_until", "supersedes", "superseded_by") if d["fm"].get(k)]
+        if fr: relh += "<div><b>Freshness</b> " + " &middot; ".join(html.escape(k.replace("_", " ")) + " " + html.escape(v) for k, v in fr) + "</div>"
         if d["out"]: relh += "<div><b>Mentions</b> " + chips(d["out"], "o") + "</div>"
         if d["inn"]: relh += "<div><b>Mentioned by</b> " + chips(d["inn"], "i") + "</div>"
         hist = log_rows(["--follow", "-n", "12", "--format=%h\t%as\t%s", "--", rel])

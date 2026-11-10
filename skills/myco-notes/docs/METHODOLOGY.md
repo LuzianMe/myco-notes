@@ -1,6 +1,6 @@
 # Myco Notes: the method
 
-Version 2 (general edition), 2026-11-03. It is project-independent and is written for engineers and teams (and for AI coding agents working with them) who run long, large or fast-changing projects: infrastructure, software platforms, data and ML systems, research, hardware, operations. It is meant as the specification from which a skill, a template repository or a team convention can be built.
+Version 2.1 (general edition), 2026-11-10. It is project-independent and is written for engineers and teams (and for AI coding agents working with them) who run long, large or fast-changing projects: infrastructure, software platforms, data and ML systems, research, hardware, operations. It is meant as the specification from which a skill, a template repository or a team convention can be built.
 
 The method grew out of a long-running, AI-operated engineering project in which the notes had to act as the memory of an operator that forgets everything between sessions. That constraint is useful for any project: if the notes are good enough for an operator with no memory, they are good enough for a new teammate, an auditor, or you in a year.
 
@@ -20,6 +20,17 @@ A **notes tree** is a small repository of plain-text (Markdown) files with a fix
 6. **Useful to readers who are not you**: other people, other agents, and later versions of yourself.
 
 It is not a wiki for prose, not a ticket system and not a replacement for code comments. It is the **operational memory** of the project: state, decisions, procedures, evidence and lessons.
+
+### 1.1 When this is not a fit
+
+The method is built for the operational memory of **one project or system**, edited by a few people and agents, in one git repository, over months or years. Look elsewhere (or add something to it) when:
+
+- **The memory is about a person, or is a stream of small facts** (preferences, contacts, "what did X say about Y"). Files with fixed roles and evidence entries are heavy for that. A store of typed, one-fact-per-file records (entity, predicate, value, validity window) with a query tool suits it better.
+- **Many writers update at once.** Here a write is a plain edit protected by git, the hook and the lint, not a transaction. Dozens of agents writing the same files need a database, or a proposal-and-review pipeline in front of the tree.
+- **You need ranked retrieval or graph queries over thousands of records.** The tree is read by file roles, links and text search; it does not rank, embed or traverse. Past a few hundred notes add a search index (a derived copy, section 9), or keep the data in a real store and write only its description here.
+- **Facts must be machine-checkable.** Prose states a fact, but no tool can tell that two sentences contradict each other. The freshness header (10.1) and the as-of query (7.1) cover dates and history, not meaning.
+- **Nobody will keep it current.** A tree that is not updated in the same session as the change is trusted and wrong, which is worse than no tree. Start smaller: entry point, state, runbook.
+- **The content cannot be written down safely.** If a note would need a secret, or the repository cannot be kept private, record where the thing lives and stop there.
 
 ## 2. Principles (the properties to preserve)
 
@@ -217,6 +228,10 @@ Cadence guideline: **update on the same turn as the change; commit on the same t
 - **What git cannot do**: it does not know a statement became false; it only records what is committed; it cannot recover uncommitted edits. Therefore the current-state sections still must be edited, and commits must actually happen (discipline plus a reminder in the end-of-session checklist; an auto-commit timer is an optional safety net).
 - **Signed commits** or a protected remote add tamper evidence when the notes are used for audit.
 
+### 7.1 What did the notes say then?
+
+Git holds every committed state, so "what did we believe on 2026-09-01?" and "what changed since?" have exact answers. `tools/asof` wraps the git commands: it picks the last commit at the end of a date (any revision, tag or hash also works), prints one note as it was, searches the notes as they were, lists what changed since, and shows the commits that touched one file. It only reads. Limits: it answers from committed text (an uncommitted edit is invisible), a note may have had another name at that date (`--history` follows renames), and it shows what the notes said, which is not always what was true.
+
 ## 8. Safety, security and integrity
 
 ### 8.1 Secrets policy
@@ -271,12 +286,25 @@ Recommended lint checks (cheap, run before publish and in review):
 ## 10. Stability and freshness
 
 - **Freshness markers**: sections whose facts drift carry "verified YYYY-MM-DD"; the master record's header "last updated" is changed whenever the changelog gets a new entry (a lint can enforce it).
-- **Review-by dates** on decisions, accepted exceptions and parked items; the tracker lists everything past its review date.
+- **Review-by dates** on decisions, accepted exceptions and parked items; the tracker lists everything past its review date (a machine-readable form is in 10.1).
 - **Drift detection**: a read-only verification script compares the live system with expectations (counts, versions, reachability, backup age) and prints pass/warn/fail; known and accepted conditions live in the verification guide so they are not re-raised.
 - **Contradiction rule**: when two statements conflict, investigate the live system, fix the wrong one, and add a lesson if the conflict came from a missed update.
 - **Deprecation**: removed components are not erased from the notes; their rows are marked removed with date and reason, and moved to the archive after a quiet period.
 - **Controlled growth**: size discipline (section 3.3), stable naming, one folder per bundle, a README per bundle, the glossary.
 - **Periodic full audit** (section 11.3) at a fixed interval and before handovers or major changes.
+
+### 10.1 Optional freshness header
+
+A note may start with a small header between two `---` lines: one `key: value` per line, dates in ISO form (`YYYY-MM-DD`), nothing nested. Every key is optional and a note without a header is unaffected. Use it for notes whose facts drift (versions, accepted risks, vendor limits, a decision with a review date), not for everything.
+
+| Key | Meaning |
+|---|---|
+| `last_confirmed` | the day someone checked the content against the live system |
+| `review_after` | the day it must be checked again |
+| `valid_from`, `valid_until` | the period the content describes; `valid_until` is the last day it was true |
+| `supersedes`, `superseded_by` | file names (comma separated) of the notes this one replaces, or that replace it |
+
+Rules: move `last_confirmed` and `review_after` **only after verifying** (principle 8), and in the same commit as the verification. The lint warns when `review_after` has passed; when `last_confirmed` is older than `STALE_DAYS` (default 365) and no `review_after` is set; when `valid_until` has passed on a note outside the history folders (supersede or archive it); when a `supersedes` or `superseded_by` target does not exist; when a date is malformed or in the wrong order. A note past its review date also shows as wilting in the mycelium view and in the `resume` briefing (11.2). The header does not replace the dated changelog; it makes the same discipline checkable by a tool.
 
 ## 11. Procedures
 
@@ -293,6 +321,8 @@ Recommended lint checks (cheap, run before publish and in review):
 
 ### 11.2 Session start
 Read the working agreement, tracker, master record headline and open items, the newest handoffs; check the live state; state the plan; ask before changing anything; keep secrets out of the chat.
+
+`tools/resume` prints this as one briefing capped at a character budget (default 6000, `--budget N` or `RESUME_BUDGET`): the repository state, the pending list, the headline facts and open items of the master record, notes past a review or follow-up date, the newest handoff and the last commits. Items are whole or left out, never cut in half, and the footer says how many were left out. It is a derived view: it saves reading, it does not replace the notes, and a fact you will act on is read in its own note.
 
 ### 11.3 Full audit
 1. Read the pending list and every note.
@@ -322,7 +352,7 @@ Restore the latest snapshot into a scratch directory; run `git fsck` and `git lo
 
 1. **Bootstrap independent of where the session starts.** Put an entry-point file in the repository root (`AGENTS.md`, `CLAUDE.md` or equivalent) with the read order and the few rules that must never be missed. Do not rely on a tool's per-folder memory alone: it may be absent for a new session or a different folder. Agent memory is a **pointer layer** (index and preferences), never the source of truth.
 2. **Read before write, every time**, especially for tracker-like files that are overwritten. Edit in place rather than regenerating whole files; a file written from memory can silently drop content.
-3. **Context budget.** Provide an index, headline facts and section pointers; keep files sized so a relevant section can be loaded without loading everything; keep summaries at the top.
+3. **Context budget.** Provide an index, headline facts and section pointers; keep files sized so a relevant section can be loaded without loading everything; keep summaries at the top. `tools/resume` gives a session a bounded start-of-session briefing (11.2).
 4. **Make notes agent-readable**: full file names, stable headings, explicit "DONE/pending", exact commands in code blocks, no pronoun-heavy shorthand.
 5. **Ask before destructive or outward-facing actions**; confirm before deleting; approval is per item and does not carry over.
 6. **Secrets stay with the human**: the agent triggers the command in a human-visible terminal and the human types the credential; the agent never prints credentials and says at once if one appears in output.
@@ -394,7 +424,9 @@ Paths are relative to the kit, which is the skill folder `skills/myco-notes/` (i
 | Secret refusal at commit time (8.2) | `tools/hooks/pre-commit` (versioned; activated by `git config core.hooksPath <tools folder>/hooks`), rules in `tools/secret-scan` |
 | Server-side gate that a contributor cannot bypass (8.2, 18) | `tools/ci-check`, `template/.github/workflows/notes-check.yml` |
 | Per-clone setup, branches and pull requests (18) | `tools/setup-clone`, `tools/notes-commit --branch/--push/--pr`, `docs/TEAM.md` |
-| Lint: references, numbering, freshness, due dates, ledger, secrets, size (3.3, 9, 10) | `tools/notes-lint.py` (`HISTORY_DIRS`, `DATA_DIRS`, `MAX_NOTE_KB`, `ENTRY_WARN_KB`) |
+| Lint: references, numbering, freshness, due dates, ledger, secrets, size (3.3, 9, 10) and the optional freshness header (10.1) | `tools/notes-lint.py` (`HISTORY_DIRS`, `DATA_DIRS`, `MAX_NOTE_KB`, `ENTRY_WARN_KB`, `STALE_DAYS`) |
+| Bounded start-of-session briefing (11.2, 12) | `tools/resume` (`--budget`, `RESUME_BUDGET`) |
+| What the notes said on a date, what changed since, history of one note (7.1) | `tools/asof` |
 | Relation map, backlinks, history, publication gate (9, 8.2) | `tools/build-notes-map.py` |
 | The relations as a network, freshness, stale follow-ups, missing references, replay of the history (9, 10) | `tools/build-notes-map.py` writes `graph.html` (`tools/notes_graph.py`, `tools/graph-template.html`) |
 | Mirror (8.4) | `tools/mirror-push` |

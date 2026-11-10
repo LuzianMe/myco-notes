@@ -60,6 +60,26 @@ def load_conf(root):
     return conf
 
 
+def frontmatter(text):
+    """Optional header at the top of a note (method 10.1): a '---' line, 'key: value' lines, a closing '---' line. No YAML library.
+
+    Returns ({key: (value, line_number)}, number of lines the header occupies); ({}, 0) when the note has none. Keys are lower-cased
+    and use underscores; a trailing '# comment' and surrounding quotes are dropped; anything that is not 'key: value' is ignored.
+    """
+    lines = text.split("\n")
+    if not lines or lines[0].strip() != "---":
+        return {}, 0
+    fm = {}
+    for i in range(1, min(len(lines), 60)):
+        raw = lines[i].rstrip("\r")
+        if raw.strip() in ("---", "..."):
+            return fm, i + 1
+        m = re.match(r"^([A-Za-z_][A-Za-z0-9_-]*)\s*:\s*(.*)$", raw)
+        if m:
+            fm[m.group(1).lower().replace("-", "_")] = (re.sub(r"\s+#.*$", "", m.group(2)).strip().strip("\"'"), i + 1)
+    return {}, 0
+
+
 def _rel(p):
     """A repository-relative folder name written with forward slashes and no leading or trailing slash."""
     return (p or "").strip().replace("\\", "/").strip("/")
