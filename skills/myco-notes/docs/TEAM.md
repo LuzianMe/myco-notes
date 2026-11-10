@@ -22,11 +22,11 @@ Paths below assume the default single-folder layout (`myco-notes/tools/...`). In
 ## 2. The routine for every contributor
 ```bash
 git clone <url> && cd <repo>
-tools/setup-clone                       # once per clone: activates the secret-refusing hook
+myco-notes/tools/setup-clone                       # once per clone: activates the secret-refusing hook
 git pull --ff-only                      # start from the latest main
 # ... change the notes (verify against the live system first; read each file just before editing) ...
 python3 myco-notes/tools/notes-lint.py             # fix errors
-tools/notes-commit --branch short-name --pr "what changed and why"
+myco-notes/tools/notes-commit --branch short-name --pr "what changed and why"
 ```
 `--branch` creates the branch, `--pr` pushes it and opens the pull request with the GitHub CLI (`gh`); without `gh` it tells you the branch to open by hand. The `notes-check` job runs the secret scan and the lint; a maintainer reviews and merges.
 
@@ -48,7 +48,7 @@ Possible through the hosting API or an integration that edits files in the repos
 - Mirror and restore drill still apply: the hosting service is one copy, not a backup. Keep an independent snapshot (`myco-notes/tools/mirror-push`, `myco-notes/tools/restore-drill`).
 
 ## 7. What CI checks (`myco-notes/tools/ci-check`)
-1. Every line the pull request adds is scanned with the same rules as the local hook (`myco-notes/tools/secret-scan`).
-2. `myco-notes/tools/notes-lint.py`: errors fail the check; warnings do not, unless you set `CI_LINT_STRICT=1` in `.myco-notes.conf`.
+1. Every line that each commit of the pull request adds is scanned with the same rules as the local hook (`myco-notes/tools/secret-scan`), so a secret added in one commit and removed in the next is still caught. Reports show file, line and rule, never the value. If one is found, change the credential and remove it from the branch history before merging (rebase or squash the branch, then force-push it).
+2. `myco-notes/tools/notes-lint.py`: errors fail the check; warnings do not, unless you set `CI_LINT_STRICT=1` in `.myco-notes.conf`. A lint that cannot run (for example an invalid expression in `.myco-notes-lint-ignore`) fails the check.
 
 Run it locally the same way: `myco-notes/tools/ci-check origin/main`.

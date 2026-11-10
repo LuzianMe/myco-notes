@@ -27,6 +27,39 @@ def toplevel(start):
     return r.stdout.strip() if r.returncode == 0 and r.stdout.strip() else None
 
 
+def _real(p):
+    return os.path.normcase(os.path.realpath(os.path.abspath(p)))
+
+
+def overlap(a, b):
+    """How folder b relates to folder a: 'same', 'inside' (b is inside a), 'contains' (b contains a) or None.
+    Compares resolved paths (symbolic links, case on Windows), so two spellings of one folder are the same folder."""
+    ra, rb = _real(a), _real(b)
+    if ra == rb:
+        return "same"
+    try:
+        common = os.path.commonpath([ra, rb])
+    except ValueError:  # different drives on Windows
+        return None
+    if common == ra:
+        return "inside"
+    if common == rb:
+        return "contains"
+    return None
+
+
+def owned_or_empty(path, marker, looks_like=None):
+    """True when `path` does not exist, is an empty folder, holds our `marker` file, or (for folders made before markers
+    existed) passes `looks_like(path)`. Tools that empty or overwrite a folder call this first."""
+    if not os.path.exists(path):
+        return True
+    if not os.path.isdir(path):
+        return False
+    if not os.listdir(path) or os.path.isfile(os.path.join(path, marker)):
+        return True
+    return bool(looks_like and looks_like(path))
+
+
 def load_conf(root):
     """Read .myco-notes.conf (shell-style KEY=value, quoted values may span lines). No shell is executed."""
     p = os.path.join(root, ".myco-notes.conf")

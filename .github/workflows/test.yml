@@ -37,3 +37,21 @@ jobs:
           $o = (& .\tools\bootstrap --help) | Out-String
           if ($o -notmatch 'target') { throw "PowerShell: .\tools\bootstrap did not run" }
           "launchers OK in PowerShell and cmd"
+  oldest-python:
+    # The tools promise Python 3.8+; run both tests on the oldest version so a newer-only feature cannot slip in.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.8"
+      - name: Git identity for the test commits
+        run: |
+          git config --global user.name "CI"
+          git config --global user.email "ci@example.invalid"
+      - name: Native test on Python 3.8
+        run: python tests/native.py
+      - name: Smoke test on Python 3.8
+        run: |
+          mkdir -p "$RUNNER_TEMP/py38" && ln -sf "$(command -v python)" "$RUNNER_TEMP/py38/python3"
+          PATH="$RUNNER_TEMP/py38:$PATH" bash tests/smoke.sh

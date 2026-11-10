@@ -4,7 +4,7 @@ description: Keep a project's knowledge in a versioned, secret-free, cross-refer
 license: Apache-2.0
 compatibility: Needs git and python 3.8+ (Linux, macOS, Windows). rsync and ssh only for a remote-host mirror. Agent-neutral; any coding agent that reads SKILL.md or AGENTS.md can use it.
 metadata:
-  version: "0.10.9"
+  version: "0.11.0"
 ---
 
 # Myco Notes
@@ -27,8 +27,8 @@ Find out what this session may do: write files, run git, reach the network, run 
 4. Update the notes the matrix names (a note with a freshness header, method section 10.1: move `last_confirmed` and `review_after` only after you verified it live): master record (`state.md`: inventory/current state and a dated changelog entry), `runbook.md` (a "How do I ...?" entry and, for mistakes, a lesson), entity note, plan/backlog, verification guide. Entry formats are in `docs/METHODOLOGY.md` section 4: why, what changed with exact names/paths/ids/versions, backup and undo, how it was tested with numbers, mistakes and lessons, follow-ups.
 5. Copy every new or changed deployed file into `<notes>/scripts/` (bundles get a README).
 6. Run `<tools>/notes-lint.py`; fix errors and relevant warnings.
-7. Commit: `<tools>/notes-commit "what changed and why"` (one logical change per commit; commit after every update big enough to matter, before ending the turn). **If it exits with code 3** it found a new folder or loose file in the repository root and committed nothing: show the owner its report, ask what to do with each item (`add`, `ignorelint`, `ignoreall` or `later`, explained in the report), never choose for them, then run it again with `--folder NAME=MODE` for each (see `NEW_FOLDERS` below).
-8. Add ONE line to the sync log in `sync-tracker.md`, move the last-synced date of each ledger target really updated, and write anything not done under Pending (never mark a copy synced if it was not).
+7. Add ONE line to the sync log (before the commit, so it goes into the same commit) in `sync-tracker.md`, move the last-synced date of each ledger target really updated, and write anything not done under Pending (never mark a copy synced if it was not).
+8. Commit: `<tools>/notes-commit "what changed and why"` (one logical change per commit; commit after every update big enough to matter, before ending the turn). **If it exits with code 3** it found a new folder or loose file in the repository root and committed nothing: show the owner its report, ask what to do with each item (`add`, `ignorelint`, `ignoreall` or `later`, explained in the report), never choose for them, then run it again with `--folder NAME=MODE` for each (see `NEW_FOLDERS` below).
 9. Mirror/push and rebuild views if configured (`notes-commit -p`, `<tools>/build-notes-map.py`, which also writes the mycelium view `<map>/graph.html`: the notes as a network with a timeline that replays the git history; point the owner to it when they ask to see how the notes connect or grew).
 10. Report in two layers: short steps while working; at the end a brief summary (what was done, how verified, what the owner must do).
 
@@ -49,7 +49,7 @@ Read the handoff in `<notes>/plans/`, check `git status` and last-modified times
 
 ### 6. Resume and hand off (start and end of a session)
 **Resume:** run `<tools>/resume` (a briefing capped at a character budget: repository state, pending list, headline facts and open items, notes past a review date, newest handoff, last commits), then read the entry point, `<notes>/working-agreement.md`, the pending list in `<notes>/sync-tracker.md`, the newest handoff in `<notes>/plans/` and `git log -5`; say in three lines what is current, what is unfinished and what is waiting on a person. Do not list pending items to the owner unless asked or unless one blocks the task.
-**Hand off:** before the session ends, commit, add the sync-log line, and write anything unfinished or undecided under Pending (or a handoff file in `<notes>/plans/` when another person or agent will continue), including the exact next command.
+**Hand off:** before the session ends, add the sync-log line, write anything unfinished or undecided under Pending (or a handoff file in `<notes>/plans/` when another person or agent will continue), including the exact next command, then commit.
 
 ## Guard rails (always)
 - **No secrets** in notes, commits, logs or chat: write where a secret lives, never its value. The commit hook and the map builder refuse obvious cases; do not rely on them.

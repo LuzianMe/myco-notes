@@ -3,10 +3,15 @@
 
   tools/ci-check [BASE]      BASE = commit or ref to compare with (default origin/main); empty or all zeros = last commit only
 
-  1. secret scan of every line the range adds (same rules as the local hook, which a contributor can bypass)
-  2. tools/notes-lint.py: errors (exit 2) fail the check; warnings fail only when CI_LINT_STRICT=1 in .myco-notes.conf
+  1. secret scan of every line each commit in the range adds, and of the range as a whole (same rules as the local hook,
+     which a contributor can bypass). Each commit is scanned on its own because a secret added in one commit and removed
+     in a later one never shows in the final diff but stays readable in the history. Findings hide the value.
+  2. tools/notes-lint.py: errors (exit 2) fail the check; warnings fail only when CI_LINT_STRICT=1 in .myco-notes.conf.
+     A lint that crashes or does not print its closing summary fails the check: an unfinished check is never a pass.
+Exit: 0 passed, 1 failed (a finding, a lint error, or a check that could not run).
 """
 import os
+import re
 import subprocess
 import sys
 
@@ -42,26 +47,47 @@ def main():
         rng = [parent.stdout.strip() if parent.returncode == 0 else EMPTY_TREE, "HEAD"]
 
     rc = 0
-    print(f"== secret scan ({' '.join(rng)})")
-    diff = _myco.git("diff", "-U0", "--no-color", *rng).stdout
-    allow_file = os.path.join(root, conf.get("SECRET_ALLOW_FILE") or ".myco-notes-secret-allow")
-    allow = []
-    if os.path.isfile(allow_file):
-        with open(allow_file, encoding="utf-8") as fh:
-            allow = [l.strip() for l in fh if l.strip() and not l.startswith("#")]
-    hits = secret_scan.scan(diff, allow)
-    if hits:
-        print("FAIL: possible secrets in added lines (first 80 characters shown):")
-        for h in hits:
-            print(h[:80])
-        rc = 1
+    if base:
+        commits = _myco.git("rev-list", "--reverse", "--no-merges", f"{base}..HEAD").stdout.split()
     else:
+        commits = [_myco.git("rev-parse", "HEAD").stdout.strip()]
+    print(f"== secret scan ({len(commits)} commit(s), and {' '.join(rng)})")
+    try:
+        allow = secret_scan.read_allow(root, conf)
+        hits, seen = [], set()
+        for c in commits:
+            shown = _myco.git("show", "--format=", "-U0", "--no-color", "--first-parent", c).stdout
+            for h in secret_scan.scan(shown, allow):
+                hits.append(secret_scan.format_hit(h, f"{c[:8]} "))
+                seen.add(h)
+        r = _myco.git("diff", "-U0", "--no-color", *rng)
+        if r.returncode != 0:
+            raise RuntimeError(f"git diff failed: {r.stderr.strip()[:200]}")
+        hits += [secret_scan.format_hit(h, "range ") for h in secret_scan.scan(r.stdout, allow) if h not in seen]
+    except Exception as e:
+        print(f"FAIL: the secret scan could not run: {e}")
+        hits, rc = [], 1
+    if hits:
+        print("FAIL: possible secrets in added lines (values hidden). A secret found in an earlier commit is still in the history:")
+        print("      change the credential, then remove it from the branch history before merging (method 8.1).")
+        for h in dict.fromkeys(hits):
+            print("  " + h)
+        rc = 1
+    elif rc == 0:
         print("ok: no secret-looking added lines")
 
     print("== notes-lint")
     sys.stdout.flush()
-    lrc = subprocess.run([sys.executable, os.path.join(HERE, "notes-lint.py"), "--root", root]).returncode
-    if lrc == 2:
+    lr = subprocess.run([sys.executable, os.path.join(HERE, "notes-lint.py"), "--root", root], capture_output=True, text=True,
+                        encoding="utf-8", errors="replace")
+    sys.stdout.write(lr.stdout)
+    sys.stderr.write(lr.stderr)
+    lrc = lr.returncode
+    finished = bool(re.search(r"(?m)^notes-lint: \d+ notes, \d+ errors, \d+ warnings, \d+ info$", lr.stdout))
+    if lrc not in (0, 1, 2) or not finished:
+        print(f"FAIL: the lint did not finish (exit {lrc}); fix the cause above")
+        rc = 1
+    elif lrc == 2:
         print("FAIL: lint errors")
         rc = 1
     elif lrc == 1 and strict:
