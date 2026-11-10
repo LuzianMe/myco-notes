@@ -15,8 +15,9 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 KIT = os.path.normpath(os.path.join(HERE, "..", "..", "skills", "myco-notes"))
-ENV = dict(os.environ, GIT_AUTHOR_NAME="Demo Owner", GIT_AUTHOR_EMAIL="demo@example.invalid",
-           GIT_COMMITTER_NAME="Demo Owner", GIT_COMMITTER_EMAIL="demo@example.invalid")
+# The demo's git identity and dates are set as variables of this process only, inherited by the git and kit commands it runs.
+DEMO_GIT = {"GIT_AUTHOR_NAME": "Demo Owner", "GIT_AUTHOR_EMAIL": "demo@example.invalid",
+            "GIT_COMMITTER_NAME": "Demo Owner", "GIT_COMMITTER_EMAIL": "demo@example.invalid"}
 
 # (date, commit message, {path under myco-notes/: text}); text starting with "+" is appended to the note instead of replacing it.
 STEPS = [
@@ -164,10 +165,13 @@ Capacitive soil moisture probes, six bought for a test in one bed. Not connected
 
 
 def run(args, cwd, date=None):
-    env = dict(ENV)
+    os.environ.update(DEMO_GIT)
     if date:
-        env["GIT_AUTHOR_DATE"] = env["GIT_COMMITTER_DATE"] = date + "T10:00:00+00:00"
-    return subprocess.run(args, cwd=cwd, env=env, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True).stdout
+        os.environ.update({"GIT_AUTHOR_DATE": date + "T10:00:00+00:00", "GIT_COMMITTER_DATE": date + "T10:00:00+00:00"})
+    else:
+        for k in ("GIT_AUTHOR_DATE", "GIT_COMMITTER_DATE"):
+            os.environ.pop(k, None)
+    return subprocess.run(args, cwd=cwd, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True).stdout
 
 
 def main():
@@ -176,12 +180,8 @@ def main():
     out = os.path.abspath(sys.argv[1])
     if os.path.exists(out):
         sys.exit("build_demo: %s exists; give a new folder" % out)
-    env_date = "2026-01-05"
-    os.environ.update({"GIT_AUTHOR_DATE": env_date + "T09:00:00+00:00", "GIT_COMMITTER_DATE": env_date + "T09:00:00+00:00"})
     run([sys.executable, os.path.join(KIT, "tools", "bootstrap.py"), out, "--name", "Greenhouse Sensors", "--owner", "Demo Owner",
-         "--tz", "UTC", "--new-folders", "add"], HERE, env_date)
-    for k in ("GIT_AUTHOR_DATE", "GIT_COMMITTER_DATE"):
-        os.environ.pop(k, None)
+         "--tz", "UTC", "--new-folders", "add"], HERE, "2026-01-05")
     notes = os.path.join(out, "myco-notes")
     with open(os.path.join(out, ".myco-notes-map.json"), "w", encoding="utf-8") as fh:
         json.dump({"title": "Greenhouse Sensors (demo)", "groups": [

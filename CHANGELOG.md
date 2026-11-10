@@ -5,7 +5,7 @@
 - Tests: `tests/smoke.sh` checks that no `.gitattributes` in the kit rewrites contents, that the launchers are stored with the right line endings, and that a new tree still gets its `.gitattributes`.
 
 ## 0.10.5
-- **Ready for the plugin directory**: a listing icon (`.claude-plugin/icon.png`, 1024 px, a small mycelium in the view's colours), `displayName` "Myco Notes" in `plugin.json`, and a README section "What it runs and what it sends" (local scripts and git only; network only for a mirror, push or pull request you configure; no telemetry). `claude plugin validate .` passes with no directory findings.
+- **Ready for the plugin directory**: a listing icon (1024 px, a small mycelium in the view's colours, in the plugin manifest folder), `displayName` "Myco Notes" in `plugin.json`, and a README section "What it runs and what it sends" (local scripts and git only; network only for a mirror, push or pull request you configure; no telemetry). `claude plugin validate .` passes with no directory findings.
 - Tests: the fake private-key header used to test the secret refusal is assembled at run time, so no file in the repository holds key-shaped text.
 
 ## 0.10.4
