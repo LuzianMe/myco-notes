@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.12.1
+Fixes from a second outside review (method 2.5: sections 8.2 and 8.4).
+- **Links in a mirror are never followed**: a symbolic link or Windows junction found inside the mirror is removed and replaced, not entered, and a folder that resolves outside the mirror is refused; before, a junction placed in the mirror could make a sync delete and write files outside it. Tested with a junction on Windows and a symlink elsewhere.
+- **Secret reports show no text from the line**: only file, line and rule. Before, a second credential on the same line was printed in full.
+- **CI scans merge commits**: the lines a merge adds that none of its parents had (a conflict resolution) are scanned.
+- **CI fails when its base cannot be found** (with a hint for shallow clones and force pushes) instead of quietly scanning only the last commit; a first push (zero base) scans the whole history.
+- **A linked git worktree is not copied into a mirror**: its `.git` is only a pointer to history stored elsewhere; `mirror-push` refuses and points to `MIRROR_TARGET=git:URL`.
+- **ssh targets get the ownership check** of local ones before rsync deletes anything (missing, empty, marked, or a mirror of the same repository), and keep their marker.
+- **Content check**: `mirror-push --verify` or `MIRROR_VERIFY=hash` compares SHA-256 when sizes match, so a change that keeps size and time is not missed (rsync gets `--checksum`).
+- **`notes-commit --only` checks only what it commits**: syntax checks and `SYNC_GLOBS` look at the selected paths; other staged files stay staged and unchecked.
+- **`notes-commit -p` passes on the mirror result**: exit 4 means committed, but the mirror did not sync (failed, or skipped with `MIRROR_STRICT=1`).
+
 ## 0.12.0
 Honest results and narrower actions, the second half of the outside review (method 2.4: sections 7, 8.4, 11.2, 11.5, 11.6, 12).
 - **Approval rule**: "Ask before changing anything the owner has not asked for; an explicit request is approval for that change. Deleting and publishing always need a per-item yes." In the method, SKILL.md and the template's entry point and working agreement, so an agent no longer stops to re-ask for work it was just asked to do.

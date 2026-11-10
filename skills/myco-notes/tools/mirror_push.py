@@ -13,6 +13,13 @@ unreachable or not configured, so a timer never nags. Run it from a timer (for e
   mirror-push --dry-run    for a local directory: list what would be copied and removed, change nothing
   mirror-push --strict     scheduled-job mode (or MIRROR_STRICT=1): exit 3 when skipped, 1 when anything failed
 
+  mirror-push --verify     compare file contents (SHA-256) when sizes match, not only size and time (or MIRROR_VERIFY=hash)
+
+Links: a symbolic link or Windows junction found in the target is removed (never followed), so a sync cannot reach outside
+the target; links in the repository are copied as links. A linked git worktree (.git is a file pointing elsewhere) cannot be
+copied into a self-contained mirror: use MIRROR_TARGET=git:URL there. An ssh target gets the same ownership check as a local
+one before rsync deletes anything.
+
 Result: the last line starts with "mirror: synced", "mirror: skipped" or "mirror: failed".
 Exit: 0 synced (or skipped, without --strict), 1 failed, 3 skipped with --strict.
 MIRROR_SCOPE (local directory and ssh targets): tracked = .git plus the tracked files, never ignored or untracked files (new
@@ -29,6 +36,8 @@ import shutil
 import stat
 import subprocess
 import sys
+import hashlib
+import shlex
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -37,7 +46,26 @@ sys.path.insert(0, HERE)
 import _myco  # noqa: E402
 
 
+def link_like(path):
+    """True for a symbolic link or a Windows junction (or other reparse point): something a sync must not follow."""
+    if os.path.islink(path):
+        return True
+    isj = getattr(os.path, "isjunction", None)          # Python 3.12+
+    if isj and isj(path):
+        return True
+    try:
+        return bool(getattr(os.lstat(path), "st_file_attributes", 0) & 0x400)   # FILE_ATTRIBUTE_REPARSE_POINT
+    except OSError:
+        return False
+
+
 def _rm(path):
+    if link_like(path):                                 # remove the link itself, never what it points to
+        try:
+            os.unlink(path)
+        except OSError:
+            os.rmdir(path)                              # a junction is removed with rmdir
+        return
     try:
         os.chmod(path, stat.S_IWRITE | stat.S_IREAD | stat.S_IEXEC)  # read-only files (.git objects on Windows)
     except OSError:
@@ -51,16 +79,29 @@ def _rm(path):
 MARKER = ".myco-mirror"
 
 
-def sync_dir(src, dst, plan=None, top=True, keep=None, rel=""):
+def same_content(a, b):
+    def h(p):
+        d = hashlib.sha256()
+        with open(p, "rb") as fh:
+            for chunk in iter(lambda: fh.read(1 << 20), b""):
+                d.update(chunk)
+        return d.digest()
+    return h(a) == h(b)
+
+
+def sync_dir(src, dst, plan=None, top=True, keep=None, rel="", verify=False, base=None, empty=False):
     """Make dst equal to src (like rsync -a --delete): copy new or changed files, remove what no longer exists.
     With `plan` (a list) nothing changes: each action is appended as ("remove"|"copy", path) instead.
     `keep(relative path)` limits what counts as source (MIRROR_SCOPE=tracked); anything else is removed from dst."""
-    if plan is None:
+    base = base or dst
+    if top and plan is None:
         os.makedirs(dst, exist_ok=True)
+    if not top and not empty and os.path.lexists(dst) and _myco.overlap(base, dst) != "inside":
+        raise OSError(f"refusing to write {dst}: it resolves outside the mirror {base}")
     src_names = set(os.listdir(src))
     if keep:
         src_names = {n for n in src_names if keep(rel + n)}
-    dst_names = os.listdir(dst) if os.path.isdir(dst) else []
+    dst_names = os.listdir(dst) if (os.path.isdir(dst) and not empty) else []
     for name in dst_names:
         if name not in src_names and not (top and name == MARKER):
             if plan is None:
@@ -69,16 +110,21 @@ def sync_dir(src, dst, plan=None, top=True, keep=None, rel=""):
                 plan.append(("remove", os.path.join(dst, name)))
     for name in sorted(src_names):
         s, d = os.path.join(src, name), os.path.join(dst, name)
+        dlink = os.path.lexists(d) and link_like(d)
         if plan is not None:
-            if os.path.isdir(s) and not os.path.islink(s):
-                if os.path.lexists(d) and not os.path.isdir(d):
+            if dlink:
+                plan.append(("remove link", d))
+            if os.path.isdir(s) and not link_like(s):
+                if os.path.lexists(d) and not dlink and not os.path.isdir(d):
                     plan.append(("remove", d))
-                sync_dir(s, d, plan, False, keep, rel + name + "/")
-            elif not (os.path.isfile(d) and os.stat(d).st_size == os.stat(s).st_size
-                      and int(os.stat(d).st_mtime) == int(os.stat(s).st_mtime)):
+                sync_dir(s, d, plan, False, keep, rel + name + "/", verify, base, empty=dlink)
+            elif dlink or not (os.path.isfile(d) and os.stat(d).st_size == os.stat(s).st_size
+                               and (same_content(s, d) if verify else int(os.stat(d).st_mtime) == int(os.stat(s).st_mtime))):
                 plan.append(("copy", d))
             continue
-        if os.path.islink(s):
+        if dlink:
+            _rm(d)                                      # never follow a link in the mirror
+        if link_like(s):
             if os.path.lexists(d):
                 _rm(d)
             try:
@@ -88,14 +134,15 @@ def sync_dir(src, dst, plan=None, top=True, keep=None, rel=""):
         elif os.path.isdir(s):
             if os.path.lexists(d) and not os.path.isdir(d):
                 _rm(d)
-            sync_dir(s, d, None, False, keep, rel + name + "/")
+            os.makedirs(d, exist_ok=True)
+            sync_dir(s, d, None, False, keep, rel + name + "/", verify, base)
         else:
             if os.path.isdir(d) and not os.path.islink(d):
                 _rm(d)
             ss = os.stat(s)
             if os.path.exists(d):
                 ds = os.stat(d)
-                if ds.st_size == ss.st_size and int(ds.st_mtime) == int(ss.st_mtime):
+                if ds.st_size == ss.st_size and (same_content(s, d) if verify else int(ds.st_mtime) == int(ss.st_mtime)):
                     continue
                 if not os.access(d, os.W_OK):
                     os.chmod(d, stat.S_IWRITE | stat.S_IREAD)
@@ -138,6 +185,28 @@ def tracked_filter(root):
     return lambda r: r == ".git" or r.startswith(".git/") or r in files or r in dirs
 
 
+def check_remote_target(root, host, path):
+    """The ssh twin of check_local_target: None when user@host:path is missing, empty, holds our marker, or is a mirror of
+    this repository (same first commit); otherwise the reason. Needs a POSIX shell on the remote side."""
+    roots = " ".join(_myco.git("-C", root, "rev-list", "--max-parents=0", "HEAD").stdout.split()) or "none"
+    q = shlex.quote(path.rstrip("/") or "/")
+    script = (f"p={q}; [ -e \"$p\" ] || {{ echo ok; exit; }}; [ -d \"$p\" ] || {{ echo notdir; exit; }}; "
+              f"[ -z \"$(ls -A \"$p\")\" ] && {{ echo ok; exit; }}; [ -f \"$p/{MARKER}\" ] && {{ echo ok; exit; }}; "
+              f"r=$(git -C \"$p\" rev-list --max-parents=0 HEAD 2>/dev/null); "
+              f"for c in {roots}; do case \" $r \" in *\" $c \"*|*\"$c\"*) echo ok; exit;; esac; done; echo foreign")
+    r = subprocess.run(["ssh", "-o", "ConnectTimeout=10", "-o", "BatchMode=yes", host, script], capture_output=True, text=True,
+                       encoding="utf-8", errors="replace")
+    out = r.stdout.strip().splitlines()[-1] if r.stdout.strip() else ""
+    if r.returncode != 0 or out not in ("ok", "notdir", "foreign"):
+        return f"could not check {host}:{path} before syncing ({(r.stderr.strip().splitlines() or ['no answer'])[-1]})"
+    if out == "notdir":
+        return f"{host}:{path} exists and is not a folder"
+    if out == "foreign":
+        return (f"{host}:{path} is not empty and is not a mirror of this repository; point MIRROR_TARGET at an empty folder, or "
+                f"create an empty file {MARKER} in it if every file there may be replaced or removed")
+    return None
+
+
 def dir_size(path):
     total = 0
     for dp, _dn, fn in os.walk(path):
@@ -160,6 +229,7 @@ def main():
     dry = "--dry-run" in args
     conf = _myco.load_conf(root)
     strict = "--strict" in args or conf.get("MIRROR_STRICT", "0") == "1"
+    verify = "--verify" in args or conf.get("MIRROR_VERIFY", "").strip().lower() == "hash"
     scope = (conf.get("MIRROR_SCOPE") or "all").strip().lower()
     if scope not in ("tracked", "all"):
         print(f"mirror: failed, MIRROR_SCOPE={scope!r} must be tracked or all", file=sys.stderr)
@@ -191,6 +261,9 @@ def main():
         if r.returncode:
             return failed(f"git push --mirror to {url} ({r.stderr.strip().splitlines()[-1] if r.stderr.strip() else 'no detail'})")
         what = "history and tracked files"
+    elif not os.path.isdir(os.path.join(root, ".git")):
+        return failed("this is a linked git worktree (.git is a file pointing to history stored elsewhere), so a copy would not "
+                      "hold its own history; use MIRROR_TARGET=git:URL (git push --mirror) for it")
     elif re.match(r"^[A-Za-z]:[\\/]", target) or ":" not in target:
         why = check_local_target(root, target)
         if why:
@@ -198,13 +271,13 @@ def main():
         keep = tracked_filter(root) if scope == "tracked" else None
         if dry:
             plan = []
-            sync_dir(root, target, plan, keep=keep)
+            sync_dir(root, target, plan, keep=keep, verify=verify)
             for act, path in plan:
                 print(f"  would {act}: {path}")
             print(f"mirror: dry run ({scope}), {sum(a == 'copy' for a, _ in plan)} to copy, {sum(a == 'remove' for a, _ in plan)} to remove; nothing changed")
             return 0
         try:
-            sync_dir(root, target, keep=keep)
+            sync_dir(root, target, keep=keep, verify=verify)
             open(os.path.join(target, MARKER), "a").close()
         except OSError as e:
             return failed(f"copy to {target} stopped: {e}")
@@ -216,7 +289,11 @@ def main():
         ok = subprocess.run(["ssh", "-o", "ConnectTimeout=5", "-o", "BatchMode=yes", host, "true"], capture_output=True).returncode == 0
         if not ok:
             return skipped(f"{host} not reachable")
-        cmd = ["rsync", "-a", "--delete", "-e", "ssh -o BatchMode=yes"]
+        path = target.split(":", 1)[1]
+        why = check_remote_target(root, host, path)
+        if why:
+            return failed(f"refused: {why}")
+        cmd = ["rsync", "-a", "--delete", "--filter=P /" + MARKER, "-e", "ssh -o BatchMode=yes"] + (["--checksum"] if verify else [])
         if scope == "tracked":   # leave out (and remove from the target) everything git does not track
             others = [f for f in _myco.git("ls-files", "--others", "--directory", "-z").stdout.split("\0") if f]
             cmd += ["--delete-excluded", "--from0", "--exclude-from=-"]
@@ -232,6 +309,7 @@ def main():
         if dry:
             print("mirror: dry run, nothing changed")
             return 0
+        subprocess.run(["ssh", "-o", "BatchMode=yes", host, "touch " + shlex.quote(path.rstrip("/") + "/" + MARKER)], capture_output=True)
         what = "history and tracked files" if scope == "tracked" else "the whole working copy"
 
     post_failed = 0

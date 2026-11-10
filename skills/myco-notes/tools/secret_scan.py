@@ -11,8 +11,9 @@ characters (12 to 19 only when not a plain lower-case word); secret/token/api_ke
 characters. Names match in any case (PASSWORD= too). Prompts like printf "...%s", placeholders like <password> or ${PASS}
 and references like "!secret name" do not match. Pattern-based: an unusual format can pass, so treat this as a safety net,
 not a guarantee.
-Reports name the file, line and rule and hide the value ("[redacted, 24 chars]"), so a report never copies a secret into a
-terminal or CI log.
+Reports name the file, line and rule and show no text from the line at all (a line can hold more than one secret, and a
+second one in a format the rules do not know would otherwise be printed), so a report never copies a secret into a terminal
+or CI log. Open the file at that line to see it.
 Allow list: regular expressions (one per line) in the file named by SECRET_ALLOW_FILE (default .myco-notes-secret-allow);
 each is matched against "path:line: rule" and against the line itself. An invalid expression is an error (exit 3).
 Exit: 0 nothing found, 1 hits, 3 the scan could not run.
@@ -57,14 +58,6 @@ def find(line):
     return None
 
 
-def redact(line, span, width=100):
-    """The line with the matched value replaced by its length, cut to `width` characters."""
-    a, b = span
-    out = line[:a] + f"[redacted, {b - a} chars]" + line[b:]
-    out = out.strip()
-    return out if len(out) <= width else out[:width - 3] + "..."
-
-
 def compile_allow(lines, source="allow list"):
     rx = []
     for n, pat in enumerate(lines, 1):
@@ -84,7 +77,7 @@ def read_allow(root, conf):
 
 
 def scan(diff_text, allow=()):
-    """Findings for the ADDED lines of a unified diff: a list of (path, line number, rule, redacted line).
+    """Findings for the ADDED lines of a unified diff: a list of (path, line number, rule). No text of the line is kept.
     `allow` holds compiled expressions (or strings) matched against 'path:line: rule' and the line itself."""
     allow = [a if hasattr(a, "search") else re.compile(a) for a in allow]
     hits = []
@@ -104,7 +97,7 @@ def scan(diff_text, allow=()):
             if f:
                 tag = f"{path}:{ln}: {f[0]}"
                 if not any(a.search(tag) or a.search(body) for a in allow):
-                    hits.append((path, ln, f[0], redact(body, f[1])))
+                    hits.append((path, ln, f[0]))
             ln += 1
         elif line.startswith(" "):
             ln += 1
@@ -112,8 +105,8 @@ def scan(diff_text, allow=()):
 
 
 def format_hit(hit, prefix=""):
-    path, ln, rule, shown = hit
-    return f"{prefix}{path}:{ln}: {rule}: {shown}"
+    path, ln, rule = hit
+    return f"{prefix}{path}:{ln}: {rule} (value not shown)"
 
 
 def main():
