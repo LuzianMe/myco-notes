@@ -28,7 +28,7 @@ SECRET = re.compile(r"BEGIN [A-Z ]*PRIVATE KEY|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{
                     r"(?i:(password|passwd|passphrase|secret|token|api[_-]?key|psk))[\"']?\s*[:=]\s*[\"']?[A-Za-z0-9+/_=-]{20,}")
 def default_groups(lay):
     n = lay["notes"] + "/"
-    start = ["AGENTS.md", "CLAUDE.md", "README.md"] + [n + f for f in ("working-agreement.md", "sync-tracker.md", "state.md", "runbook.md")]
+    start = ["AGENTS.md", "CLAUDE.md", "README.md"] + [n + f for f in ("working-agreement.md", "sync-tracker.md", lay["state"], "runbook.md")]
     return [
         ("start", "Start here", "Read in this order: entry point, working agreement, tracker, master record, runbook.", start),
         ("plans", "Plans, backlog and decisions", "What is parked, planned, waiting or decided.", [n + "plans/"]),

@@ -4,7 +4,7 @@ description: Keep a project's knowledge in a versioned, secret-free, cross-refer
 license: Apache-2.0
 compatibility: Needs git and python 3.8+ (Linux, macOS, Windows). rsync and ssh only for a remote-host mirror. Agent-neutral; any coding agent that reads SKILL.md or AGENTS.md can use it.
 metadata:
-  version: "0.8.2"
+  version: "0.8.3"
 ---
 
 # Myco Notes
@@ -66,4 +66,4 @@ If the project has notes but no tools folder yet, copy it from the kit into the 
 `AGENTS.md`/`CLAUDE.md`; `<notes>/working-agreement.md`; `<notes>/state.md`; `<notes>/runbook.md`; `<notes>/sync-tracker.md`; `<notes>/plans/backlog.md`; `<notes>/logs/`; `<notes>/scripts/`; `<notes>/verification/verification.md`; `<notes>/archive/`; `.myco-notes.conf`; `<tools>/`; `<docs>/` (`<notes>` is `myco-notes` by default, so these are `myco-notes/state.md` and so on).
 
 ## Configuration
-`.myco-notes.conf` (shell syntax): the layout (`MYCO_DIR`, `NOTES_DIR`, `TOOLS_DIR`, `DOCS_DIR`, `MAP_DIR`, `DATA_DIRS`, `HISTORY_DIRS`), the lint limits (`MAX_NOTE_KB`, `ENTRY_WARN_KB`), `AGENT_TRAILER` (co-author line for commits made by an agent), `SYNC_GLOBS`/`SYNC_CMD` (keep the live copy of executed files equal to the committed copy), `NEW_FOLDERS` (`ask` default, `add`, `ignorelint`, `ignoreall`: what `notes-commit` does with a new root folder or loose file; `notes-commit --folder NAME=MODE` answers for one item, `NAME=*` for all, `later` leaves it out of this commit), `CHECK_SH`/`CHECK_PY`, `MIRROR_TARGET`, `POST_PUSH_CMDS`, `SECRET_ALLOW_FILE`. Optional `.myco-notes-map.json` (groups, hints, title) and `.myco-notes-lint-ignore` (regexes of findings to drop).
+`.myco-notes.conf` (shell syntax): the layout (`MYCO_DIR`, `NOTES_DIR`, `TOOLS_DIR`, `DOCS_DIR`, `MAP_DIR`, `DATA_DIRS`, `HISTORY_DIRS`, `STATE_FILE` for a master record not called `state.md`), the lint limits (`MAX_NOTE_KB`, `ENTRY_WARN_KB`), `AGENT_TRAILER` (co-author line for commits made by an agent), `SYNC_GLOBS`/`SYNC_CMD` (keep the live copy of executed files equal to the committed copy), `NEW_FOLDERS` (`ask` default, `add`, `ignorelint`, `ignoreall`: what `notes-commit` does with a new root folder or loose file; `notes-commit --folder NAME=MODE` answers for one item, `NAME=*` for all, `later` leaves it out of this commit), `CHECK_SH`/`CHECK_PY`, `MIRROR_TARGET`, `POST_PUSH_CMDS`, `SECRET_ALLOW_FILE`. Optional `.myco-notes-map.json` (groups, hints, title) and `.myco-notes-lint-ignore` (regexes of findings to drop).

@@ -72,6 +72,7 @@ def layout(root, conf=None):
     MYCO_DIR=myco-notes: that one folder holds the notes themselves plus tools/, docs/ and map/.
     NOTES_DIR, TOOLS_DIR, DOCS_DIR and MAP_DIR each override one folder; DATA_DIRS lists project folders that are not notes;
     HISTORY_DIRS (inside the notes folder) holds records that are not re-checked for dates and references.
+    STATE_FILE is the master record's file name inside the notes folder (default state.md; a project may call it homelab.md).
     """
     conf = load_conf(root) if conf is None else conf
     my = _rel(conf.get("MYCO_DIR"))
@@ -85,6 +86,7 @@ def layout(root, conf=None):
         "tools": pick("TOOLS_DIR", "tools", my + "/tools"),
         "docs": pick("DOCS_DIR", "docs", my + "/docs"),
         "map": pick("MAP_DIR", "notes-map", my + "/map"),
+        "state": _rel(conf.get("STATE_FILE")) or "state.md",
         "data": [d for d in (_rel(x) for x in conf.get("DATA_DIRS", "").split()) if d],
         "history": [d for d in (_rel(x) for x in conf.get("HISTORY_DIRS", "archive logs").split()) if d],
     }

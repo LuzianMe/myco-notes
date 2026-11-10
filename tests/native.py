@@ -121,6 +121,11 @@ def main():
         check("lint runs", rc in (0, 1) and "notes-lint:" in out, out)
         rc, out = run([sys.executable, os.path.join(proj, MY, "tools", "build-notes-map.py")], proj)
         check("map builds inside the one folder", rc == 0 and os.path.exists(os.path.join(proj, MY, "map", "index.html")), out)
+        sys.path.insert(0, os.path.join(proj, MY, "tools"))
+        import _myco as _m
+        check("STATE_FILE defaults to state.md", _m.layout(proj)["state"] == "state.md")
+        check("STATE_FILE can name the master record", _m.layout(proj, {"MYCO_DIR": "myco-notes", "STATE_FILE": "homelab.md"})["state"] == "homelab.md")
+        sys.path.pop(0)
         check("map is gitignored", git(proj, "check-ignore", "-q", MY + "/map")[0] == 0)
         check("map is not read as notes by the lint", "map/" not in run(lint, proj)[1])
 

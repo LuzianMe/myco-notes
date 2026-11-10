@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.3
+- **`STATE_FILE` in `.myco-notes.conf`.** A project whose master record is not called `state.md` (the homelab calls it `homelab.md`) can name it; the map's "Start here" group and `_myco.layout()` use that name. The default stays `state.md`, so nothing changes for existing trees. The working agreement and the tracker keep their standard names for now.
+- Tests: `tests/native.py` checks the default and the override.
+
 ## 0.8.2
 - **Mycelium view: no more mushrooms.** The entry notes (`AGENTS.md`, `CLAUDE.md`, working agreement, tracker, state, runbook) were drawn as cartoon mushrooms, but every Myco Notes tree has the same ones, so highlighting them said nothing about the project. Every note is now a glowing orb.
 - **Hubs come from the project's own data.** The few most-mentioned notes (at least two mentions, at most six) are drawn larger with two soft rings and always carry a label. The entry and method notes (the map's "Start here" and "Method" groups) and the history folders are never hubs, however often they are mentioned, because every tree has them.
