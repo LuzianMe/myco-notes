@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.10.2
+- **Mycelium view, phone panel**: on a phone, selecting a note opens a small strip at the bottom (the title on one line, links out and in, any warning, Open and More) instead of a panel that covered most of the screen. More (or a tap on the title) shows the full details and the lists; Less shrinks it again, and the choice is kept while the page is open. The desktop panel is unchanged.
+
 ## 0.10.1
 - **Mycelium view, pinch to zoom**: on a touch screen two fingers now zoom around their midpoint, and moving them together pans (the canvas turns off the browser's own gestures, and until now it followed only one finger, so pinching did nothing). Lifting the fingers selects nothing. The mouse wheel is unchanged.
 - **Mycelium view, bud colours**: the bud at the end of a thread has the colour of the note the thread comes from (its group, or the wilt colour), a shade darker on the dark theme and lighter on the light one.
