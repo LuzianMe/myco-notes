@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased (repository only; the skill is unchanged)
+- **Live demo**: `examples/demo/build_demo.py` builds a made-up "Greenhouse Sensors" tree (about 20 dated commits, a wilting note and a missing reference on purpose); `.github/workflows/demo.yml` publishes its map and mycelium view on GitHub Pages from `main`.
+- **README**: new opening (the problem in one line, a replay clip of the mycelium view, the live demo link, the install command, five feature bullets, badges); the screenshots now come from the demo tree.
+- Tests: `tests/smoke.sh` builds the demo tree and lints it.
+
 ## 0.10.0
 - **Mycelium view, direction**: the threads now show who mentions whom, in the view's own vocabulary instead of arrowheads. A hypha leaves the note that writes the mention broad and thins toward the note it names, ending in a small swollen tip (a bud) on its rim; two notes that mention each other share an even thread with a bud at both ends. On a lit thread the sap flows from the mentioning note to the mentioned one, and during a replay a new thread grows from its source instead of fading in. The detail panel lists "Mentions" and "Mentioned by" separately (it had one mixed list).
 - **Method**: section 9 says the relation map's edges have a direction and a view should show it. Version 2.2 of the document.
