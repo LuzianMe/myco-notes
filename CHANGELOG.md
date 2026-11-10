@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.7
+- **Plugin directory listing links**: `plugin.json` now sets `documentationUrl` (the method), `supportUrl` (GitHub issues) and `privacyPolicyUrl` (the README section "What it runs and what it sends": the plugin collects nothing and has no telemetry).
+- The demo builder (`examples/demo/build_demo.py`) sets only its own git variables instead of copying the whole environment; the demo tree is unchanged.
+
 ## 0.10.6
 - **Plugin directory validation**: the portal refused the repository ("Couldn't validate that repository") because its `.gitattributes` converted line endings (`text=auto eol=lf`, `*.cmd eol=crlf`), and the directory refuses attributes that rewrite file contents. The kit's `.gitattributes` is now `* -text` (store and check out every file exactly as committed): the `.cmd` launchers are committed with CRLF, everything else with LF, so they still work on every platform, also with `core.autocrlf=true`. The template's rules move to `template/gitattributes`, which `bootstrap` installs as the new tree's `.gitattributes`, so notes trees keep normalising line endings as before.
 - Tests: `tests/smoke.sh` checks that no `.gitattributes` in the kit rewrites contents, that the launchers are stored with the right line endings, and that a new tree still gets its `.gitattributes`.
