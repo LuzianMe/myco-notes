@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.10.4
+- **Mycelium view, collapsible boxes on a larger screen**: the search box has a − button that folds it to the title and counts (+ opens it again), and the detail panel has the phone's strip with Less and More, so both can give the network more room. The detail panel starts open on a larger screen and as a strip on a phone; a choice made with the buttons is remembered in the browser (localStorage, when allowed). The phone layout is unchanged.
+
 ## 0.10.3
 - **Mycelium view, labels take turns**: names used to show only on the hubs (for ever) and, zoomed in, on every larger note. Now a few notes carry their name at a time (about the square root of the notes in view, more when zoomed in past the fitted view): one fades in about every second with a small rise, each stays about 7 s and fades out, and a note that was just named rests for 25 s. Hubs, well-mentioned and recently changed notes are picked more often; a name never lands on another one or under the search, timeline, tools or detail panel, and fades out if the camera moves it under one. With a note selected, only its neighbours take turns, faster, and the ones already named stay. Hover, selection and search matches are named at once. With reduced motion the names switch without fading, every 11 s.
 - README stills retaken.
