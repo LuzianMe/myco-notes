@@ -159,4 +159,8 @@ echo "demo tree (README screenshots and the live demo)"
 chk "build_demo makes the tree, its map and the mycelium view" "python3 $repo/examples/demo/build_demo.py $tmp/demo | grep -q 'graph: 30 nodes' && [ -f $tmp/demo/myco-notes/map/graph.html ] && [ \"\$(git -C $tmp/demo rev-list --count HEAD)\" -ge 20 ]"
 chk "the demo tree is lint-clean apart from its two staged warnings" "(cd $tmp/demo && myco-notes/tools/notes-lint.py --quiet | grep -q ' 0 errors, 2 warnings')"
 
+chk "no .gitattributes in the kit rewrites file contents (the plugin directory refuses it)" "! git -C $repo ls-files -z '*.gitattributes' '.gitattributes' | xargs -0 -I{} grep -h -v '^#' $repo/{} | grep -q -E 'eol=|filter|export-|(^| )text( |=|$)'"
+chk ".cmd launchers are stored with CRLF and shell launchers with LF" "git -C $repo ls-files --eol -- skills/myco-notes/tools | awk '/\\.cmd\$/{if(\$1!=\"i/crlf\")bad=1;next} \$1==\"i/crlf\"{bad=1} END{exit bad}'"
+chk "bootstrap gives a new tree the normalising .gitattributes" "grep -q 'eol=lf' myco-notes/../.gitattributes 2>/dev/null || grep -q 'eol=lf' $tmp/demo/.gitattributes"
+
 echo; echo "passed $pass, failed $fail"; [ "$fail" = 0 ]

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.6
+- **Plugin directory validation**: the portal refused the repository ("Couldn't validate that repository") because its `.gitattributes` converted line endings (`text=auto eol=lf`, `*.cmd eol=crlf`), and the directory refuses attributes that rewrite file contents. The kit's `.gitattributes` is now `* -text` (store and check out every file exactly as committed): the `.cmd` launchers are committed with CRLF, everything else with LF, so they still work on every platform, also with `core.autocrlf=true`. The template's rules move to `template/gitattributes`, which `bootstrap` installs as the new tree's `.gitattributes`, so notes trees keep normalising line endings as before.
+- Tests: `tests/smoke.sh` checks that no `.gitattributes` in the kit rewrites contents, that the launchers are stored with the right line endings, and that a new tree still gets its `.gitattributes`.
+
 ## 0.10.5
 - **Ready for the plugin directory**: a listing icon (`.claude-plugin/icon.png`, 1024 px, a small mycelium in the view's colours), `displayName` "Myco Notes" in `plugin.json`, and a README section "What it runs and what it sends" (local scripts and git only; network only for a mirror, push or pull request you configure; no telemetry). `claude plugin validate .` passes with no directory findings.
 - Tests: the fake private-key header used to test the secret refusal is assembled at run time, so no file in the repository holds key-shaped text.
