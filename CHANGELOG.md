@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.12.0
+Honest results and narrower actions, the second half of the outside review (method 2.4: sections 7, 8.4, 11.2, 11.5, 11.6, 12).
+- **Approval rule**: "Ask before changing anything the owner has not asked for; an explicit request is approval for that change. Deleting and publishing always need a per-item yes." In the method, SKILL.md and the template's entry point and working agreement, so an agent no longer stops to re-ask for work it was just asked to do.
+- **Restore drill gives two verdicts**: *history* (fsck, HEAD) and *working copy* (entry point, master record and tracker present; working files equal the last commit, ignoring file modes that archives drop). Either failing fails the drill, and the sync-log line names both.
+- **Mirror scope and results**: `MIRROR_SCOPE=tracked` (new trees) copies `.git` and the tracked files only, never ignored or untracked files, and removes from the target what an earlier sync copied outside that scope; `all` keeps the whole working copy (the default when the setting is missing). The last line says `mirror: synced`, `skipped` or `failed`; a real failure (for example a rejected `git push --mirror`) now exits 1, while an unreachable target is still a quiet skip. `--strict` or `MIRROR_STRICT=1` makes a skip exit 3 and a failed post-push command exit 1, for scheduled jobs. ssh targets get `--dry-run` too.
+- **Narrower commits**: `notes-commit --only PATH` (repeatable) commits just those paths and leaves other changes uncommitted; `notes-commit --dry-run` shows what would be committed, using a throw-away index.
+- **Kit version and `doctor`**: `bootstrap` and `relocate` write `KIT_VERSION` into `.myco-notes.conf`, and the tools carry their version. The new read-only `tools/doctor` reports the tree's kit version, whether its tools are older than the kit you run it from (with the `relocate` command to refresh them), the hook, the layout, the launchers and missing settings (`NEW_FOLDERS`, `MIRROR_SCOPE`).
+- Tests cover each change; the version now also lives in `tools/_myco.py` and moves with the others.
+
 ## 0.11.0
 Safety fixes from an outside review (method 2.3: sections 8.2, 8.4, 11.1 and 18).
 - **Mirror and map never delete what they do not own.** `mirror-push` refuses a local target that is the repository, inside it, or a folder that contains it, and writes only into an empty folder, a folder holding its `.myco-mirror` marker, or an earlier mirror of the same repository (which then gets the marker). `mirror-push --dry-run` lists what would be copied and removed. `build-notes-map.py` refuses an `--out` that is the repository or contains it, and empties only an empty folder, a folder with its `.myco-notes-map` marker or an earlier map.

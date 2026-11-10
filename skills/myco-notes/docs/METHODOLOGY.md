@@ -1,6 +1,6 @@
 # Myco Notes: the method
 
-Version 2.3 (general edition), 2026-11-10. It is project-independent and is written for engineers and teams (and for AI coding agents working with them) who run long, large or fast-changing projects: infrastructure, software platforms, data and ML systems, research, hardware, operations. It is meant as the specification from which a skill, a template repository or a team convention can be built.
+Version 2.4 (general edition), 2026-11-10. It is project-independent and is written for engineers and teams (and for AI coding agents working with them) who run long, large or fast-changing projects: infrastructure, software platforms, data and ML systems, research, hardware, operations. It is meant as the specification from which a skill, a template repository or a team convention can be built.
 
 The method grew out of a long-running, AI-operated engineering project in which the notes had to act as the memory of an operator that forgets everything between sessions. That constraint is useful for any project: if the notes are good enough for an operator with no memory, they are good enough for a new teammate, an auditor, or you in a year.
 
@@ -218,7 +218,7 @@ Cadence guideline: **update on the same turn as the change; commit on the same t
 - The notes tree is a git repository from day one. Default branch `main`; a single repository is enough for one project.
 - **No copy-suffix files** (`.bak`, `-old`, `-v2`, `-final`) for files in the repository: they duplicate history badly and rot. Use `git log -- <file>`, `git diff <commit> -- <file>`, `git show`, `git restore -s <commit> -- <file>` and `git revert <commit>`.
 - Copy-suffix backups **are** right for things outside the repository (a config on a server, a database row set, a cloud resource) before you change them; name them `<file>.bak-before-<reason>-<date>` and record them in the entry.
-- **Commit helper.** A single command (for example `notes-commit "what and why"`) that stages everything, runs cheap syntax checks on changed scripts, commits with a descriptive message and a co-author trailer when an agent did the work, optionally pushes the mirror, and syncs scripts that are executed elsewhere (so the running copy always equals the committed copy). A `--human` flag omits the trailer.
+- **Commit helper.** A single command (for example `notes-commit "what and why"`) that stages everything (or only the paths named, with a preview of what would be committed), runs cheap syntax checks on changed scripts, commits with a descriptive message and a co-author trailer when an agent did the work, optionally pushes the mirror, and syncs scripts that are executed elsewhere (so the running copy always equals the committed copy). A `--human` flag omits the trailer.
 - **Commit granularity.** One logical change per commit; message states what and why in plain language (`Rotate backup key and document the restore test`, not `update notes`). Several small commits beat one large one. Commit before ending any turn or session that edited the tree.
 - **Pre-commit hook.** Reject commits whose added lines look like secrets (private-key blocks; names such as password, passphrase, secret, token, api key followed by a long literal). Allow an explicit one-time override after human review. Keep the hook and the helper in the repository (for example under `tools/`) and install them with a one-line setup script, because `.git/hooks` is not versioned.
 - **`.gitignore`**: generated output, caches, large binaries that can be rebuilt, backup suffix files, local credentials, per-machine state.
@@ -253,10 +253,11 @@ Mark files or sections as **public / internal / sensitive**. Sensitive notes (ne
 ### 8.4 Integrity
 - **Checksums**: offline or exported copies carry a checksum manifest (`SHA256SUMS`) regenerated and verified at each refresh.
 - **Three copies, two media, one elsewhere** for the tree itself: working copy, a mirror on a second machine, an independent encrypted snapshot store; plus an offline encrypted copy for disaster recovery.
-- **Restore drills**: at least twice a year restore the notes from the independent store into a scratch directory, run `git log` and `git fsck`, and record the result. A backup that was never restored is a hypothesis.
+- **Restore drills**: at least twice a year restore the notes from the independent store into a scratch directory and record the result. A drill gives two verdicts: **history** (`git fsck` passes and the commits are there) and **working copy** (the entry point, master record and tracker are present and the files equal the last commit). Intact history with an incomplete working copy is recoverable but is not a usable restore, and the drill says so. A backup that was never restored is a hypothesis.
 - **Tools that delete only delete what they own**: a mirror or generated output never goes into the tree itself, inside it, or a folder that contains it, and a tool empties or makes equal only a folder it created (it leaves a marker there) or an empty one. Anything that deletes offers a dry run first.
 - **Checks that fail must say so**: a check that crashes or cannot finish reports failure, never success; a report that did not complete is not a pass.
 - **Immutability where possible**: append-only backup targets for the snapshot store; protect the mirror against being the only copy when it is rsynced with deletion (it mirrors accidental deletions; the snapshot store is what keeps history).
+- **Mirror scope and results**: a mirror copies what is versioned (the git history and the tracked files), not ignored or untracked files, which may hold local credentials; copying the whole working copy is an explicit choice. A sync reports `synced`, `skipped` (target unreachable or not configured) or `failed`, and a scheduled job can ask for a strict result in which anything but `synced` is an error.
 - **Access control**: the tree and its mirror are readable only by the team; published views stay inside the trusted network unless classified public.
 - **Encryption at rest** for offline media; unmount/lock procedure documented (and how not to corrupt the media).
 - **Supply chain**: scripts in the tree that are executed on systems are reviewed like code; the commit helper syncs the executed copy from the committed copy, never the reverse.
@@ -322,7 +323,7 @@ Rules: move `last_confirmed` and `review_after` **only after verifying** (princi
 9. Report to the owner in two layers: steps while working, then a short summary (done, verified how, what the owner must do).
 
 ### 11.2 Session start
-Read the working agreement, tracker, master record headline and open items, the newest handoffs; check the live state; state the plan; ask before changing anything; keep secrets out of the chat.
+Read the working agreement, tracker, master record headline and open items, the newest handoffs; check the live state; state the plan; ask before changing anything the owner has not asked for (an explicit request is approval for that change); keep secrets out of the chat.
 
 `tools/resume` prints this as one briefing capped at a character budget (default 6000, `--budget N` or `RESUME_BUDGET`): the repository state, the pending list, the headline facts and open items of the master record, notes past a review or follow-up date, the newest handoff and the last commits. Items are whole or left out, never cut in half, and the footer says how many were left out. It is a derived view: it saves reading, it does not replace the notes, and a fact you will act on is read in its own note.
 
@@ -346,9 +347,10 @@ When several sessions or people edit the same tree: each writes a handoff to the
 4. Add the map builder and the publish step (or a plain index file to start).
 5. Make the first commit: "Baseline".
 6. Write the first changelog entry and the first sync-log line.
+7. Record which version of the kit made the tree (`KIT_VERSION` in `.myco-notes.conf`), so an old copy of the tools can be found later; `tools/doctor` reports it.
 
 ### 11.6 Restore drill
-Restore the latest snapshot into a scratch directory; run `git fsck` and `git log -5`; open the entry point; record date and result in the tracker.
+Restore the latest snapshot into a scratch directory; run `git fsck` and `git log -5`; check that the entry point, master record and tracker are there and that the working files equal the last commit; record date and both verdicts (history, working copy) in the tracker.
 
 ## 12. Working with AI agents
 
@@ -356,7 +358,7 @@ Restore the latest snapshot into a scratch directory; run `git fsck` and `git lo
 2. **Read before write, every time**, especially for tracker-like files that are overwritten. Edit in place rather than regenerating whole files; a file written from memory can silently drop content.
 3. **Context budget.** Provide an index, headline facts and section pointers; keep files sized so a relevant section can be loaded without loading everything; keep summaries at the top. `tools/resume` gives a session a bounded start-of-session briefing (11.2).
 4. **Make notes agent-readable**: full file names, stable headings, explicit "DONE/pending", exact commands in code blocks, no pronoun-heavy shorthand.
-5. **Ask before destructive or outward-facing actions**; confirm before deleting; approval is per item and does not carry over.
+5. **Approval.** Ask before changing anything the owner has not asked for; an explicit request is approval for that change. Deleting and publishing always need a per-item yes. Approval does not carry over to other changes, and a request does not cover more than it says.
 6. **Secrets stay with the human**: the agent triggers the command in a human-visible terminal and the human types the credential; the agent never prints credentials and says at once if one appears in output.
 7. **Report in two layers**: step-by-step while working, then a short, phone-friendly summary with evidence and what is pending.
 8. **Honesty over polish**: report mistakes immediately; mark unverified claims; say when blocked and what is needed.
@@ -431,8 +433,9 @@ Paths are relative to the kit, which is the skill folder `skills/myco-notes/` (i
 | What the notes said on a date, what changed since, history of one note (7.1) | `tools/asof` |
 | Relation map, backlinks, history, publication gate (9, 8.2) | `tools/build-notes-map.py` |
 | The relations as a network, freshness, stale follow-ups, missing references, replay of the history (9, 10) | `tools/build-notes-map.py` writes `graph.html` (`tools/notes_graph.py`, `tools/graph-template.html`) |
-| Mirror (8.4); refuses a target that overlaps the tree or holds other files; `--dry-run` | `tools/mirror-push` |
-| Restore drill (8.4, 11.6) | `tools/restore-drill` |
+| Mirror (8.4); refuses a target that overlaps the tree or holds other files; `--dry-run`; `MIRROR_SCOPE`, `--strict` | `tools/mirror-push` |
+| Restore drill with history and working-copy verdicts (8.4, 11.6) | `tools/restore-drill` |
+| Health of a tree: kit version, tools, hook, layout, settings (11.5) | `tools/doctor` (read-only) |
 | Entry point for agents (12) | `template/AGENTS.md` (+ `CLAUDE.md` containing `@AGENTS.md`) |
 | Agent skill | `SKILL.md` (Agent Skills format, read by Claude Code, Codex and other agents; Claude Code plugin manifests in `.claude-plugin/` at the repository root) |
 

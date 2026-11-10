@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """restore-drill: prove the notes can be restored. Give it a directory that was restored from the mirror or from a snapshot
-(or a .tar, .tar.gz or .zip of it). It runs git fsck, shows the last commits, checks the entry point and the tracker, compares
-the newest commit with the live repository, and prints one line ready to paste into the sync log.
+(or a .tar, .tar.gz or .zip of it). It gives two verdicts and prints one line ready to paste into the sync log:
+  history       git fsck passes and the commits are there (the notes can be recovered from git)
+  working copy  the entry point (AGENTS.md), the master record and the tracker are present, and the working files equal the
+                last commit (the restored copy can be used as it is)
+Either verdict failing makes the drill fail (exit 1). It also compares the newest commit with the live repository.
 
   tools/restore-drill /path/to/restored-copy
   tools/restore-drill /path/to/backup.tar.gz
@@ -76,14 +79,31 @@ def main():
     print("  last commits:")
     for line in _myco.git("-C", repo, "log", "--oneline", "-5").stdout.splitlines():
         print(f"    {line}")
-    for f in ("AGENTS.md", "CLAUDE.md"):
-        if os.path.isfile(os.path.join(repo, f)):
-            print(f"  entry point present: {f}")
-    notes_dir = _myco.layout(repo)["notes"]
-    if os.path.isfile(os.path.join(repo, *notes_dir.split("/"), "sync-tracker.md")):
-        print("  tracker present")
-    else:
-        print("  tracker MISSING")
+    hist_ok = rc == 0 and _myco.git("-C", repo, "rev-parse", "-q", "--verify", "HEAD").returncode == 0
+    lay = _myco.layout(repo)
+    work = []
+    need = [("entry point", "AGENTS.md"), ("master record", lay["notes"] + "/" + lay["state"]), ("tracker", lay["notes"] + "/sync-tracker.md")]
+    for what, rel in need:
+        if os.path.isfile(os.path.join(repo, *rel.split("/"))):
+            print(f"  {what} present: {rel}")
+        else:
+            print(f"  {what} MISSING: {rel}")
+            work.append(f"{rel} missing")
+    st = _myco.git("-C", repo, "-c", "core.fileMode=false", "status", "--porcelain", "--untracked-files=no")  # archives drop the executable bit
+    changed = [l for l in st.stdout.splitlines() if l.strip()]
+    if st.returncode != 0:
+        work.append("git status failed")
+    elif changed:
+        print(f"  working files differ from the last commit ({len(changed)}):")
+        for l in changed[:10]:
+            print(f"    {l}")
+        if len(changed) > 10:
+            print(f"    ... and {len(changed) - 10} more")
+        work.append(f"{len(changed)} file(s) differ from the last commit")
+    print(f"  verdict history:      {'OK' if hist_ok else 'PROBLEMS'}")
+    print(f"  verdict working copy: {'OK' if not work else 'INCOMPLETE (' + '; '.join(work) + ')'}")
+    if work:
+        print(f"  (the history is {'intact: git -C <restored copy> restore --source=HEAD -- . brings the files back' if hist_ok else 'damaged too'})")
         rc = 1
     a = _myco.git("-C", repo, "rev-parse", "HEAD").stdout.strip()
     b = _myco.git("-C", live, "rev-parse", "HEAD").stdout.strip() if live else ""
@@ -92,9 +112,9 @@ def main():
     else:
         print(f"  restored HEAD differs from live HEAD (restored {a[:8]}, live {b[:8]}): fine for an old snapshot, check the date")
     now = datetime.datetime.now()
-    res = "OK" if rc == 0 else "PROBLEMS"
+    wres = "OK" if not work else "INCOMPLETE"
     print()
-    print(f"Sync-log line: - **{now:%Y-%m-%d} ({now:%H:%M}):** restore drill from {os.path.basename(arg.rstrip('/' + os.sep))}: fsck and log {res}; HEAD {a[:8]}.")
+    print(f"Sync-log line: - **{now:%Y-%m-%d} ({now:%H:%M}):** restore drill from {os.path.basename(arg.rstrip('/' + os.sep))}: history {'OK' if hist_ok else 'PROBLEMS'}, working copy {wres}; HEAD {a[:8]}.")
     if tmp:
         tmp.cleanup()
     return rc

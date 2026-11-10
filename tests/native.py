@@ -355,7 +355,7 @@ def main():
         write(conf, text)
         run(L(proj, "notes-commit", T) + ["Configure mirror"], proj)
         rc, out = run(L(proj, "mirror-push", T), proj)
-        check("mirror push to a local directory", rc == 0 and "mirror: pushed" in out and os.path.isdir(os.path.join(mirror, ".git")), out)
+        check("mirror push to a local directory", rc == 0 and "mirror: synced" in out and os.path.isdir(os.path.join(mirror, ".git")), out)
         rc, out = run(L(proj, "restore-drill", T) + [mirror], proj)
         check("restore drill passes", rc == 0 and "fsck: OK" in out and "tracker present" in out, out)
         arch = os.path.join(tmp, "backup.zip")

@@ -34,6 +34,7 @@ import json,re
 v=json.load(open('$kit/.claude-plugin/plugin.json'))['version']
 t=open('$skill/SKILL.md').read().split('---')[1]
 assert re.search(r'version:\s*\"?'+re.escape(v)+r'\"?\s*\$', t, re.M), 'SKILL.md metadata.version differs from plugin.json'
+assert re.search(r'^VERSION = \"'+re.escape(v)+r'\"', open('$skill/tools/_myco.py').read(), re.M), '_myco.VERSION differs from plugin.json'
 PY"
 
 echo "agent skill (Agent Skills specification)"
@@ -129,7 +130,7 @@ rm -f myco-notes/leak.md
 echo "mirror and restore drill"
 sed "s|^MIRROR_TARGET=.*|MIRROR_TARGET=\"$tmp/mirror\"|" .myco-notes.conf > .myco-notes.conf.new && mv .myco-notes.conf.new .myco-notes.conf
 git add -A; git commit -q -m "Configure mirror"
-chk "mirror push"                       "myco-notes/tools/mirror-push | grep -q 'mirror: pushed'"
+chk "mirror push"                       "myco-notes/tools/mirror-push | grep -q 'mirror: synced'"
 chk "mirror contains .git"              "[ -d $tmp/mirror/.git ]"
 chk "restore drill passes"              "myco-notes/tools/restore-drill $tmp/mirror | grep -q 'fsck: OK'"
 
@@ -165,7 +166,7 @@ setmirror "$tmp";                 chk "mirror refuses a folder that contains the
 mkdir -p "$tmp/other"; echo keep > "$tmp/other/precious.txt"
 setmirror "$tmp/other";           chk "mirror refuses a non-empty folder that is not its mirror" "! myco-notes/tools/mirror-push && [ -f $tmp/other/precious.txt ]"
 setmirror "$tmp/mirror2";         chk "mirror dry run changes nothing" "myco-notes/tools/mirror-push --dry-run | grep -q 'nothing changed' && [ ! -e $tmp/mirror2 ]"
-chk "mirror into a new folder leaves its marker" "myco-notes/tools/mirror-push | grep -q 'mirror: pushed' && [ -f $tmp/mirror2/.myco-mirror ]"
+chk "mirror into a new folder leaves its marker" "myco-notes/tools/mirror-push | grep -q 'mirror: synced' && [ -f $tmp/mirror2/.myco-mirror ]"
 setmirror "$tmp/mirror"; git checkout -q -- .myco-notes.conf 2>/dev/null
 mkdir -p myco-notes/pg && echo "# Nested" > myco-notes/pg/x.md && echo "# Flat" > myco-notes/pg-x.md
 chk "two notes with the same page name both get a page" "python3 myco-notes/tools/build-notes-map.py && [ \$(ls myco-notes/map/p | grep -c '^myco-notes-pg-x') = 2 ]"
@@ -183,6 +184,24 @@ git switch -q -c feat-crash; echo '[unclosed' > .myco-notes-lint-ignore; git add
 chk "lint exits 3 on an invalid ignore expression" "myco-notes/tools/notes-lint.py --quiet; [ \$? = 3 ]"
 chk "ci-check fails when the lint cannot run" "! myco-notes/tools/ci-check $base2"
 git switch -q main; git branch -q -D feat-crash
+
+echo "0.12: restore verdicts, mirror scope and results, narrower commits, kit version, doctor"
+chk "new trees record the kit version"  "grep -q '^KIT_VERSION=[0-9]' .myco-notes.conf && grep -q '^MIRROR_SCOPE=tracked' .myco-notes.conf"
+chk "doctor reports a healthy tree"     "myco-notes/tools/doctor | grep -q 'doctor: healthy'"
+git clone -q "$tmp/proj" "$tmp/drill"; rm -f "$tmp/drill/AGENTS.md"; echo changed > "$tmp/drill/myco-notes/state.md"
+chk "restore drill fails an incomplete working copy" "out=\$(myco-notes/tools/restore-drill $tmp/drill); [ \$? -ne 0 ] && echo \"\$out\" | grep -q 'verdict history:      OK' && echo \"\$out\" | grep -q 'working copy: INCOMPLETE'"
+echo "local only" > ignored-local.env; printf 'ignored-local.env\n' >> .git/info/exclude
+setmirror "$tmp/mirror3"
+chk "tracked mirror leaves ignored files out" "myco-notes/tools/mirror-push | grep -q 'mirror: synced' && [ -f $tmp/mirror3/AGENTS.md ] && [ -d $tmp/mirror3/.git ] && [ ! -e $tmp/mirror3/ignored-local.env ]"
+rm -f ignored-local.env
+setmirror "git:$tmp/nowhere.git"
+chk "unreachable git mirror is skipped (exit 0)" "myco-notes/tools/mirror-push | grep -q 'mirror: skipped'"
+chk "--strict makes a skip exit 3"      "myco-notes/tools/mirror-push --strict; [ \$? = 3 ]"
+git checkout -q -- .myco-notes.conf
+echo "- only one" >> myco-notes/plans/backlog.md; echo "- not this" >> myco-notes/runbook.md
+chk "notes-commit --dry-run changes nothing" "myco-notes/tools/notes-commit --dry-run 'x' | grep -q 'would commit 2' && [ -z \"\$(git diff --cached --name-only)\" ]"
+chk "notes-commit --only commits just that path" "myco-notes/tools/notes-commit --only myco-notes/plans/backlog.md 'Only the backlog' >/dev/null && git show --name-only --format= HEAD | grep -qx myco-notes/plans/backlog.md && ! git show --name-only --format= HEAD | grep -q runbook && git diff --name-only | grep -q runbook"
+git checkout -q -- myco-notes/runbook.md
 
 echo "flat layout and relocate (older trees keep working; relocate moves them)"
 "$kit/tools/bootstrap" "$tmp/flat" --name "Old" --tz "UTC" --layout flat >/dev/null 2>&1
