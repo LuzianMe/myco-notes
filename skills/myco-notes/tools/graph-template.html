@@ -30,6 +30,7 @@ input[type=search]:focus-visible,button:focus-visible,a:focus-visible,input[type
 #panel[hidden]{display:none}#panel h2{font-size:16px;margin:0 0 2px;padding-right:22px}#panel .rel{color:var(--muted);font:12px ui-monospace,Menlo,Consolas,monospace;word-break:break-all}
 #panel dl{margin:10px 0;display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:13px}#panel dt{color:var(--muted)}#panel dd{margin:0}
 #panel .warn{color:#e6a45c}#panel .open{display:inline-block;margin:4px 0 8px;color:var(--accent)}
+#panel .sum{display:none}
 #panel .side{color:var(--muted);font-size:12px;margin:8px 0 4px}#panel .nb{display:flex;flex-wrap:wrap;gap:4px}#panel .nb button{font:inherit;font-size:12px;padding:1px 8px;border-radius:99px;border:1px solid var(--line);background:transparent;color:var(--fg);cursor:pointer}
 #close{position:absolute;top:8px;right:8px;border:0;background:transparent;color:var(--muted);font-size:18px;cursor:pointer;line-height:1}
 #time{padding:10px 14px;display:grid;grid-template-columns:auto 1fr;gap:8px 10px;align-items:center}
@@ -61,7 +62,12 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 #when{grid-area:w;justify-self:start;font-size:11.5px}
 #what{grid-area:x;grid-column:auto;min-height:0;display:block;white-space:nowrap;text-overflow:ellipsis;font-size:11.5px;color:var(--muted);cursor:pointer}
 #what.full{white-space:normal}
-#panel{top:auto;right:12px;left:12px;bottom:92px;width:auto;max-height:34vh}
+#panel{top:auto;right:12px;left:12px;bottom:92px;width:auto;max-height:34vh;padding:10px 14px}
+#panel .sum{display:flex;align-items:center;gap:12px;font-size:13px;color:var(--muted);margin-top:4px}#panel .sum span{flex:1;white-space:pre}
+#panel .sum a{color:var(--accent)}#panel .sum button{font:inherit;font-size:12.5px;padding:2px 12px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--fg);cursor:pointer}
+#panel .det .open{display:none}
+#panel.min h2{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:15px}#panel.min .rel,#panel.min .det{display:none}
+#panel h2{cursor:pointer}
 .notime #panel{bottom:12px}
 }
 </style>
@@ -421,12 +427,20 @@ document.getElementById("theme").addEventListener("click",function(){
 });
 var panel=document.getElementById("panel");
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e}
+var panelFull=false;   /* on a phone the panel opens as a small strip (title, counts, Open); More shows the details. The choice is kept while the page is open. */
+function setPanelFull(f){panelFull=f;panel.classList.toggle("min",!f);var m=document.getElementById("more");if(m){m.textContent=f?"Less":"More";m.setAttribute("aria-expanded",f?"true":"false")}}
 function select(i){
   sel=i;
   if(i<0){panel.hidden=true;return}
   var n=NODES[i],g=D.groups[n.g];panel.hidden=false;panel.textContent="";
   var x=el("button",null,"×");x.id="close";x.setAttribute("aria-label","Close");x.addEventListener("click",function(){select(-1)});panel.appendChild(x);
-  panel.appendChild(el("h2",null,n.title));panel.appendChild(el("div","rel",n.rel));
+  var h=el("h2",null,n.title);h.addEventListener("click",function(){setPanelFull(!panelFull)});panel.appendChild(h);panel.appendChild(el("div","rel",n.rel));
+  var sum=el("div","sum");   /* the strip: shown on a phone only */
+  sum.appendChild(el("span",null,"→ "+n.out+"  ← "+n.in+(n.due?"  · wilting":"")+(n.miss?"  · missing refs":"")));
+  var so=el("a",null,"Open →");so.href="p/"+n.id+".html";sum.appendChild(so);
+  var mb=el("button",null,"More");mb.id="more";mb.type="button";mb.setAttribute("aria-controls","panel");mb.addEventListener("click",function(){setPanelFull(!panelFull)});sum.appendChild(mb);
+  panel.appendChild(sum);
+  var det=el("div","det");panel.appendChild(det);
   var dl=el("dl");
   function row(k,v,cls){dl.appendChild(el("dt",null,k));dl.appendChild(el("dd",cls,v))}
   row("Group",g?g.name:"");
@@ -436,14 +450,15 @@ function select(i){
   if(n.due)row("Follow-ups",n.due+" past due","warn");
   if(n.miss)row("Missing refs",n.miss.join(", "),"warn");
   if(!n.in&&!n.out)row("Links","none: no note mentions this one");
-  panel.appendChild(dl);
-  var a=el("a","open","Open the note →");a.href="p/"+n.id+".html";panel.appendChild(a);
+  det.appendChild(dl);
+  var a=el("a","open","Open the note →");a.href="p/"+n.id+".html";det.appendChild(a);
   [["out","Mentions →"],["inn","Mentioned by ←"]].forEach(function(side){
     var list=adj[i].filter(function(m){return m[side[0]]});if(!list.length)return;
-    panel.appendChild(el("div","side",side[1]));var nb=el("div","nb");
+    det.appendChild(el("div","side",side[1]));var nb=el("div","nb");
     list.sort(function(p,q){return q.e.w-p.e.w}).slice(0,14).forEach(function(m){
       var b=el("button",null,m.n.name.replace(/\.md$/,""));b.addEventListener("click",function(){select(m.n.i);focusOn(m.n.i)});nb.appendChild(b)});
-    panel.appendChild(nb)});
+    det.appendChild(nb)});
+  setPanelFull(panelFull);
 }
 function focusOn(i){var n=NODES[i];autoFit=false;cam.tx=n.x;cam.ty=n.y;cam.tk=Math.max(cam.tk,1.4)}
 var q=document.getElementById("q");

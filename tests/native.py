@@ -163,6 +163,7 @@ def main():
         check("a link keeps its direction (who mentions whom)", (weight(MY + "/plans/graph-renamed.md", MY + "/state.md") or 0) > 0 and weight(MY + "/state.md", MY + "/plans/graph-renamed.md") == 0 and (weight(MY + "/plans/graph-a.md", MY + "/plans/graph-hub.md") or 0) > 0,
               str(g["edges"][:8]))
         check("the threads are drawn with a direction", "e.dir" in h and "Mentioned by" in h)
+        check("on a phone the detail panel opens as a strip with More", "panelFull" in h and '#panel.min' in h and '"More"' in h)
         check("two fingers pinch to zoom, and a bud has its source's colour", "pinch" in h and "pointercancel" in h and "budRGB(e.dir>0?e.a:e.b)" in h)
         check("a missing reference is shown", gn is not None and gn.get("miss") == ["no-such-note.md"], str(gn))
         check("the history is replayed across a rename", gn is not None and gn["b"] < gn["l"] and len(g["commits"]) >= 3 and g["commits"][gn["b"]]["s"].startswith("Add a note for the graph test"), str((gn, [c["s"] for c in g["commits"]])))
