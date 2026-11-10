@@ -86,6 +86,15 @@ Any agent that supports Agent Skills: copy or link `skills/myco-notes/` into its
 ### No agent
 Use the tools directly (below). The method is plain Markdown plus git.
 
+## What it runs and what it sends
+Everything runs on your machine, inside the notes repository you point it at. Nothing is sent anywhere unless you configure it.
+- **The skill** tells the agent to edit Markdown files in the notes tree and to run the kit's own Python scripts (`notes-commit`, `notes-lint.py`, `build-notes-map.py`, `resume`, `asof` and the others in `tools/`) and `git`. No package is downloaded or installed; the scripts use the Python standard library only.
+- **Writes** go to the notes repository: its files, its git history, and `core.hooksPath` in its git config (so the secret-refusing pre-commit hook runs). `bootstrap` creates a new tree in the folder you name.
+- **Network:** none by default, and no telemetry. Only when you set it up: `mirror-push` copies the repository to the `MIRROR_TARGET` you configure (a local folder, `git push --mirror` to a git URL, or rsync over ssh); `notes-commit --push` / `--pr` runs `git push` to your `origin` and, with `--pr`, `gh pr create` if the GitHub CLI is installed; `POST_PUSH_CMDS` and `SYNC_CMD` run commands you write yourself in `.myco-notes.conf`.
+- **The map and the mycelium view** are static HTML files with no scripts or fonts from the network; they contain note titles, paths, counts and commit subjects (the map pages also the note text), and are written only to the gitignored map folder.
+- **Secrets:** the notes say where a secret lives, never its value; the pre-commit hook, the map builder and the CI check refuse text that looks like a credential.
+- **Commit trailer:** commits made by an agent get the `AGENT_TRAILER` line from `.myco-notes.conf` (empty it, or use `notes-commit --human`, to leave it out).
+
 ## When it is not a fit
 Myco Notes is the operational memory of one project or system, edited by a few people and agents, in one git repository, over months or years. It is the wrong tool for: memory about a person or a stream of small facts (a typed one-fact-per-file store fits better); many writers updating at once (writes here are plain edits protected by git, the hook and the lint, not transactions); ranked retrieval or graph queries over thousands of records (add a search index, or a real store); facts that a tool must check for meaning (the freshness header and `asof` check dates and history, not whether two sentences contradict); and a tree nobody will keep current in the same session as the change. The full list is in `skills/myco-notes/docs/METHODOLOGY.md` section 1.1.
 

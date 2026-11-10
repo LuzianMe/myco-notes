@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.5
+- **Ready for the plugin directory**: a listing icon (`.claude-plugin/icon.png`, 1024 px, a small mycelium in the view's colours), `displayName` "Myco Notes" in `plugin.json`, and a README section "What it runs and what it sends" (local scripts and git only; network only for a mirror, push or pull request you configure; no telemetry). `claude plugin validate .` passes with no directory findings.
+- Tests: the fake private-key header used to test the secret refusal is assembled at run time, so no file in the repository holds key-shaped text.
+
 ## 0.10.4
 - **Mycelium view, collapsible boxes on a larger screen**: the search box has a − button that folds it to the title and counts (+ opens it again), and the detail panel has the phone's strip with Less and More, so both can give the network more room. The detail panel starts open on a larger screen and as a strip on a phone; a choice made with the buttons is remembered in the browser (localStorage, when allowed). The phone layout is unchanged.
 
