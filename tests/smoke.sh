@@ -154,6 +154,36 @@ chk "--pr is documented in the usage"   "myco-notes/tools/notes-commit --help | 
 
 chk "no __pycache__ left in the project by the tools" "[ -z \"\$(find . -name __pycache__ -not -path './.git/*')\" ]"
 
+echo "safety: destructive outputs, history scan, crashes, redaction, page names"
+chk "map refuses --out at the repository root" "! python3 myco-notes/tools/build-notes-map.py --out . && [ -f myco-notes/state.md ]"
+chk "map refuses --out on a folder it did not make" "! python3 myco-notes/tools/build-notes-map.py --out myco-notes && [ -f myco-notes/state.md ]"
+chk "map marks its own folder"          "python3 myco-notes/tools/build-notes-map.py && [ -f myco-notes/map/.myco-notes-map ]"
+setmirror() { sed "s|^MIRROR_TARGET=.*|MIRROR_TARGET=\"$1\"|" .myco-notes.conf > .myco-notes.conf.new && mv .myco-notes.conf.new .myco-notes.conf; }
+setmirror "$tmp/proj";            chk "mirror refuses the repository itself"   "! myco-notes/tools/mirror-push"
+setmirror "$tmp/proj/myco-notes/m"; chk "mirror refuses a folder inside the repository" "! myco-notes/tools/mirror-push && [ ! -e myco-notes/m ]"
+setmirror "$tmp";                 chk "mirror refuses a folder that contains the repository" "! myco-notes/tools/mirror-push"
+mkdir -p "$tmp/other"; echo keep > "$tmp/other/precious.txt"
+setmirror "$tmp/other";           chk "mirror refuses a non-empty folder that is not its mirror" "! myco-notes/tools/mirror-push && [ -f $tmp/other/precious.txt ]"
+setmirror "$tmp/mirror2";         chk "mirror dry run changes nothing" "myco-notes/tools/mirror-push --dry-run | grep -q 'nothing changed' && [ ! -e $tmp/mirror2 ]"
+chk "mirror into a new folder leaves its marker" "myco-notes/tools/mirror-push | grep -q 'mirror: pushed' && [ -f $tmp/mirror2/.myco-mirror ]"
+setmirror "$tmp/mirror"; git checkout -q -- .myco-notes.conf 2>/dev/null
+mkdir -p myco-notes/pg && echo "# Nested" > myco-notes/pg/x.md && echo "# Flat" > myco-notes/pg-x.md
+chk "two notes with the same page name both get a page" "python3 myco-notes/tools/build-notes-map.py && [ \$(ls myco-notes/map/p | grep -c '^myco-notes-pg-x') = 2 ]"
+rm -rf myco-notes/pg myco-notes/pg-x.md
+upper="PASS""WORD"
+printf '%s=Hunter2Hunter2x\n' "$upper" > myco-notes/upper.md
+chk "an upper-case password line is refused, value hidden" "out=\$(git add -A && git commit -q -m upper 2>&1); [ \$? -ne 0 ] && echo \"\$out\" | grep -q 'redacted' && ! echo \"\$out\" | grep -q Hunter2"
+git reset -q; rm -f myco-notes/upper.md
+base2="$(git rev-parse HEAD)"; git switch -q -c feat-history
+printf 'token = %s\n' "QQQQQQQQQQABCDEFGHIJKL1234" > myco-notes/gone.md; git add -A; git commit -q --no-verify -m "add"
+git rm -q myco-notes/gone.md; git commit -q -m "remove"
+chk "ci-check finds a secret added and removed again" "out=\$(myco-notes/tools/ci-check $base2); [ \$? -ne 0 ] && echo \"\$out\" | grep -q 'gone.md:1' && ! echo \"\$out\" | grep -q QQQQ"
+git switch -q main; git branch -q -D feat-history
+git switch -q -c feat-crash; echo '[unclosed' > .myco-notes-lint-ignore; git add -A; git commit -q -m "bad ignore"
+chk "lint exits 3 on an invalid ignore expression" "myco-notes/tools/notes-lint.py --quiet; [ \$? = 3 ]"
+chk "ci-check fails when the lint cannot run" "! myco-notes/tools/ci-check $base2"
+git switch -q main; git branch -q -D feat-crash
+
 echo "flat layout and relocate (older trees keep working; relocate moves them)"
 "$kit/tools/bootstrap" "$tmp/flat" --name "Old" --tz "UTC" --layout flat >/dev/null 2>&1
 chk "flat tree has notes/ tools/ docs/ at the root" "[ -d $tmp/flat/notes ] && [ -d $tmp/flat/tools ] && [ -d $tmp/flat/docs ] && [ \"\$(git -C $tmp/flat config core.hooksPath)\" = tools/hooks ]"

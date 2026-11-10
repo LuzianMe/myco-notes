@@ -7,14 +7,15 @@ Checks
   fresh     "Last updated <date>" header older than the newest changelog entry in the same file
   due       follow-up dates that have passed ("after 2026-11-04", "review-by 2026-12-01") on lines not marked DONE (heuristic; words: after, about, due, review-by, waiting until, on or after)
   ledger    sync-tracker rows without a last-synced date or a refresh method
-  secrets   secret-looking strings (same patterns as the pre-commit hook)
+  secrets   secret-looking strings (the rules of tools/secret_scan.py, the same as the pre-commit hook and CI; values are not shown)
   orphans   notes that no other note mentions by file name (info only)
   size      notes larger than MAX_NOTE_KB (default 100) and an AGENTS.md near or over the 32 KiB some agents load (warns from ENTRY_WARN_KB, default 24)
   header    the optional freshness header (method 10.1: last_confirmed, review_after, valid_from, valid_until, supersedes, superseded_by): malformed or
             reversed dates, a passed review_after or valid_until, last_confirmed older than STALE_DAYS (default 365) without a review_after, missing targets
 
 Usage:  tools/notes-lint.py [--root DIR] [--quiet] [--strict]
-Exit:   0 clean, 1 warnings, 2 errors (secrets). --strict turns warnings into exit 1 even for info-only runs of 'due'.
+Exit:   0 clean, 1 warnings, 2 errors (secrets), 3 the lint could not run (for example an invalid ignore expression). --strict turns
+        warnings into exit 1 even for info-only runs of 'due'. The last line is always the 'notes-lint: N notes, ...' summary when it finished.
 Ignore: put regular expressions (one per line) in .myco-notes-lint-ignore; a finding whose text matches is dropped.
 Layout (.myco-notes.conf): the generated map folder and DATA_DIRS (project data that is not notes) are not read as notes; the folders in
         HISTORY_DIRS (default "archive logs", inside the notes folder) are records, so references, follow-up dates, size and orphans are not
@@ -26,17 +27,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.dont_write_bytecode = True
 sys.path.insert(0, HERE)
 import _myco  # noqa: E402
+import secret_scan  # noqa: E402
 
 SKIP_DIRS = {".git", "site", "notes-map", "node_modules", "__pycache__"}
-SECRET_PATTERNS = [
-    r"BEGIN [A-Z ]*PRIVATE KEY",
-    r"AKIA[0-9A-Z]{16}",
-    r"ghp_[A-Za-z0-9]{30,}",
-    r"github_pat_[A-Za-z0-9_]{30,}",
-    r"xox[baprs]-[A-Za-z0-9-]{10,}",
-    r"sk-[A-Za-z0-9]{32,}",
-    r"(?i)(password|passwd|passphrase|secret|token|api[_-]?key|psk)[\"']?\s*[:=]\s*[\"']?[A-Za-z0-9+/_=-]{20,}",
-]
 DATE = r"\d{4}-\d{2}-\d{2}"
 
 
@@ -101,7 +94,8 @@ def main():
     ignore = []
     ip = os.path.join(root, ".myco-notes-lint-ignore")
     if os.path.exists(ip):
-        ignore = [re.compile(l.strip()) for l in open(ip, encoding="utf-8") if l.strip() and not l.startswith("#")]
+        with open(ip, encoding="utf-8") as fh:
+            ignore = secret_scan.compile_allow([l.strip() for l in fh if l.strip() and not l.startswith("#")], ".myco-notes-lint-ignore")
     today = datetime.date.today()
     md_files = walk_md(root, {lay["map"], *lay["data"]})
     names, paths = all_files(root, {lay["map"]})
@@ -136,10 +130,9 @@ def main():
             if line.strip().startswith("```"):
                 in_code = not in_code
                 continue
-            for pat in SECRET_PATTERNS:
-                if re.search(pat, line):
-                    add("ERROR", rel, i, "secret-looking string (remove it or store it where the notes say secrets live)")
-                    break
+            hit = secret_scan.find(line)
+            if hit:
+                add("ERROR", rel, i, f"secret-looking string ({hit[0]}; remove it or store it where the notes say secrets live)")
             if in_code:
                 continue
             for tok in ([] if is_hist else re.findall(r"`([^`\n]+)`", line)):
@@ -270,5 +263,20 @@ def main():
     return 1 if (n["WARN"] or (a.strict and n["INFO"])) else 0
 
 
+def run():
+    try:
+        return main()
+    except secret_scan.ScanError as e:
+        print(f"notes-lint: could not run: {e}")
+        return 3
+    except SystemExit:
+        raise
+    except Exception as e:  # a crash must never read as "warnings only"
+        import traceback
+        traceback.print_exc()
+        print(f"notes-lint: could not run: {type(e).__name__}: {e}")
+        return 3
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(run())

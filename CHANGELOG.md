@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.11.0
+Safety fixes from an outside review (method 2.3: sections 8.2, 8.4, 11.1 and 18).
+- **Mirror and map never delete what they do not own.** `mirror-push` refuses a local target that is the repository, inside it, or a folder that contains it, and writes only into an empty folder, a folder holding its `.myco-mirror` marker, or an earlier mirror of the same repository (which then gets the marker). `mirror-push --dry-run` lists what would be copied and removed. `build-notes-map.py` refuses an `--out` that is the repository or contains it, and empties only an empty folder, a folder with its `.myco-notes-map` marker or an earlier map.
+- **CI scans every commit.** `ci-check` scans what each commit in the range adds, not only the net difference, so a secret added in one commit and removed in the next fails the check (it is still in the history).
+- **A check that cannot run fails.** `notes-lint` exits 3 when it cannot run (for example an invalid expression in `.myco-notes-lint-ignore`, now reported with its entry number); `secret-scan` exits 3 the same way and the pre-commit hook then refuses the commit; `ci-check` fails unless the lint finished and printed its summary.
+- **Secret reports hide the value**: file, line and rule, with the value shown as `[redacted, N chars]`, in the hook, CI, the lint and the map builder. One set of rules (`tools/secret_scan.py`) serves all four: names match in any case (`PASSWORD=`), and password/passphrase/psk values are flagged from 12 characters (placeholders such as `<password>`, `${PASS}` or `changeme` are not).
+- **Unique note pages**: two notes whose paths give the same page name (`a/b.md` and `a-b.md`) both get a page; the later one gets a short hash of its path. Other page names do not change.
+- The sync-log line now comes before the commit (SKILL.md, the method and the template), so it goes into the same commit. TEAM.md commands use `myco-notes/tools/`.
+- Tests: the reviewer's cases are smoke tests; CI also runs both tests on Python 3.8, the oldest version the tools support.
+
 ## 0.10.9
 - **Codex plugin**: Codex installs Myco Notes with `codex plugin marketplace add LuzianMe/myco-notes` and `codex plugin add myco-notes@myco-notes` (it reads the existing marketplace file). A new `.codex-plugin/plugin.json` gives Codex the display name, icon, description and starter prompts. The README's Codex section leads with this; linking the skill folder still works.
 - Tests: the Codex manifest must match the plugin manifest's name and version, and its icon paths must exist.

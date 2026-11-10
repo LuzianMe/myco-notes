@@ -10,7 +10,10 @@ What it produces
   graph.html        the mycelium view: notes as a living network (mentions, groups, freshness, follow-ups gone stale, missing references) with a
                     timeline that replays the git history; one self-contained file, opens by double-click; only titles, paths and commit subjects
 Relations are file-name mentions: a note that writes `runbook.md` in backticks (or plain text) mentions that note.
-It refuses to build if any note contains a secret-looking string (publication gate).
+It refuses to build if any note contains a secret-looking string (publication gate; the rules of tools/secret_scan.py, value hidden).
+The output folder is emptied and rebuilt, so --out must not be the repository or a folder that contains it, and must be empty,
+missing, or a map this tool built (it leaves a .myco-notes-map marker there).
+Two notes whose paths give the same page name (a/b.md and a-b.md) keep apart: the later one gets a short hash of its path.
 Optional config: .myco-notes-map.json  {"title": "...", "groups": [{"id","name","blurb","prefixes":["myco-notes/plans/"]}], "hints": {"myco-notes/state.md": "one line"}}
 Folders: the notes folder, docs folder and map folder come from .myco-notes.conf (see tools/_myco.py layout); DATA_DIRS (project data that is not notes) are left out.
 Needs only the Python standard library; if the 'markdown' package is installed pages are rendered nicely, otherwise as preformatted text.
@@ -22,10 +25,14 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, HERE)
 import _myco  # noqa: E402
 import notes_graph  # noqa: E402
+import secret_scan  # noqa: E402
+import hashlib  # noqa: E402
 
 SKIP_DIRS = {".git", "site", "notes-map", "node_modules", "__pycache__"}
-SECRET = re.compile(r"BEGIN [A-Z ]*PRIVATE KEY|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|xox[baprs]-[A-Za-z0-9-]{10,}|sk-[A-Za-z0-9]{32,}|"
-                    r"(?i:(password|passwd|passphrase|secret|token|api[_-]?key|psk))[\"']?\s*[:=]\s*[\"']?[A-Za-z0-9+/_=-]{20,}")
+MARKER = ".myco-notes-map"   # marks a folder this tool made, so it may empty and rebuild it
+MAP_FILES = {"index.html", "graph.html", "p", "raw", MARKER}
+
+
 def default_groups(lay):
     n = lay["notes"] + "/"
     start = ["AGENTS.md", "CLAUDE.md", "README.md"] + [n + f for f in ("working-agreement.md", "sync-tracker.md", lay["state"], "runbook.md")]
@@ -77,7 +84,13 @@ def main():
     a = ap.parse_args()
     root = sh(["git", "rev-parse", "--show-toplevel"], a.root).strip() or os.path.abspath(a.root)
     lay = _myco.layout(root)
-    out = a.out or os.path.join(root, *lay["map"].split("/"))
+    out = os.path.abspath(a.out) if a.out else os.path.join(root, *lay["map"].split("/"))
+    rel_out = _myco.overlap(root, out)
+    if rel_out in ("same", "contains"):
+        sys.exit(f"REFUSING to build: --out {out} is the repository or contains it, and the output folder is emptied before each build")
+    if not _myco.owned_or_empty(out, MARKER, lambda d: set(os.listdir(d)) <= MAP_FILES and "index.html" in os.listdir(d)):
+        sys.exit(f"REFUSING to build: {out} holds files this tool did not make, and the output folder is emptied before each build; "
+                 "choose an empty or new folder")
     skip_rel = {lay["map"], *lay["data"]}
     cfg = {}
     cp = os.path.join(root, ".myco-notes-map.json")
@@ -101,9 +114,10 @@ def main():
     info = {}
     for rel in files:
         text = open(os.path.join(root, rel), encoding="utf-8", errors="replace").read()
-        m = SECRET.search(text)
-        if m:
-            sys.exit(f"REFUSING to build: {rel} looks like it contains a secret near: {m.group(0)[:30]}...")
+        for ln, line in enumerate(text.split("\n"), 1):
+            hit = secret_scan.find(line)
+            if hit:
+                sys.exit(f"REFUSING to build: {rel}:{ln} looks like it contains a secret ({hit[0]}; value not shown)")
         fm, fm_end = _myco.frontmatter(text)      # optional freshness header (method 10.1): shown as a line, not rendered as text
         shown = "\n".join(text.split("\n")[fm_end:]) if fm_end else text
         h1 = re.search(r"^#\s+(.+)$", shown, re.M)
@@ -119,6 +133,15 @@ def main():
         info[rel] = dict(id=slug(rel), rel=rel, name=os.path.basename(rel), title=ttl, group=group, text=text, shown=shown, fm={k: v[0] for k, v in fm.items()}, out={}, inn={},
                          hint=hints.get(rel) or (para[:170] + ("..." if len(para) > 170 else "")),
                          mtime=os.path.getmtime(os.path.join(root, rel)), size=len(text.encode("utf-8")))
+    taken = {}
+    for rel in sorted(info):                       # a/b.md and a-b.md give the same page name: the later one gets a path hash
+        pid = info[rel]["id"]
+        if pid in taken:
+            pid = f"{pid}-{hashlib.sha1(rel.encode('utf-8')).hexdigest()[:6]}"
+            info[rel]["id"] = pid
+        if pid in taken:
+            sys.exit(f"REFUSING to build: {rel} and {taken[pid]} would write the same page {pid}.html")
+        taken[pid] = rel
     by_name = {}
     for rel, d in info.items():
         by_name.setdefault(d["name"], []).append(rel)
@@ -139,6 +162,7 @@ def main():
 
     shutil.rmtree(out, ignore_errors=True)
     os.makedirs(os.path.join(out, "p")); os.makedirs(os.path.join(out, "raw"))
+    open(os.path.join(out, MARKER), "w").write("Built by build-notes-map.py; this folder is emptied and rebuilt on each build.\n")
     for rel, d in info.items():
         if md_lib:
             m = md_lib.Markdown(extensions=["tables", "fenced_code", "toc", "sane_lists"])
