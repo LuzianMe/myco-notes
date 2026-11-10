@@ -60,7 +60,7 @@ Mycelium is the underground network of threads (hyphae) that connects the trees 
 | `tools/relocate` | Moves an older tree (notes/, tools/, docs/ at the root) into the single folder, or renames that folder: dry run first, keeps your folder names, rewrites the path references. |
 | `tools/ci-check`, `tools/setup-clone`, `docs/TEAM.md`, `template/.github/` | Team use: a pull-request check (secret scan + lint), per-clone setup, CODEOWNERS and PR template, and the step-by-step guide for GitHub or GitHub Enterprise. |
 
-At the repository root: `.claude-plugin/` (Claude Code plugin and marketplace manifests), `tests/` (`native.py`, `smoke.sh`), `examples/`, `LICENSE`, `NOTICE`.
+At the repository root: `.claude-plugin/` (Claude Code plugin and marketplace manifests, also read by Codex), `.codex-plugin/` (Codex plugin manifest), `tests/` (`native.py`, `smoke.sh`), `examples/`, `LICENSE`, `NOTICE`.
 
 ## Install
 
@@ -71,14 +71,20 @@ At the repository root: `.claude-plugin/` (Claude Code plugin and marketplace ma
 ```
 Then ask Claude to "start a Myco Notes tree for my project", "update the notes", "audit the notes" or "commit the notes".
 
-### OpenAI Codex
-Codex reads skills from `~/.agents/skills` (all your projects) or `.agents/skills` inside a repository, and follows symlinks. Clone the kit once and link the skill folder:
+### OpenAI Codex (one command)
+```bash
+codex plugin marketplace add LuzianMe/myco-notes
+codex plugin add myco-notes@myco-notes
+```
+Then use the same requests as above. `codex plugin marketplace upgrade` followed by the same `add` picks up a new release.
+
+Without the plugin system, link the skill folder instead: Codex reads skills from `~/.agents/skills` (all your projects) or `.agents/skills` inside a repository, and follows symlinks.
 ```bash
 git clone https://github.com/LuzianMe/myco-notes.git ~/.agents/myco-notes-kit
 mkdir -p ~/.agents/skills
 ln -s ~/.agents/myco-notes-kit/skills/myco-notes ~/.agents/skills/myco-notes
 ```
-Restart Codex if the skill does not appear, then use the same requests as above. (Tried under Codex on Windows: the skill is discovered as "Myco Notes" and builds a tree. Please report anything that differs.)
+Restart Codex if the skill does not appear.
 
 ### Other agents
 Any agent that supports Agent Skills: copy or link `skills/myco-notes/` into its skills folder; the folder is self-contained. Any other agent: clone the repository and tell it to read `skills/myco-notes/SKILL.md` as a procedure; once a notes tree exists, point it at the tree's `AGENTS.md`.
