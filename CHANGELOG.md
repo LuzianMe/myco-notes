@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.2
+- **Mycelium view: no more mushrooms.** The entry notes (`AGENTS.md`, `CLAUDE.md`, working agreement, tracker, state, runbook) were drawn as cartoon mushrooms, but every Myco Notes tree has the same ones, so highlighting them said nothing about the project. Every note is now a glowing orb.
+- **Hubs come from the project's own data.** The few most-mentioned notes (at least two mentions, at most six) are drawn larger with two soft rings and always carry a label. The entry and method notes (the map's "Start here" and "Method" groups) and the history folders are never hubs, however often they are mentioned, because every tree has them.
+- **The timeline moved to the left column**, under the search and legend panel, so it no longer takes room from the diagram on a desktop screen; the network is centered in the free space to its right. On a phone it stays a bar at the bottom.
+- Tests: `tests/native.py` 105 checks (hubs follow mentions and not names, the timeline sits in the left column, no mushrooms in the page).
+
 ## 0.8.1
 - **`relocate` now updates a project that already uses the single folder.** Until now it said "nothing to do" for such a tree, so a project kept the tools it was created with. Run from a newer kit (`python <kit>/tools/relocate.py --root PROJECT`) it lists the new and changed files in the project's tools and docs (a Windows checkout's CRLF line endings do not count as a change), and `--apply` copies them (never `bootstrap`, the notes, `.myco-notes.conf` or `AGENTS.md`), refreshes the hooks path and shows the lint before and after. It then prints what else to check: set `NEW_FOLDERS` if the conf lacks it, and add the exit-code-3 rule to `AGENTS.md` if it is missing. Run from the project's own tools folder it says there is no newer kit.
 - `SKILL.md` documents the update flow. Tests: `tests/native.py` 102 checks (refresh dry run, CRLF, apply, protected files, second run, the refreshed tools build the graph).

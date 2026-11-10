@@ -1,7 +1,7 @@
 """notes_graph: the data and the page for the mycelium view (graph.html), called by build-notes-map.py.
 
 The view is one self-contained HTML file (no server, no network, no libraries): notes are nodes, mentions between notes are hyphae, the
-entry notes are drawn as mushrooms, and a timeline replays the git history so the network grows commit by commit. Only titles, paths, counts
+most-mentioned notes of the project are its hubs, and a timeline replays the git history so the network grows commit by commit. Only titles, paths, counts
 and commit subjects are written into it, never the text of a note.
 """
 import json
@@ -93,14 +93,12 @@ def build(root, lay, info, groups, out, title, sh, today, built):
     skip_prefixes = (lay["docs"] + "/", "template/", lay["map"] + "/") + tuple(lay["notes"] + "/" + h + "/" for h in lay["history"])
     hist_prefixes = tuple(lay["notes"] + "/" + h + "/" for h in lay["history"])
     gids = [g[0] for g in groups]
-    start_ids = {rels_i for rels_i in rels if info[rels_i]["group"] == "start"}
-    if not start_ids:
-        start_ids = set(sorted(rels, key=lambda r: -len(info[r]["inn"]))[:5])
+    hubs = hub_set(info, hist_prefixes)
     nodes = []
     for rel in rels:
         d = info[rel]
         n = {"id": d["id"], "rel": rel, "name": d["name"], "title": d["title"][:90], "g": gids.index(d["group"]) if d["group"] in gids else 0,
-             "kb": round(d["size"] / 1024, 1), "in": len(d["inn"]), "out": len(d["out"]), "hub": rel in start_ids, "hist": rel.startswith(hist_prefixes)}
+             "kb": round(d["size"] / 1024, 1), "in": len(d["inn"]), "out": len(d["out"]), "hub": rel in hubs, "hist": rel.startswith(hist_prefixes)}
         n["b"] = born.get(rel, uncommitted) if commits else -1
         if rel in last:
             n["l"] = last[rel]
@@ -134,6 +132,15 @@ def build(root, lay, info, groups, out, title, sh, today, built):
     with open(os.path.join(out, "graph.html"), "w", encoding="utf-8", newline="\n") as fh:
         fh.write(page)
     return len(nodes), len(edges), len(commits)
+
+
+def hub_set(info, hist_prefixes):
+    """The notes that most other notes mention: a few per project, chosen by the mentions. Every tree has the same entry and method notes
+    (the "start" and "docs" groups), so highlighting those would say nothing about this project: they are never hubs, nor are history
+    notes. A note needs at least two mentions to count."""
+    live = [r for r in info if not r.startswith(hist_prefixes) and info[r]["group"] not in ("start", "docs") and len(info[r]["inn"]) >= 2]
+    k = min(6, max(2, len(info) // 8))
+    return set(sorted(live, key=lambda r: (-len(info[r]["inn"]), -info[r]["size"], r))[:k])
 
 
 def _esc(s):
