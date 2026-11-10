@@ -356,6 +356,20 @@ def main():
         run(L(proj, "notes-commit", T) + ["Configure mirror"], proj)
         rc, out = run(L(proj, "mirror-push", T), proj)
         check("mirror push to a local directory", rc == 0 and "mirror: synced" in out and os.path.isdir(os.path.join(mirror, ".git")), out)
+        outside = os.path.join(tmp, "outside")
+        os.makedirs(outside)
+        write(os.path.join(outside, "keep.txt"), "sentinel\n")
+        plans = os.path.join(mirror, MY, "plans")
+        shutil.rmtree(plans)
+        if WIN:   # a junction needs no special rights on Windows; the reviewer's case
+            made = subprocess.run(["cmd", "/c", "mklink", "/J", plans, outside], capture_output=True).returncode == 0
+        else:
+            os.symlink(outside, plans)
+            made = True
+        rc, out = run(L(proj, "mirror-push", T) + ["--strict"], proj)
+        check("a link or junction inside the mirror is replaced, never followed",
+              made and rc == 0 and os.listdir(outside) == ["keep.txt"] and read(os.path.join(outside, "keep.txt")) == "sentinel\n"
+              and os.path.isdir(plans) and not os.path.islink(plans), out)
         rc, out = run(L(proj, "restore-drill", T) + [mirror], proj)
         check("restore drill passes", rc == 0 and "fsck: OK" in out and "tracker present" in out, out)
         arch = os.path.join(tmp, "backup.zip")

@@ -173,7 +173,7 @@ chk "two notes with the same page name both get a page" "python3 myco-notes/tool
 rm -rf myco-notes/pg myco-notes/pg-x.md
 upper="PASS""WORD"
 printf '%s=Hunter2Hunter2x\n' "$upper" > myco-notes/upper.md
-chk "an upper-case password line is refused, value hidden" "out=\$(git add -A && git commit -q -m upper 2>&1); [ \$? -ne 0 ] && echo \"\$out\" | grep -q 'redacted' && ! echo \"\$out\" | grep -q Hunter2"
+chk "an upper-case password line is refused, no line text shown" "out=\$(git add -A && git commit -q -m upper 2>&1); [ \$? -ne 0 ] && echo \"\$out\" | grep -q 'value not shown' && ! echo \"\$out\" | grep -q Hunter2"
 git reset -q; rm -f myco-notes/upper.md
 base2="$(git rev-parse HEAD)"; git switch -q -c feat-history
 printf 'token = %s\n' "QQQQQQQQQQABCDEFGHIJKL1234" > myco-notes/gone.md; git add -A; git commit -q --no-verify -m "add"
@@ -202,6 +202,53 @@ echo "- only one" >> myco-notes/plans/backlog.md; echo "- not this" >> myco-note
 chk "notes-commit --dry-run changes nothing" "myco-notes/tools/notes-commit --dry-run 'x' | grep -q 'would commit 2' && [ -z \"\$(git diff --cached --name-only)\" ]"
 chk "notes-commit --only commits just that path" "myco-notes/tools/notes-commit --only myco-notes/plans/backlog.md 'Only the backlog' >/dev/null && git show --name-only --format= HEAD | grep -qx myco-notes/plans/backlog.md && ! git show --name-only --format= HEAD | grep -q runbook && git diff --name-only | grep -q runbook"
 git checkout -q -- myco-notes/runbook.md
+
+echo "0.12.1: links in the mirror, line text, merges, missing base, worktrees, scoped checks, -p result, content check, ssh"
+setmirror "$tmp/mir4"; myco-notes/tools/mirror-push >/dev/null
+mkdir -p "$tmp/outside4"; echo sentinel > "$tmp/outside4/keep.txt"
+rm -rf "$tmp/mir4/myco-notes/plans"; ln -s "$tmp/outside4" "$tmp/mir4/myco-notes/plans"
+rm -f "$tmp/mir4/AGENTS.md"; ln -s "$tmp/outside4/keep.txt" "$tmp/mir4/AGENTS.md"
+chk "a link inside the mirror is replaced, never followed" "myco-notes/tools/mirror-push | grep -q 'mirror: synced' && [ -f $tmp/outside4/keep.txt ] && [ \"\$(cat $tmp/outside4/keep.txt)\" = sentinel ] && [ \$(ls $tmp/outside4 | wc -l) = 1 ] && [ ! -L $tmp/mir4/myco-notes/plans ] && [ ! -L $tmp/mir4/AGENTS.md ]"
+f="$tmp/mir4/myco-notes/state.md"; t=$(python3 -c "import os,sys;print(int(os.stat(sys.argv[1]).st_mtime))" "$f")
+python3 - "$f" "$t" <<'PY'
+import os,sys
+p,t=sys.argv[1],int(sys.argv[2]); b=bytearray(open(p,'rb').read()); b[0]=ord('X') if b[0]!=ord('X') else ord('Y'); open(p,'wb').write(b); os.utime(p,(t,t))
+PY
+chk "--verify repairs a same-size, same-time change" "myco-notes/tools/mirror-push >/dev/null; ! cmp -s myco-notes/state.md $f && myco-notes/tools/mirror-push --verify >/dev/null && cmp -s myco-notes/state.md $f"
+two="token = $(printf 'Q%.0s' 1 2 3 4 5 6 7 8 9 10)ABCDEFGHIJKL1234 api_key = $(printf 'W%.0s' 1 2 3 4 5 6 7 8 9 10)ABCDEFGHIJKL5678"
+printf '%s\n' "$two" > myco-notes/two.md
+chk "two secrets on one line: neither is shown" "out=\$(git add -A && git commit -q -m two 2>&1); [ \$? -ne 0 ] && echo \"\$out\" | grep -q 'two.md:1' && ! echo \"\$out\" | grep -q -e QQQQ -e WWWW"
+git reset -q; rm -f myco-notes/two.md
+base3="$(git rev-parse HEAD)"
+git switch -q -c side3; echo "side line" >> myco-notes/runbook.md; git commit -qam side
+git switch -q -c feat-merge "$base3"; echo "main line" >> myco-notes/runbook.md; git commit -qam main
+git merge -q side3 >/dev/null 2>&1
+printf 'resolved\ntoken = %sABCDEFGHIJKL1234\n' "$(printf 'M%.0s' 1 2 3 4 5 6 7 8 9 10)" > myco-notes/runbook.md
+git add -A; git commit -q --no-verify -m "merge with a secret in the resolution"
+git rm -q -f myco-notes/runbook.md 2>/dev/null; git checkout -q "$base3" -- myco-notes/runbook.md; git commit -q -m "drop the secret"
+chk "ci-check finds a secret added by a merge resolution" "out=\$(myco-notes/tools/ci-check $base3); [ \$? -ne 0 ] && echo \"\$out\" | grep -q 'runbook.md' && ! echo \"\$out\" | grep -q MMMM"
+chk "ci-check fails when the base cannot be found" "out=\$(myco-notes/tools/ci-check 0123456789abcdef0123456789abcdef01234567); [ \$? -ne 0 ] && echo \"\$out\" | grep -q 'not found'"
+chk "a first push (zero base) scans the whole history" "! myco-notes/tools/ci-check 0000000000000000000000000000000000000000"
+git switch -q main; git branch -q -D side3 feat-merge
+git worktree add -q "$tmp/wt" -b wt-branch >/dev/null 2>&1
+chk "a linked worktree is not copied into a mirror" "(cd $tmp/wt && sed -i.bak 's|^MIRROR_TARGET=.*|MIRROR_TARGET=\"$tmp/wtmir\"|' .myco-notes.conf && rm -f .myco-notes.conf.bak && out=\$(myco-notes/tools/mirror-push 2>&1); [ \$? = 1 ] && echo \"\$out\" | grep -q 'worktree') && [ ! -e $tmp/wtmir ]"
+git worktree remove --force "$tmp/wt"; git branch -q -D wt-branch
+printf 'def broken(:\n' > broken_unrelated.py; git add broken_unrelated.py
+echo "- scoped" >> myco-notes/plans/backlog.md
+chk "--only ignores an unrelated staged file with a syntax error" "myco-notes/tools/notes-commit --only myco-notes/plans/backlog.md 'Scoped commit' >/dev/null && git show --name-only --format= HEAD | grep -qx myco-notes/plans/backlog.md && git diff --cached --name-only | grep -qx broken_unrelated.py"
+git rm -q --cached broken_unrelated.py; rm -f broken_unrelated.py
+setmirror "git:$tmp/nowhere.git"; echo "- p test" >> myco-notes/plans/backlog.md
+chk "notes-commit -p exits 4 when a strict mirror is skipped" "MS=1; sed -i.bak 's|^MIRROR_STRICT=.*|MIRROR_STRICT=1|' .myco-notes.conf; rm -f .myco-notes.conf.bak; myco-notes/tools/notes-commit -p --only myco-notes/plans/backlog.md 'P test' >/dev/null 2>&1; [ \$? = 4 ]"
+git checkout -q -- .myco-notes.conf
+if command -v rsync >/dev/null 2>&1; then
+  mkdir -p "$tmp/fakebin"; printf '#!/bin/sh\nwhile [ $# -gt 0 ]; do case "$1" in -o|-l|-p) shift 2;; -*) shift;; *) break;; esac; done\nshift\nexec sh -c "$*"\n' > "$tmp/fakebin/ssh"; chmod +x "$tmp/fakebin/ssh"
+  mkdir -p "$tmp/rforeign"; echo x > "$tmp/rforeign/x"
+  setmirror "fakehost:$tmp/rforeign"
+  chk "an ssh target that is not its mirror is refused before rsync" "out=\$(PATH=$tmp/fakebin:\$PATH myco-notes/tools/mirror-push 2>&1); [ \$? = 1 ] && echo \"\$out\" | grep -q 'not a mirror' && [ -f $tmp/rforeign/x ]"
+  setmirror "fakehost:$tmp/rmir"
+  chk "an ssh target that is new gets synced and marked" "PATH=$tmp/fakebin:\$PATH myco-notes/tools/mirror-push | grep -q 'mirror: synced' && [ -f $tmp/rmir/.myco-mirror ] && [ -d $tmp/rmir/.git ]"
+  git checkout -q -- .myco-notes.conf
+fi
 
 echo "flat layout and relocate (older trees keep working; relocate moves them)"
 "$kit/tools/bootstrap" "$tmp/flat" --name "Old" --tz "UTC" --layout flat >/dev/null 2>&1

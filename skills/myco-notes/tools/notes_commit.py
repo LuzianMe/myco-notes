@@ -22,6 +22,9 @@ Behaviour (configured in .myco-notes.conf at the repository root):
   - adds AGENT_TRAILER unless --human
   - after the commit, if a changed file matches SYNC_GLOBS, runs SYNC_CMD so the live copy equals the committed copy
   - team use: --branch / --push / --pr give each change its own branch and pull request (see docs/TEAM.md)
+  - with --only, the syntax checks and SYNC_GLOBS look only at the files this commit contains; other staged files stay staged
+Exit: 0 committed (or nothing to commit), 1 a check failed, 2 usage, 3 new root folders need a decision (nothing committed),
+      4 committed, but -p's mirror push did not sync (it failed, or was skipped with MIRROR_STRICT=1)
 """
 import argparse
 import collections
@@ -290,7 +293,8 @@ def main():
         print("notes-commit: nothing to commit")
         return 0
 
-    changed = [f for f in _myco.git("-c", "core.quotepath=off", "diff", "--cached", "--name-only", "--diff-filter=AM", "-z").stdout.split("\0") if f]
+    changed = [f for f in _myco.git("-c", "core.quotepath=off", "diff", "--cached", "--name-only", "--diff-filter=AM", "-z",
+                                    *(["--"] + only if only else [])).stdout.split("\0") if f]
     for f in changed:
         if f.endswith(".py") and check_py:
             try:
@@ -317,18 +321,21 @@ def main():
         if r.returncode:
             print("WARNING: committed, but SYNC_CMD failed; the live copy may differ from the committed copy", file=sys.stderr)
 
+    result = 0
     if a.p:
-        if subprocess.run([sys.executable, os.path.join(HERE, "mirror_push.py")]).returncode:
-            print("WARNING: committed, but the mirror push failed", file=sys.stderr)
+        mrc = subprocess.run([sys.executable, os.path.join(HERE, "mirror_push.py")]).returncode
+        if mrc:
+            print(f"WARNING: committed, but the mirror push did not sync (mirror-push exit {mrc})", file=sys.stderr)
+            result = 4
 
     if a.push or a.pr:
         cur = _myco.git("symbolic-ref", "-q", "--short", "HEAD").stdout.strip()
         if not cur:
             print("WARNING: detached HEAD, not pushing", file=sys.stderr)
-            return 0
+            return result
         if _myco.git("remote", "get-url", "origin").returncode != 0:
             print("WARNING: no remote named origin; nothing pushed", file=sys.stderr)
-            return 0
+            return result
         if subprocess.run(["git", "push", "-q", "-u", "origin", cur]).returncode == 0:
             print(f"pushed {cur} to origin")
         else:
@@ -339,7 +346,7 @@ def main():
                     print("WARNING: pull request not created (does one exist already?)", file=sys.stderr)
             else:
                 print(f"gh (GitHub CLI) not installed: open a pull request for branch {cur} in your hosting service")
-    return 0
+    return result
 
 
 if __name__ == "__main__":
