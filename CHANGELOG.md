@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.10.8
+- **Round icon**: the plugin icon (`.claude-plugin/icon.png`) now draws the mycelium on a dark disc with transparent corners instead of a dark square; a few notes and threads grow past the rim.
+
 ## 0.10.7
 - **Plugin directory listing links**: `plugin.json` now sets `documentationUrl` (the method), `supportUrl` (GitHub issues) and `privacyPolicyUrl` (the README section "What it runs and what it sends": the plugin collects nothing and has no telemetry).
 - The demo builder (`examples/demo/build_demo.py`) sets only its own git variables instead of copying the whole environment; the demo tree is unchanged.
