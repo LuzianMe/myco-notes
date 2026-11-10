@@ -110,7 +110,7 @@ def main():
         os.remove(leak)
         git(proj, "reset", "-q")
         key = os.path.join(proj, MY, "key-test.md")
-        write(key, "-----BEGIN RSA PRIVATE KEY-----\nabc\n")
+        write(key, "-----BEGIN RSA " + "PRIVATE KEY-----\nabc\n")   # built at run time, so this file holds no key-shaped text
         rc, out = run(L(proj, "notes-commit", T) + ["add a key"], proj)
         check("private key block is refused", rc != 0, out)
         os.remove(key)

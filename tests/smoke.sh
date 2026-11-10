@@ -72,7 +72,7 @@ echo "pre-commit hook"
 printf 'api_key = AbCdEfGhIjKlMnOpQrStUvWx12\n' > myco-notes/secret-test.md
 chk "secret is refused"                 "! myco-notes/tools/notes-commit 'add a secret'"
 git reset -q; rm -f myco-notes/secret-test.md
-printf -- '-----BEGIN RSA PRIVATE KEY-----\nabc\n' > myco-notes/key-test.md
+printf -- '-----BEGIN RSA %s-----\nabc\n' 'PRIVATE KEY' > myco-notes/key-test.md   # assembled at run time: no key-shaped text in this file
 chk "private key block is refused"      "! myco-notes/tools/notes-commit 'add a key'"
 git reset -q; rm -f myco-notes/key-test.md
 chk "tree is clean again"               "[ -z \"\$(git status --porcelain)\" ]"
