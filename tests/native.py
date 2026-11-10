@@ -130,6 +130,9 @@ def main():
             h = read(os.path.join(root_dir, *map_dir.split("/"), "graph.html"))
             return h, json.loads(_re.search(r'<script id="data" type="application/json">(.*?)</script>', h, _re.S).group(1).replace("<\\/", "</"))
         write(os.path.join(proj, MY, "plans", "graph-test.md"), "# Graph Test Note\nSee `state.md`. The unique phrase is zebra-unique-phrase-8812 and `no-such-note.md` is missing.\n")
+        write(os.path.join(proj, MY, "plans", "graph-hub.md"), "# Hub\nThe centre of the test.\n")
+        for x in ("a", "b", "c"):
+            write(os.path.join(proj, MY, "plans", f"graph-{x}.md"), f"# Spoke {x}\nSee `graph-hub.md`.\n")
         rc, out = run(NC + ["Add a note for the graph test"], proj)
         git(proj, "mv", MY + "/plans/graph-test.md", MY + "/plans/graph-renamed.md")
         write(os.path.join(proj, MY, "plans", "graph-renamed.md"), "\nMore text.\n", "a")
@@ -144,13 +147,18 @@ def main():
         check("a mention becomes a link", any({g["nodes"][e[0]]["rel"], g["nodes"][e[1]]["rel"]} == {MY + "/plans/graph-renamed.md", MY + "/state.md"} for e in g["edges"]), str(g["edges"][:5]))
         check("a missing reference is shown", gn is not None and gn.get("miss") == ["no-such-note.md"], str(gn))
         check("the history is replayed across a rename", gn is not None and gn["b"] < gn["l"] and len(g["commits"]) >= 3 and g["commits"][gn["b"]]["s"].startswith("Add a note for the graph test"), str((gn, [c["s"] for c in g["commits"]])))
+        hubs = {n["rel"] for n in g["nodes"] if n["hub"]}
+        live = sorted((n for n in g["nodes"] if not n["hist"] and n["in"] >= 2 and g["groups"][n["g"]]["id"] not in ("start", "docs")), key=lambda n: (-n["in"], -n["kb"], n["rel"]))
+        check("hubs are the most-mentioned project notes", MY + "/plans/graph-hub.md" in hubs and hubs == {n["rel"] for n in live[:min(6, max(2, len(g["nodes"]) // 8))]} and not any(n["in"] < 2 for n in g["nodes"] if n["hub"]), str(sorted(hubs)))
+        check("the entry and method notes are never hubs, however often they are mentioned", not any(n["hub"] and g["groups"][n["g"]]["id"] in ("start", "docs") for n in g["nodes"]) and any(n["in"] >= 2 and g["groups"][n["g"]]["id"] == "start" for n in g["nodes"]), str([(n["rel"], n["in"]) for n in g["nodes"] if n["in"] >= 2]))
+        check("the timeline sits in the left column under the search panel, no mushrooms drawn", h.index('id="left"') < h.index('id="head"') < h.index('id="time"') < h.index('id="panel"') and "mushroom" not in h.lower())
         check("the page needs no network", not _re.search(r'(src|href)="https?:', h) and h.count("</script>") == 2 and "%%" not in h)
         node = shutil.which("node")
         if node:
             code = _re.search(r"<script>\n\(function.*?</script>", h, _re.S).group(0)[len("<script>\n"):-len("</script>")]
             write(os.path.join(tmp, "graph-check.js"), code)
             check("the script is valid JavaScript", run([node, "--check", os.path.join(tmp, "graph-check.js")], tmp)[0] == 0)
-        git(proj, "rm", "-q", MY + "/plans/graph-renamed.md")
+        git(proj, "rm", "-q", MY + "/plans/graph-renamed.md", *[MY + f"/plans/graph-{x}.md" for x in ("hub", "a", "b", "c")])
         run(NC + ["Remove the graph test note"], proj)
         shutil.rmtree(os.path.join(proj, MY, "map"), ignore_errors=True)
         check("the map folder is still gitignored and the tree clean", git(proj, "status", "--porcelain")[1].strip() == "", git(proj, "status", "--porcelain")[1])
