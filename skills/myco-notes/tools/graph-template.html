@@ -258,7 +258,16 @@ function strand(P,upto,w0,w1){   /* fill the path P up to the length `upto`, hal
   return Q[Q.length-1];
 }
 function tip(p,r){cx.beginPath();cx.arc(p[0],p[1],r,0,6.3);cx.fill()}
-function hypha(e,w,grow,col,tipCol){
+/* A bud has the colour of the note the thread comes from (as that note is drawn: its group, or the wilt colour), a little
+   darker on the dark theme and a little lighter on the light one, so it reads as part of the source and still stands out. */
+var shades={};
+function budRGB(n){
+  var c=n.due?T.wilt:gcol(n.g),k=(T.dark?"d":"l")+c;
+  if(!shades[k]){var v=parseInt(c.slice(1),16),r=v>>16&255,g=v>>8&255,b=v&255;
+    shades[k]=(T.dark?[r*.72,g*.72,b*.72]:[r+(255-r)*.3,g+(255-g)*.3,b+(255-b)*.3]).map(Math.round).join(",")}
+  return shades[k];
+}
+function hypha(e,w,grow,col,tipA){
   var P=hyphaPath(e);if(P.length<2)return;
   var tot=0,i;for(i=1;i<P.length;i++)tot+=Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1]);
   if(tot<2)return;
@@ -266,10 +275,11 @@ function hypha(e,w,grow,col,tipCol){
   if(e.dir===0){   /* each side grows half the way; the two meet in the middle */
     var R=P.slice().reverse(),h=w*.5;
     strand(P,tot*grow/2+.5,h,h);var q=strand(R,tot*grow/2+.5,h,h);
-    cx.fillStyle=tipCol;if(grow<1){if(q)tip(q,tr*.8)}else{tip(P[P.length-1],tr);tip(P[0],tr)}
+    var bud=function(n){cx.fillStyle="rgba("+budRGB(n)+","+tipA+")"};   /* the bud on b's rim comes from a, and the other way round */
+    if(grow<1){if(q){bud(e.b);tip(q,tr*.8)}}else{bud(e.a);tip(P[P.length-1],tr);bud(e.b);tip(P[0],tr)}
   }else{
     var S=e.dir>0?P:P.slice().reverse(),end=strand(S,tot*grow,w*1.15,w*.12);
-    if(end){cx.fillStyle=tipCol;tip(end,tr)}
+    if(end){cx.fillStyle="rgba("+budRGB(e.dir>0?e.a:e.b)+","+tipA+")";tip(end,tr)}
   }
 }
 function label(txt,x,y,bold){
@@ -285,7 +295,7 @@ function draw(now){
     var a=Math.min(e.a.ap,e.b.ap);if(a<=0)return;
     var hot=focus>=0&&(e.a.i===focus||e.b.i===focus),d=Math.min(dim(e.a),dim(e.b));
     var w=Math.min(2.6,.6+Math.sqrt(e.w)*.45)*(hot?1.5:1)*Math.min(1.4,cam.k+.3),al=(hot?.85:.26)*Math.min(1,a*2)*(hot?1:Math.max(d,.35));
-    hypha(e,w,a,"rgba("+T.hypha+","+al.toFixed(3)+")","rgba("+T.hypha+","+Math.min(1,al*3).toFixed(3)+")");
+    hypha(e,w,a,"rgba("+T.hypha+","+al.toFixed(3)+")",Math.min(1,al*3).toFixed(3));
     /* on a lit thread, sap flows from the note that mentions to the note it names (both ways on a fused thread) */
     if(hot&&!reduce&&a>=1){for(var s=0;s<2;s++){var u=((t*.00035+e.k*.37+s*.5)%1),back=e.dir<0||(e.dir===0&&s===1),p=curve(e,back?1-u:u);cx.fillStyle="rgba("+T.hypha+",.95)";cx.beginPath();cx.arc(sx(p.x),sy(p.y),2.1,0,6.3);cx.fill()}}
   });
@@ -353,15 +363,33 @@ function pick(px,py){
   });
   return best;
 }
-var drag=null;
+var drag=null,ptr={},pinch=null;   /* ptr: the pointers that are down; two of them (fingers) pinch to zoom around their midpoint */
+function downPts(){return Object.keys(ptr).map(function(k){return ptr[k]})}
+function pinchState(){var p=downPts(),a=p[0],b=p[1];return {d:Math.hypot(a.x-b.x,a.y-b.y)||1,mx:(a.x+b.x)/2,my:(a.y+b.y)/2}}
+function endPointer(ev){
+  delete ptr[ev.pointerId];
+  if(pinch){if(downPts().length<2)pinch=null;drag=null;cv.classList.remove("drag");return true}   /* lifting a finger after a pinch selects nothing */
+  return false;
+}
 cv.addEventListener("pointerdown",function(ev){
   cv.setPointerCapture(ev.pointerId);
+  ptr[ev.pointerId]={x:ev.clientX,y:ev.clientY};
+  if(downPts().length>=2){
+    if(drag&&drag.id>=0)NODES[drag.id].fixed=false;
+    drag=null;autoFit=false;var s=pinchState();pinch={d:s.d,k:cam.tk,w:world(s.mx,s.my)};return;
+  }
   var i=pick(ev.clientX,ev.clientY);
   drag={id:i,sx:ev.clientX,sy:ev.clientY,cx:cam.tx,cy:cam.ty,moved:false};
   if(i>=0){NODES[i].fixed=true}
   cv.classList.add("drag");
 });
 cv.addEventListener("pointermove",function(ev){
+  if(ptr[ev.pointerId]){ptr[ev.pointerId].x=ev.clientX;ptr[ev.pointerId].y=ev.clientY}
+  if(pinch){   /* zoom by the change of the finger distance, keeping the point under the midpoint under it (so moving both fingers also pans) */
+    if(downPts().length<2)return;
+    var s=pinchState();cam.tk=cam.k=Math.max(.12,Math.min(5,pinch.k*s.d/pinch.d));
+    cam.tx=cam.x=pinch.w.x-(s.mx-W/2)/cam.k;cam.ty=cam.y=pinch.w.y-(s.my-H/2)/(cam.k*VS);return;
+  }
   if(!drag){var i=pick(ev.clientX,ev.clientY);if(i!==hov){hov=i;cv.classList.toggle("hover",i>=0)}return}
   var dx=ev.clientX-drag.sx,dy=ev.clientY-drag.sy;
   if(!drag.moved&&Math.abs(dx)+Math.abs(dy)>4)drag.moved=true;
@@ -369,7 +397,9 @@ cv.addEventListener("pointermove",function(ev){
   if(drag.id>=0){var w=world(ev.clientX,ev.clientY),n=NODES[drag.id];n.x=w.x;n.y=w.y;alpha=Math.max(alpha,.35)}
   else{autoFit=false;cam.tx=drag.cx-dx/cam.k;cam.ty=drag.cy-dy/(cam.k*VS);cam.x=cam.tx;cam.y=cam.ty}
 });
+cv.addEventListener("pointercancel",function(ev){endPointer(ev);if(drag&&drag.id>=0)NODES[drag.id].fixed=false;drag=null;cv.classList.remove("drag")});
 cv.addEventListener("pointerup",function(ev){
+  if(endPointer(ev))return;
   cv.classList.remove("drag");
   if(!drag)return;
   if(drag.id>=0)NODES[drag.id].fixed=false;
