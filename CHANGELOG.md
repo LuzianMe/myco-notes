@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.3
+- **Mycelium view, labels take turns**: names used to show only on the hubs (for ever) and, zoomed in, on every larger note. Now a few notes carry their name at a time (about the square root of the notes in view, more when zoomed in past the fitted view): one fades in about every second with a small rise, each stays about 7 s and fades out, and a note that was just named rests for 25 s. Hubs, well-mentioned and recently changed notes are picked more often; a name never lands on another one or under the search, timeline, tools or detail panel, and fades out if the camera moves it under one. With a note selected, only its neighbours take turns, faster, and the ones already named stay. Hover, selection and search matches are named at once. With reduced motion the names switch without fading, every 11 s.
+- README stills retaken.
+
 ## 0.10.2
 - **Mycelium view, phone panel**: on a phone, selecting a note opens a small strip at the bottom (the title on one line, links out and in, any warning, Open and More) instead of a panel that covered most of the screen. More (or a tap on the title) shows the full details and the lists; Less shrinks it again, and the choice is kept while the page is open. The desktop panel is unchanged.
 

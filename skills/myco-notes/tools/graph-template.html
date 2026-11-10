@@ -212,7 +212,7 @@ function fitTarget(soft){
   var nk=Math.max(.15,Math.min(2.2,Math.min((W-padX)/bw,(H-padY)/bh))),nx=(x0+x1)/2-(wide?171/nk:0),ny=(y0+y1)/2;   /* centre the network in the space right of the left column */
   /* soft (during a replay): ignore small changes of the bounding box, so one node drifting at the edge does not make the whole picture breathe */
   if(soft&&cam.fit&&Math.abs(nk-cam.tk)/cam.tk<.07&&Math.hypot(nx-cam.tx,ny-cam.ty)*cam.tk<30)return;
-  cam.tk=nk;cam.tx=nx;cam.ty=ny;cam.fit=true;
+  cam.tk=nk;cam.tx=nx;cam.ty=ny;cam.fit=true;cam.fk=nk;
 }
 
 /* ---------- drawing ---------- */
@@ -288,9 +288,54 @@ function hypha(e,w,grow,col,tipA){
     if(end){cx.fillStyle="rgba("+budRGB(e.dir>0?e.a:e.b)+","+tipA+")";tip(end,tr)}
   }
 }
-function label(txt,x,y,bold){
-  cx.font=(bold?"600 ":"")+"12px system-ui,Segoe UI,sans-serif";cx.textAlign="center";cx.lineWidth=3.5;cx.strokeStyle=T.halo;cx.fillStyle=T.text;
-  cx.strokeText(txt,x,y);cx.fillText(txt,x,y);
+function label(txt,x,y,bold,a){
+  cx.globalAlpha=a;cx.font=(bold?"600 ":"")+"12px system-ui,Segoe UI,sans-serif";cx.textAlign="center";cx.lineWidth=3.5;cx.strokeStyle=T.halo;cx.fillStyle=T.text;
+  cx.strokeText(txt,x,y);cx.fillText(txt,x,y);cx.globalAlpha=1;
+}
+
+/* ---------- labels ----------
+   A few notes carry their name at a time and take turns, like spores catching the light: one label fades in about every
+   second until the slots are full, each stays about 7 s, fades out, and a note that was just named waits ~25 s before it is
+   picked again. Well-mentioned, hub and recently changed notes are picked more often; a label never lands on another one.
+   With a note selected, only its neighbours take turns (all of them stay, when they fit in the slots). Zoomed in past the
+   fitted view there are more slots. The hovered and the selected note and search matches are always named. */
+var LDWELL=reduce?11000:7000,LFADE=reduce?1:1400,LGAP=reduce?0:1100,lastAdd=-1e9,spotFor=-2;
+NODES.forEach(function(n){n.la=0;n.lt=0;n.lu=0;n.ls=-1e9});
+function forced(n){return n.i===hov||n.i===sel||(match&&match[n.i])}
+function onScreen(n){var x=sx(n.x),y=sy(n.y);return x>24&&x<W-24&&y>24&&y<H-24}
+function slotCount(pool){   /* about the square root of the notes in view; zoomed in past the fitted view, up to three times more */
+  var z=Math.max(1,Math.min(3,cam.k/(cam.fk||cam.k))),b=sel>=0?8:Math.round(Math.sqrt(pool)*.9*z);if(W<640)b--;return Math.max(2,Math.min(sel>=0?8:16,b))}
+function lrad(n){return n.r*Math.max(.7,Math.min(1.6,cam.k))}
+function lbox(n){var w=n.name.length*6.6-14,x=sx(n.x),y=sy(n.y)+lrad(n)*(n.hub?2.5:1)+14;return [x-w/2-8,y-13,x+w/2+8,y+5]}
+function overlaps(b,c){return b[0]<c[2]&&c[0]<b[2]&&b[1]<c[3]&&c[1]<b[3]}
+function updateLabels(now,dt){
+  var fresh0=sel!==spotFor;
+  if(fresh0){spotFor=sel;NODES.forEach(function(n){n.ls=-1e9});lastAdd=-1e9}   /* a new focus: every note may be named again, and the names come quicker */
+  var pool=NODES.filter(function(n){return n.vis&&n.ap>=1&&n.i!==sel&&(sel<0||adj[sel].some(function(m){return m.n===n}))&&dim(n)>.5});
+  var ui=[];document.querySelectorAll(".box").forEach(function(el){   /* names stay clear of the search, timeline, tools and detail panel */
+    if(el.hidden)return;var r=el.getBoundingClientRect();if(r.width&&r.height)ui.push([r.left,r.top,r.right,r.bottom])});
+  var S=slotCount(pool.filter(onScreen).length),keep=pool.length<=S,on=0;
+  NODES.forEach(function(n){   /* a name outside the new neighbourhood, past its time, or now under a panel fades out; one that still belongs stays */
+    if(n.lt&&((!keep&&now>n.lu)||pool.indexOf(n)<0||ui.some(function(u){return overlaps(lbox(n),u)}))){n.lt=0;n.ls=now}
+    if(n.lt)on++;
+  });
+  if(on<S&&now-lastAdd>=(sel>=0?LGAP*.4:LGAP)){
+    var boxes=NODES.filter(function(n){return n.vis&&(n.la>.05||n.lt||forced(n))}).map(lbox).concat(ui);
+    var cand=pool.filter(function(n){return !n.lt&&!forced(n)&&n.la<.05&&onScreen(n)});
+    var fresh=cand.filter(function(n){return now-n.ls>25000});   /* rested notes first; in a small neighbourhood, the longest-rested */
+    if(fresh.length)cand=fresh;else{cand=cand.filter(function(n){return now-n.ls>3000}).sort(function(a,b){return a.ls-b.ls}).slice(0,3)}
+    for(var tries=0;tries<10&&cand.length;tries++){
+      var ws=cand.map(function(n){return 1+Math.sqrt(n.in)*1.2+(n.hub?3:0)+recency(n)*2}),sum=ws.reduce(function(a,b){return a+b},0),r=Math.random()*sum,k=0;
+      while(k<cand.length-1&&(r-=ws[k])>0)k++;
+      var c=cand[k],b=lbox(c);
+      if(!boxes.some(function(o){return overlaps(b,o)})){c.lt=1;c.lu=now+LDWELL*(sel>=0?1.4:1)+Math.random()*1500;lastAdd=now;break}
+      cand.splice(k,1);
+    }
+  }
+  NODES.forEach(function(n){   /* fade towards the target; a hovered or selected note is named at once */
+    var f=forced(n),tg=n.lt||f?1:0;if(n.la===tg)return;
+    var st=dt/(f?220:LFADE);n.la=tg>n.la?Math.min(1,n.la+st):Math.max(0,n.la-st);
+  });
 }
 function draw(now){
   cx.setTransform(DPR,0,0,DPR,0,0);cx.clearRect(0,0,W,H);
@@ -322,8 +367,7 @@ function draw(now){
     if(n.due){cx.setLineDash([2,3]);cx.strokeStyle=T.wilt;cx.lineWidth=1.2;cx.beginPath();cx.arc(x,y,r+3.5,0,6.3);cx.stroke();cx.setLineDash([])}
     if(n.miss&&(cam.k>.7||focus===n.i)){var ang=hash(n.i+9)*6.28,x2=x+Math.cos(ang)*(r+13),y2=y+Math.sin(ang)*(r+13);cx.setLineDash([2,2]);cx.strokeStyle=T.wilt;cx.lineWidth=1;cx.beginPath();cx.moveTo(x+Math.cos(ang)*r,y+Math.sin(ang)*r);cx.lineTo(x2,y2);cx.stroke();cx.setLineDash([]);cx.fillStyle=T.wilt;cx.font="10px system-ui";cx.textAlign="center";cx.fillText("?",x2+Math.cos(ang)*4,y2+Math.sin(ang)*4+3)}
     cx.globalAlpha=1;
-    var showLabel=n.hub||n.i===hov||n.i===sel||(match&&match[n.i])||(cam.k>1.5&&n.r>5);
-    if(showLabel&&d>.5)label(n.name.replace(/\.md$/,""),x,y+r*(n.hub?2.5:1)+14,n.hub||n.i===sel);
+    if(n.la>.01&&d>.5){var la=n.la*n.la*(3-2*n.la);label(n.name.replace(/\.md$/,""),x,y+r*(n.hub?2.5:1)+14+(1-la)*5,n.hub||n.i===sel,la)}   /* a name rises a few pixels as it fades in */
   });
   /* ripples: a new or changed note lets out a ring */
   ripples=ripples.filter(function(rp){return t-rp.t<1100});
@@ -349,6 +393,7 @@ function frame(now){
   if(alpha>0){tick();if(!playing)tick()}
   if(autoFit)fitTarget(playing);
   var k=playing?.045:.1;cam.x+=(cam.tx-cam.x)*k;cam.y+=(cam.ty-cam.y)*k;cam.k+=(cam.tk-cam.k)*k;
+  updateLabels(now,dt);
   draw(now);
   requestAnimationFrame(frame);
 }
