@@ -8,6 +8,8 @@ import sys
 import tempfile
 import zipfile
 
+sys.dont_write_bytecode = True   # the test imports _myco from the project under test; that must not leave a __pycache__ there
+
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SKILL = os.path.join(REPO, "skills", "myco-notes")
 WIN = os.name == "nt"
