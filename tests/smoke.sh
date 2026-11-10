@@ -20,6 +20,14 @@ import json
 a=json.load(open('$kit/.claude-plugin/plugin.json'));b=json.load(open('$kit/.claude-plugin/marketplace.json'))
 assert a['name']==b['plugins'][0]['name'] and 'version' in a and b['plugins'][0]['source'] in ('./', '.')
 PY"
+chk "Codex manifest matches the plugin manifest" "python3 - <<PY
+import json,os
+a=json.load(open('$kit/.claude-plugin/plugin.json'));c=json.load(open('$kit/.codex-plugin/plugin.json'))
+assert c['name']==a['name'] and c['version']==a['version'], 'name or version differs'
+assert c['skills']=='./skills/' and c['interface']['displayName']
+for k in ('composerIcon','logo'):
+    assert os.path.isfile(os.path.join('$kit', c['interface'][k])), k
+PY"
 chk "marketplace source resolves to the plugin root" "[ -f $kit/.claude-plugin/plugin.json ] && [ -d $skill ]"
 chk "skill version equals plugin version" "python3 - <<PY
 import json,re

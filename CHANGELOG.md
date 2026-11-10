@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.9
+- **Codex plugin**: Codex installs Myco Notes with `codex plugin marketplace add LuzianMe/myco-notes` and `codex plugin add myco-notes@myco-notes` (it reads the existing marketplace file). A new `.codex-plugin/plugin.json` gives Codex the display name, icon, description and starter prompts. The README's Codex section leads with this; linking the skill folder still works.
+- Tests: the Codex manifest must match the plugin manifest's name and version, and its icon paths must exist.
+
 ## 0.10.8
 - **Round icon**: the plugin icon (`.claude-plugin/icon.png`) now draws the mycelium on a dark disc with transparent corners instead of a dark square; a few notes and threads grow past the rim.
 
