@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.10.1
 - **Mycelium view, pinch to zoom**: on a touch screen two fingers now zoom around their midpoint, and moving them together pans (the canvas turns off the browser's own gestures, and until now it followed only one finger, so pinching did nothing). Lifting the fingers selects nothing. The mouse wheel is unchanged.
 - **Mycelium view, bud colours**: the bud at the end of a thread has the colour of the note the thread comes from (its group, or the wilt colour), a shade darker on the dark theme and lighter on the light one.
 - **Live demo**: `examples/demo/build_demo.py` builds a made-up "Greenhouse Sensors" tree (about 20 dated commits, a wilting note and a missing reference on purpose); `.github/workflows/demo.yml` publishes its map and mycelium view on GitHub Pages from `main`.
