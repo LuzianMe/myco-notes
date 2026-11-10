@@ -224,6 +224,7 @@ def main():
         ctext = _myco.set_conf_key(ctext, key, val)
     with open(cp, "w", encoding="utf-8", newline="") as fh:
         fh.write(ctext)
+    _myco.record_kit_version(root)
     gi = os.path.join(root, ".gitignore")
     gtext = open(gi, encoding="utf-8", newline="").read() if os.path.isfile(gi) else ""
     if new["map"] + "/" not in [l.strip() for l in gtext.splitlines()]:
@@ -270,11 +271,7 @@ def same_text(a, b):
 
 
 def kit_version():
-    try:
-        m = re.search(r'^\s*version:\s*"?([0-9][^"\s]*)"?\s*$', open(os.path.join(KIT, "SKILL.md"), encoding="utf-8").read().split("---")[1], re.M)
-        return m.group(1) if m else "unknown"
-    except (OSError, IndexError):
-        return "unknown"
+    return _myco.VERSION
 
 
 def refresh_only(root, old, conf, a, self_run):
@@ -303,13 +300,14 @@ def refresh_only(root, old, conf, a, self_run):
     print(f"  the tree already uses {my}/ ; nothing to move. Refreshing tools and docs from this kit (version {kit_version()}).")
     print(f"  new files ({len(new_f)}):" + "".join(f"\n    + {p[2]}" for p in new_f[:40]))
     print(f"  changed files ({len(changed)}):" + "".join(f"\n    ~ {p[2]}" for p in changed[:60]))
-    print(f"  unchanged: {same}. Not touched: bootstrap, your notes, .myco-notes.conf, AGENTS.md, .gitignore.")
+    print(f"  unchanged: {same}. Not touched: bootstrap, your notes, AGENTS.md, .gitignore; .myco-notes.conf only gets KIT_VERSION.")
     print(f"  lint before: {lint_summary(root, old['tools'])}")
     if a.apply:
         for src, dst, _label in new_f + changed:
             os.makedirs(os.path.dirname(dst), exist_ok=True)
             shutil.copy2(src, dst)
         _myco.git("-C", root, "config", "core.hooksPath", old["tools"] + "/hooks")
+        _myco.record_kit_version(root)
         if not _myco.IS_WINDOWS:
             for d in (old["tools"], old["tools"] + "/hooks"):
                 full = absp(root, d)

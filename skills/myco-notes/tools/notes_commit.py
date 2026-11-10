@@ -9,9 +9,11 @@
   tools/notes-commit --push "message"                  also git push the current branch to origin (sets the upstream)
   tools/notes-commit --pr "message"                    --push, then open a pull request with the GitHub CLI (gh pr create --fill)
   tools/notes-commit --folder NAME=MODE "message"      decide what to do with a new root folder or file (MODE: add, ignorelint, ignoreall, later)
+  tools/notes-commit --only PATH [--only PATH] "msg"   commit only these files or folders; other changes stay uncommitted
+  tools/notes-commit --dry-run "message"               show what would be committed (and any new-folder decision); change nothing
 
 Behaviour (configured in .myco-notes.conf at the repository root):
-  - stages everything (respecting .gitignore); says "nothing to commit" and exits 0 when clean
+  - stages everything (respecting .gitignore), or only the --only paths; says "nothing to commit" and exits 0 when clean
   - new folders and loose files in the repository root are not staged silently: NEW_FOLDERS in the conf says what to do
     (ask = the default: commit nothing, print a report and exit 3 so the agent can ask the owner; add = track and treat as notes;
     ignorelint = track but skip in the lint and the map; ignoreall = do not track, do not lint). Decisions are written to the conf and .gitignore
@@ -171,6 +173,35 @@ def apply_choice(root, lay, name, kind, mode):
         append(".myco-notes-lint-ignore", "^" + re.escape(name) + ":")
 
 
+def preview(root, only, later):
+    """Stage into a throw-away copy of the index and list what the commit would contain; the real index is untouched."""
+    import tempfile
+    idx = _myco.git("rev-parse", "--git-path", "index").stdout.strip()
+    fd, tmp = tempfile.mkstemp(prefix="myco-index-")
+    os.close(fd)
+    try:
+        if os.path.isfile(os.path.join(root, idx)):
+            shutil.copyfile(os.path.join(root, idx), tmp)
+        else:
+            os.remove(tmp)
+        env = dict(os.environ, GIT_INDEX_FILE=tmp)
+        run = lambda *args: subprocess.run(["git", *args], cwd=root, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace")
+        run("add", "-A", "--", *(only or ["."]))
+        for n in later:
+            run("rm", "-r", "-q", "--cached", "--ignore-unmatch", "--", n)
+        lines = run("-c", "core.quotepath=off", "diff", "--cached", "--name-status", "--", *(only or ["."])).stdout.splitlines()
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+    if not lines:
+        print("notes-commit: dry run, nothing to commit")
+        return 0
+    print(f"notes-commit: dry run, would commit {len(lines)} file(s):")
+    for l in lines:
+        print("  " + l.replace("\t", "  "))
+    return 0
+
+
 def main():
     _myco.utf8_console()
     ap = argparse.ArgumentParser(prog="notes-commit", add_help=False)
@@ -181,6 +212,8 @@ def main():
     ap.add_argument("--push", action="store_true")
     ap.add_argument("--pr", action="store_true")
     ap.add_argument("--folder", action="append", default=[])
+    ap.add_argument("--only", action="append", default=[])
+    ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("-h", "--help", action="store_true")
     ap.add_argument("message", nargs="*")
     a = ap.parse_args()
@@ -189,7 +222,7 @@ def main():
         return 0
     msg = " ".join(a.message).strip()
     if not msg:
-        print('usage: notes-commit [-p] [--human] [--tag NAME] [--branch NAME] [--push|--pr] [--folder NAME=MODE] "message"', file=sys.stderr)
+        print('usage: notes-commit [-p] [--human] [--tag NAME] [--branch NAME] [--push|--pr] [--folder NAME=MODE] [--only PATH] [--dry-run] "message"', file=sys.stderr)
         return 2
 
     root = _myco.toplevel(os.environ.get("NOTES_ROOT") or os.getcwd()) or _myco.toplevel(HERE)
@@ -201,7 +234,11 @@ def main():
     trailer, sync_globs, sync_cmd = conf.get("AGENT_TRAILER", ""), conf.get("SYNC_GLOBS", "").split(), conf.get("SYNC_CMD", "")
     hooks_prefix = _myco.layout(root, conf)["tools"] + "/hooks/"
 
-    if a.branch:
+    only = [(_myco._rel(p) or p.strip()) for p in a.only]
+    for p in only:
+        if not os.path.exists(p) and _myco.git("ls-files", "--error-unmatch", "--", p).returncode != 0:
+            fail(f"--only {p}: no such file or folder, and git does not know it", 2)
+    if a.branch and not a.dry_run:
         cur = _myco.git("symbolic-ref", "-q", "--short", "HEAD").stdout.strip()
         if cur != a.branch:
             exists = _myco.git("show-ref", "-q", "--verify", f"refs/heads/{a.branch}").returncode == 0
@@ -223,6 +260,8 @@ def main():
             fail(f"--folder {spec}: the choice must be one of {', '.join(CHOICES)}", 2)
         given[name] = choice
     items = new_items(lay) if os.path.isfile(os.path.join(root, ".myco-notes.conf")) else {}
+    if only:   # only the new items this commit would touch need a decision
+        items = {n: v for n, v in items.items() if any(p == n or p.startswith(n + "/") or n.startswith(p.rstrip("/") + "/") for p in only)}
     stray = [n for n in given if n != "*" and n not in items]
     if stray:
         fail(f"--folder {stray[0]}: no new folder or file with that name at the repository root (new now: {', '.join(items) or 'none'})", 2)
@@ -233,11 +272,16 @@ def main():
             report_new(items, pending)
             return 3
         for n, c in chosen.items():
+            if a.dry_run:
+                print(f"notes-commit: would treat new {items[n]['kind']} {n} as: {c}")
+                continue
             apply_choice(root, lay, n, items[n]["kind"], c)
             print(f"notes-commit: new {items[n]['kind']} {n}: {c}")
         later = [n for n, c in chosen.items() if c == "later"]
 
-    _myco.git("add", "-A")
+    if a.dry_run:
+        return preview(root, only, later)
+    _myco.git("add", "-A", "--", *(only or ["."]))
     for n in later:
         _myco.git("rm", "-r", "-q", "--cached", "--ignore-unmatch", "--", n)
     if later:
@@ -259,7 +303,7 @@ def main():
                 fail(f"syntax error in {f}, not committing")
 
     full = msg + (f"\n\n{trailer}" if trailer and not a.human else "")
-    rc = subprocess.run(["git", "commit", "-q", "-m", full]).returncode  # hook output goes straight to the terminal
+    rc = subprocess.run(["git", "commit", "-q", "-m", full, *(["--"] + only if only else [])]).returncode  # hook output goes to the terminal
     if rc:
         return rc
     print(_myco.git("log", "--oneline", "-1").stdout.strip())

@@ -9,8 +9,8 @@ Created {{DATE}}. This file says how people and agents work on this project. Whe
 - Say "I am waiting on you" with the exact steps when blocked.
 
 ## 2. Approvals and safety
-- Ask before changing anything; say what will change and how to undo it. Bigger work gets a written plan first.
-- Confirm before deleting: look at the target, show what goes, wait for a yes. Approval is per item.
+- Ask before changing anything the owner has not asked for; an explicit request is approval for that change (and only for that change). Say what will change and how to undo it. Bigger work gets a written plan first.
+- Confirm before deleting or publishing, even when the work was requested: look at the target, show what goes (or what goes out), wait for a yes. Approval is per item.
 - Prefer reversible steps: back up (or commit) first, apply, test, roll back on failure.
 - Do not disturb the working system: check capacity and impact first.
 - Do not expose anything to the internet or third parties without a recorded decision.

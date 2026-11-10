@@ -86,7 +86,7 @@ def main():
 
     subs = (("{{PROJECT_NAME}}", a.name), ("{{OWNER}}", owner), ("{{TIMEZONE}}", a.tz), ("{{DATE}}", datetime.date.today().isoformat()),
             ("{{MYCO_DIR}}", lay["myco"]), ("{{NOTES_DIR}}", lay["notes"]), ("{{TOOLS_DIR}}", lay["tools"]), ("{{DOCS_DIR}}", lay["docs"]),
-            ("{{MAP_DIR}}", lay["map"]), ("{{DATA_DIRS}}", " ".join(data)), ("{{NEW_FOLDERS}}", a.new_folders))
+            ("{{MAP_DIR}}", lay["map"]), ("{{DATA_DIRS}}", " ".join(data)), ("{{NEW_FOLDERS}}", a.new_folders), ("{{KIT_VERSION}}", _myco.VERSION))
     tools_abs = os.path.normcase(at(lay["tools"]))
     for dp, dn, fn in os.walk(target):
         dn[:] = [d for d in dn if d != ".git" and os.path.normcase(os.path.join(dp, d)) != tools_abs]

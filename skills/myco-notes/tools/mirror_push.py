@@ -11,6 +11,13 @@ History safety comes from an independent snapshot job that backs up the mirror. 
 unreachable or not configured, so a timer never nags. Run it from a timer (for example every 6 hours) and after notes-commit -p.
 
   mirror-push --dry-run    for a local directory: list what would be copied and removed, change nothing
+  mirror-push --strict     scheduled-job mode (or MIRROR_STRICT=1): exit 3 when skipped, 1 when anything failed
+
+Result: the last line starts with "mirror: synced", "mirror: skipped" or "mirror: failed".
+Exit: 0 synced (or skipped, without --strict), 1 failed, 3 skipped with --strict.
+MIRROR_SCOPE (local directory and ssh targets): tracked = .git plus the tracked files, never ignored or untracked files (new
+trees); all = the whole working copy (the default when the setting is missing, as in trees made before 0.12.0). Files outside
+the scope that an earlier sync copied are removed from the target.
 
 A local directory target must not be the repository, a folder inside it or a folder that contains it. Because the copy is
 made equal (files only in the target are removed), the tool writes only into an empty folder, a folder holding its marker
@@ -44,12 +51,15 @@ def _rm(path):
 MARKER = ".myco-mirror"
 
 
-def sync_dir(src, dst, plan=None, top=True):
+def sync_dir(src, dst, plan=None, top=True, keep=None, rel=""):
     """Make dst equal to src (like rsync -a --delete): copy new or changed files, remove what no longer exists.
-    With `plan` (a list) nothing changes: each action is appended as ("remove"|"copy", path) instead."""
+    With `plan` (a list) nothing changes: each action is appended as ("remove"|"copy", path) instead.
+    `keep(relative path)` limits what counts as source (MIRROR_SCOPE=tracked); anything else is removed from dst."""
     if plan is None:
         os.makedirs(dst, exist_ok=True)
     src_names = set(os.listdir(src))
+    if keep:
+        src_names = {n for n in src_names if keep(rel + n)}
     dst_names = os.listdir(dst) if os.path.isdir(dst) else []
     for name in dst_names:
         if name not in src_names and not (top and name == MARKER):
@@ -63,7 +73,7 @@ def sync_dir(src, dst, plan=None, top=True):
             if os.path.isdir(s) and not os.path.islink(s):
                 if os.path.lexists(d) and not os.path.isdir(d):
                     plan.append(("remove", d))
-                sync_dir(s, d, plan, False)
+                sync_dir(s, d, plan, False, keep, rel + name + "/")
             elif not (os.path.isfile(d) and os.stat(d).st_size == os.stat(s).st_size
                       and int(os.stat(d).st_mtime) == int(os.stat(s).st_mtime)):
                 plan.append(("copy", d))
@@ -78,7 +88,7 @@ def sync_dir(src, dst, plan=None, top=True):
         elif os.path.isdir(s):
             if os.path.lexists(d) and not os.path.isdir(d):
                 _rm(d)
-            sync_dir(s, d, None, False)
+            sync_dir(s, d, None, False, keep, rel + name + "/")
         else:
             if os.path.isdir(d) and not os.path.islink(d):
                 _rm(d)
@@ -116,6 +126,18 @@ def check_local_target(root, target):
     return None
 
 
+def tracked_filter(root):
+    """keep(rel) for MIRROR_SCOPE=tracked: .git and everything under it, the tracked files and the folders that hold them."""
+    files = [f for f in _myco.git("-C", root, "-c", "core.quotepath=off", "ls-files", "-z").stdout.split("\0") if f]
+    dirs = set()
+    for f in files:
+        parts = f.split("/")
+        for i in range(1, len(parts)):
+            dirs.add("/".join(parts[:i]))
+    files = set(files)
+    return lambda r: r == ".git" or r.startswith(".git/") or r in files or r in dirs
+
+
 def dir_size(path):
     total = 0
     for dp, _dn, fn in os.walk(path):
@@ -131,61 +153,106 @@ def main():
     _myco.utf8_console()
     root = _myco.toplevel(HERE)
     if not root:
-        print("mirror: not inside a git repository", file=sys.stderr)
+        print("mirror: failed, not inside a git repository", file=sys.stderr)
         return 1
     os.chdir(root)
-    dry = "--dry-run" in sys.argv[1:]
+    args = sys.argv[1:]
+    dry = "--dry-run" in args
     conf = _myco.load_conf(root)
+    strict = "--strict" in args or conf.get("MIRROR_STRICT", "0") == "1"
+    scope = (conf.get("MIRROR_SCOPE") or "all").strip().lower()
+    if scope not in ("tracked", "all"):
+        print(f"mirror: failed, MIRROR_SCOPE={scope!r} must be tracked or all", file=sys.stderr)
+        return 1
     target = os.path.expanduser(os.path.expandvars(conf.get("MIRROR_TARGET", "")))
     post = [c for c in conf.get("POST_PUSH_CMDS", "").splitlines() if c.strip()]
+
+    def skipped(why):
+        print(f"mirror: skipped, {why}")
+        return 3 if strict else 0
+
+    def failed(why):
+        print(f"mirror: failed, {why}", file=sys.stderr)
+        return 1
+
     if not target:
-        print("mirror: MIRROR_TARGET not set in .myco-notes.conf, skipped")
-        return 0
+        return skipped("MIRROR_TARGET not set in .myco-notes.conf")
 
     if target.startswith("git:"):
         url = target[4:]
+        if dry:
+            print(f"mirror: dry run, would run git push --mirror to {url}; nothing changed")
+            return 0
+        reach = subprocess.run(["git", "ls-remote", "-q", "--heads", url], capture_output=True, text=True, encoding="utf-8",
+                               errors="replace", timeout=60, env=dict(os.environ, GIT_TERMINAL_PROMPT="0"))
+        if reach.returncode:
+            return skipped(f"{url} not reachable ({reach.stderr.strip().splitlines()[-1] if reach.stderr.strip() else 'no detail'})")
         r = subprocess.run(["git", "push", "--mirror", "-q", url], capture_output=True, text=True, encoding="utf-8", errors="replace")
         if r.returncode:
-            print(f"mirror: git push --mirror to {url} failed, skipped ({r.stderr.strip().splitlines()[-1] if r.stderr.strip() else 'no detail'})")
-            return 0
+            return failed(f"git push --mirror to {url} ({r.stderr.strip().splitlines()[-1] if r.stderr.strip() else 'no detail'})")
+        what = "history and tracked files"
     elif re.match(r"^[A-Za-z]:[\\/]", target) or ":" not in target:
         why = check_local_target(root, target)
         if why:
-            print(f"mirror: failed, refused: {why}", file=sys.stderr)
-            return 1
+            return failed(f"refused: {why}")
+        keep = tracked_filter(root) if scope == "tracked" else None
         if dry:
             plan = []
-            sync_dir(root, target, plan)
+            sync_dir(root, target, plan, keep=keep)
             for act, path in plan:
                 print(f"  would {act}: {path}")
-            print(f"mirror: dry run, {sum(a == 'copy' for a, _ in plan)} to copy, {sum(a == 'remove' for a, _ in plan)} to remove; nothing changed")
+            print(f"mirror: dry run ({scope}), {sum(a == 'copy' for a, _ in plan)} to copy, {sum(a == 'remove' for a, _ in plan)} to remove; nothing changed")
             return 0
-        sync_dir(root, target)
-        open(os.path.join(target, MARKER), "a").close()
+        try:
+            sync_dir(root, target, keep=keep)
+            open(os.path.join(target, MARKER), "a").close()
+        except OSError as e:
+            return failed(f"copy to {target} stopped: {e}")
+        what = "history and tracked files" if scope == "tracked" else "the whole working copy"
     else:  # user@host:/path
         host = target.split(":", 1)[0]
         if not shutil.which("rsync") or not shutil.which("ssh"):
-            print("mirror: a remote host target needs rsync and ssh; install them or use MIRROR_TARGET=git:URL", file=sys.stderr)
-            return 1
+            return failed("a remote host target needs rsync and ssh; install them or use MIRROR_TARGET=git:URL")
         ok = subprocess.run(["ssh", "-o", "ConnectTimeout=5", "-o", "BatchMode=yes", host, "true"], capture_output=True).returncode == 0
         if not ok:
-            print(f"mirror: {host} not reachable, skipped")
+            return skipped(f"{host} not reachable")
+        cmd = ["rsync", "-a", "--delete", "-e", "ssh -o BatchMode=yes"]
+        if scope == "tracked":   # leave out (and remove from the target) everything git does not track
+            others = [f for f in _myco.git("ls-files", "--others", "--directory", "-z").stdout.split("\0") if f]
+            cmd += ["--delete-excluded", "--from0", "--exclude-from=-"]
+            listing = "".join("/" + f.rstrip("/") + "\0" for f in others)
+        else:
+            listing = None
+        if dry:
+            cmd.insert(1, "--dry-run")
+            cmd.insert(1, "--itemize-changes")
+        r = subprocess.run(cmd + [root.rstrip("/") + "/", target.rstrip("/") + "/"], input=listing, text=True)
+        if r.returncode:
+            return failed(f"rsync to {target} exited {r.returncode}")
+        if dry:
+            print("mirror: dry run, nothing changed")
             return 0
-        subprocess.run(["rsync", "-a", "--delete", "-e", "ssh -o BatchMode=yes", root.rstrip("/") + "/", target.rstrip("/") + "/"], check=True)
+        what = "history and tracked files" if scope == "tracked" else "the whole working copy"
 
+    post_failed = 0
     for c in post:
         try:
             r = _myco.run_shell(c, root, timeout=120)
             print("\n".join((r.stdout + r.stderr).strip().splitlines()[-2:]))
-        except Exception as e:  # a failing publish never breaks the push
+            if r.returncode:
+                post_failed += 1
+                print(f"mirror: post-push command exited {r.returncode}: {c}")
+        except Exception as e:  # a failing publish does not undo the push
+            post_failed += 1
             print(f"mirror: post-push command failed ({e})")
     try:
         with open(os.path.join(root, ".git", "last-mirror-push"), "w") as fh:
             fh.write(str(int(time.time())) + "\n")
     except OSError:
         pass
-    print(f"mirror: pushed {_myco.human_size(dir_size(root))} to {conf.get('MIRROR_TARGET')}")
-    return 0
+    print(f"mirror: synced, pushed {_myco.human_size(dir_size(root))} ({what}) to {conf.get('MIRROR_TARGET')}"
+          + (f"; {post_failed} post-push command(s) failed" if post_failed else ""))
+    return 1 if (post_failed and strict) else 0
 
 
 if __name__ == "__main__":

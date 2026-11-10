@@ -1,7 +1,7 @@
 {
   "name": "myco-notes",
   "displayName": "Myco Notes",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "Myco Notes: keep a project's knowledge in a versioned, secret-free, cross-referenced Markdown notes tree that stays accurate: method, starter tree, commit/lint/map/mirror tools and an agent skill.",
   "author": {
     "name": "Luzian",

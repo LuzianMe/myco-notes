@@ -4,6 +4,8 @@ import re
 import subprocess
 import sys
 
+VERSION = "0.12.0"   # the kit version these tools come from; moves with plugin.json and SKILL.md (tests check it)
+
 IS_WINDOWS = os.name == "nt"
 
 
@@ -143,6 +145,17 @@ def layout(root, conf=None):
         "data": [d for d in (_rel(x) for x in conf.get("DATA_DIRS", "").split()) if d],
         "history": [d for d in (_rel(x) for x in conf.get("HISTORY_DIRS", "archive logs").split()) if d],
     }
+
+
+def record_kit_version(root):
+    """Write KIT_VERSION=<these tools' version> into the tree's .myco-notes.conf (bootstrap and relocate call it)."""
+    cp = os.path.join(root, ".myco-notes.conf")
+    if not os.path.isfile(cp):
+        return
+    with open(cp, encoding="utf-8", newline="") as fh:
+        text = fh.read()
+    with open(cp, "w", encoding="utf-8", newline="") as fh:
+        fh.write(set_conf_key(text, "KIT_VERSION", VERSION))
 
 
 def set_conf_key(text, key, value):
