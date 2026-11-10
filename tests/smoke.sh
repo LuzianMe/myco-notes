@@ -97,6 +97,17 @@ chk "lint finds passed follow-up date"  "grep -q 'has passed' /tmp/lint.$$"
 git checkout -q -- myco-notes/runbook.md
 rm -f /tmp/lint.$$
 
+echo "freshness header, resume, asof"
+printf -- '---\nreview_after: 2020-03-01\n---\n# Fresh smoke\n' > myco-notes/plans/fresh-smoke.md
+myco-notes/tools/notes-lint.py >/tmp/lint.$$ 2>&1
+chk "lint reports a passed review_after in a header" "grep -q 'review date 2020-03-01 has passed' /tmp/lint.$$"
+rm -f /tmp/lint.$$
+chk "resume prints a briefing with a footer" "myco-notes/tools/resume | grep -q 'budget 6000 characters'"
+chk "resume lists the note past its review date" "myco-notes/tools/resume | grep -q 'fresh-smoke.md'"
+chk "asof shows the notes at HEAD"      "myco-notes/tools/asof HEAD state.md | grep -q 'master record'"
+chk "asof rejects a date before the history" "! myco-notes/tools/asof 2001-01-01"
+rm -f myco-notes/plans/fresh-smoke.md
+
 echo "map"
 chk "map builds"                        "python3 myco-notes/tools/build-notes-map.py && [ -f myco-notes/map/index.html ]"
 chk "page has history"                  "grep -q 'History' myco-notes/map/p/myco-notes-state.html"

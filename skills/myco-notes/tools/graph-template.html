@@ -43,7 +43,27 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 #time select{font:inherit;font-size:12px;background:transparent;color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:2px 4px}
 .sr{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
 #empty{position:fixed;inset:0;display:none;align-items:center;justify-content:center;color:var(--muted)}
-@media (max-width:640px){#left{display:contents}#left>.box{position:fixed}#head{top:12px;left:12px;width:calc(100vw - 24px)}#time{bottom:12px;left:12px;right:12px}#panel{top:auto;right:12px;left:12px;bottom:176px;width:auto;max-height:30vh}#tools{top:auto;bottom:auto;right:12px}#legend{max-height:60px;overflow:auto}}
+#find{display:none}
+@media (max-width:640px){
+#left{display:contents}#left>.box{position:fixed}
+/* header: title and counts only; search and legend open with Find */
+#head{top:12px;left:12px;width:calc(100vw - 24px);padding:8px 12px}
+#head h1{font-size:15px;margin:0;padding-right:196px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#head p{margin:0;font-size:11.5px}
+#head:not(.open) #q,#head:not(.open) #legend{display:none}
+#head.open #q{margin-top:8px}#legend{max-height:96px;overflow:auto}
+#tools{top:17px;right:20px;padding:0;background:none;border:0;backdrop-filter:none;gap:5px}
+#tools a,#tools button{padding:3px 8px;font-size:12px}#find{display:inline-block}
+#find[aria-expanded=true]{border-color:var(--accent)}
+/* replay: one row of controls and one line of text */
+#time{bottom:12px;left:12px;right:12px;padding:6px 10px;gap:3px 8px;grid-template-columns:auto 1fr auto;grid-template-areas:"p s v" "w x x";align-items:center}
+#play{grid-area:p;min-width:0;padding:3px 12px}#slide{grid-area:s;grid-column:auto;margin:0}#speedl{grid-area:v;grid-column:auto}#speedl .lbl{display:none}
+#when{grid-area:w;justify-self:start;font-size:11.5px}
+#what{grid-area:x;grid-column:auto;min-height:0;display:block;white-space:nowrap;text-overflow:ellipsis;font-size:11.5px;color:var(--muted);cursor:pointer}
+#what.full{white-space:normal}
+#panel{top:auto;right:12px;left:12px;bottom:92px;width:auto;max-height:34vh}
+.notime #panel{bottom:12px}
+}
 </style>
 </head>
 <body>
@@ -51,8 +71,8 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 <div id="empty">No notes to draw yet.</div>
 <div id="left"><div id="head" class="box"><h1>%%TITLE%%</h1><p id="stats"></p>
 <input id="q" type="search" placeholder="Find a note..." aria-label="Find a note"><div id="legend" role="group" aria-label="Show or hide a group of notes"></div></div>
-<div id="time" class="box" hidden><button id="play" type="button">Replay</button><span id="when"></span><input id="slide" type="range" min="0" value="0" aria-label="Position in the history of the notes"><div id="what"></div><label id="speedl">Speed <select id="speed"><option value="0.5">0.5x</option><option value="1" selected>1x</option><option value="2">2x</option><option value="4">4x</option></select></label></div></div>
-<div id="tools" class="box"><a href="index.html">Map</a><button id="fit" type="button" title="Fit the whole network in view">Fit</button><button id="theme" type="button" title="Switch light and dark">Theme</button></div>
+<div id="time" class="box" hidden><button id="play" type="button">Replay</button><span id="when"></span><input id="slide" type="range" min="0" value="0" aria-label="Position in the history of the notes"><div id="what"></div><label id="speedl"><span class="lbl">Speed </span><select id="speed" aria-label="Replay speed"><option value="0.5">0.5x</option><option value="1" selected>1x</option><option value="2">2x</option><option value="4">4x</option></select></label></div></div>
+<div id="tools" class="box"><button id="find" type="button" aria-expanded="false" aria-controls="head">Find</button><a href="index.html">Map</a><button id="fit" type="button" title="Fit the whole network in view">Fit</button><button id="theme" type="button" title="Switch light and dark">Theme</button></div>
 <aside id="panel" class="box" hidden aria-live="polite"></aside>
 <nav class="sr" aria-label="All notes"><ul>%%LINKS%%</ul></nav>
 <script id="data" type="application/json">%%DATA%%</script>
@@ -106,7 +126,7 @@ D.edges.forEach(function(e,k){
 });
 var cur=NC;                                   /* commits applied: 0..NC */
 var hov=-1,sel=-1,match=null,alpha=1,playing=false,acc=0,ripples=[];
-var cam={x:0,y:0,k:1,tx:0,ty:0,tk:1},autoFit=true,W=0,H=0,DPR=1,lastT=0;
+var cam={x:0,y:0,k:1,tx:0,ty:0,tk:1},autoFit=true,W=0,H=0,DPR=1,lastT=0,VS=1;
 function gcol(g){return T.pal[g%T.pal.length]}
 function when(t){return new Date(t*1000).toLocaleDateString(undefined,{year:"numeric",month:"short",day:"numeric"})}
 
@@ -117,7 +137,9 @@ function setStep(v,rip){
     var show=!hidden[n.g]&&(NC===0||n.b<v);
     if(show&&!n.vis){
       var near=adj[n.i].filter(function(m){return m.n.vis});
-      if(near.length){var m=near[Math.floor(hash(n.i)*near.length)].n;n.x=m.x+(hash(n.i+3)-.5)*40;n.y=m.y+(hash(n.i+7)-.5)*40}
+      if(near.length){   /* sprout outward from a neighbour at about the length of a thread, so the new note does not start inside the others and get kicked away */
+        var m=near[Math.floor(hash(n.i)*near.length)].n,ang=(m.x||m.y?Math.atan2(m.y,m.x):hash(n.i+3)*6.2832)+(hash(n.i+3)-.5)*1.8,dist=n.r+m.r+34+hash(n.i+7)*14;
+        n.x=m.x+Math.cos(ang)*dist;n.y=m.y+Math.sin(ang)*dist}
       else{n.x=n.x0*.6+(hash(n.i+1)-.5)*20;n.y=n.y0*.6+(hash(n.i+5)-.5)*20}
       n.vx=n.vy=0;n.ap=reduce?1:0;
     }
@@ -127,10 +149,11 @@ function setStep(v,rip){
   for(var c=0;c<v;c++){var cm=D.commits[c];for(var j=0;j<cm.n.length;j++)NODES[cm.n[j]].touch=c}
   if(rip&&!reduce&&v>0){D.commits[v-1].n.forEach(function(i){if(NODES[i].vis)ripples.push({i:i,t:performance.now(),born:D.commits[v-1].a.indexOf(i)>=0})})}
   var sl=document.getElementById("slide");sl.value=v;
-  document.getElementById("when").textContent=v>0?when(D.commits[v-1].t)+"  ("+v+" / "+NC+")":"before the first commit";
+  var small=window.matchMedia&&matchMedia("(max-width:640px)").matches;   /* on a phone: "Nov 1 · 5/134" */
+  document.getElementById("when").textContent=v>0?(small?new Date(D.commits[v-1].t*1000).toLocaleDateString(undefined,{month:"short",day:"numeric"})+" · "+v+"/"+NC:when(D.commits[v-1].t)+"  ("+v+" / "+NC+")"):"before the first commit";
   document.getElementById("what").textContent=v>0?D.commits[v-1].s:"";
   document.getElementById("stats").textContent=visCount()+" of "+NN+" notes, "+E.filter(edgeVis).length+" links"+(NC?", "+NC+" commits":"");
-  alpha=Math.max(alpha,.4);
+  alpha=Math.max(alpha,playing&&rip?.1:.4);   /* a replay step only nudges the layout; a jump or a click on the legend re-settles it */
 }
 function edgeVis(e){return e.a.vis&&e.b.vis}
 function visCount(){var c=0;NODES.forEach(function(n){if(n.vis)c++});return c}
@@ -143,7 +166,7 @@ function recency(n){
 /* ---------- physics ---------- */
 function tick(){
   var vs=NODES.filter(function(n){return n.vis});if(vs.length===0)return;
-  var a=alpha,cell=110,grid={},i,j;
+  var a=alpha,cell=110,grid={},i,j,calm=playing&&!reduce;   /* calm: during a replay the nodes move slowly and settle, no shaking */
   vs.forEach(function(n){var k=Math.floor(n.x/cell)+","+Math.floor(n.y/cell);(grid[k]=grid[k]||[]).push(n)});
   vs.forEach(function(n){
     var cx0=Math.floor(n.x/cell),cy0=Math.floor(n.y/cell);
@@ -166,25 +189,28 @@ function tick(){
   vs.forEach(function(n){var c=cen[n.g]||(cen[n.g]={x:0,y:0,c:0});c.x+=n.x;c.y+=n.y;c.c++});
   vs.forEach(function(n){
     var c=cen[n.g];n.vx+=(c.x/c.c-n.x)*.012*a;n.vy+=(c.y/c.c-n.y)*.012*a;
-    var gr=(n.hub?.03:.007)*a;n.vx-=n.x*gr;n.vy-=n.y*gr;
+    var gr=(n.hub?.03:adj[n.i].length?.007:.016)*a;n.vx-=n.x*gr;n.vy-=n.y*gr;   /* a note nobody mentions is pulled in a little harder, so it does not drift out of the picture */
     if(n.fixed){n.vx=n.vy=0;return}
-    n.vx*=.8;n.vy*=.8;var sp=Math.sqrt(n.vx*n.vx+n.vy*n.vy);if(sp>14){n.vx*=14/sp;n.vy*=14/sp}
+    var dmp=calm?.6:.8,cap=calm?3:14;
+    n.vx*=dmp;n.vy*=dmp;var sp=Math.sqrt(n.vx*n.vx+n.vy*n.vy);if(sp>cap){n.vx*=cap/sp;n.vy*=cap/sp}
     n.x+=n.vx;n.y+=n.vy;
   });
   alpha*=.988;if(alpha<.004)alpha=0;
 }
-function fitTarget(){
+function fitTarget(soft){
   var vs=NODES.filter(function(n){return n.vis});if(!vs.length)return;
   var x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
   vs.forEach(function(n){x0=Math.min(x0,n.x-n.r*2);x1=Math.max(x1,n.x+n.r*2);y0=Math.min(y0,n.y-n.r*2);y1=Math.max(y1,n.y+n.r*2)});
-  var wide=W>700,bw=Math.max(80,x1-x0),bh=Math.max(80,y1-y0),padX=wide?382:40,padY=wide?80:210;
-  cam.tk=Math.max(.15,Math.min(2.2,Math.min((W-padX)/bw,(H-padY)/bh)));
-  cam.tx=(x0+x1)/2-(wide?171/cam.tk:0);cam.ty=(y0+y1)/2;   /* centre the network in the space right of the left column */
+  var wide=W>700,bw=Math.max(80,x1-x0),bh=Math.max(80,y1-y0)*VS,padX=wide?382:32,padY=wide?80:176;
+  var nk=Math.max(.15,Math.min(2.2,Math.min((W-padX)/bw,(H-padY)/bh))),nx=(x0+x1)/2-(wide?171/nk:0),ny=(y0+y1)/2;   /* centre the network in the space right of the left column */
+  /* soft (during a replay): ignore small changes of the bounding box, so one node drifting at the edge does not make the whole picture breathe */
+  if(soft&&cam.fit&&Math.abs(nk-cam.tk)/cam.tk<.07&&Math.hypot(nx-cam.tx,ny-cam.ty)*cam.tk<30)return;
+  cam.tk=nk;cam.tx=nx;cam.ty=ny;cam.fit=true;
 }
 
 /* ---------- drawing ---------- */
 function sx(x){return (x-cam.x)*cam.k+W/2}
-function sy(y){return (y-cam.y)*cam.k+H/2}
+function sy(y){return (y-cam.y)*cam.k*VS+H/2}
 function dim(n){
   var a=1;
   if(match&&!match[n.i])a=Math.min(a,.14);
@@ -216,7 +242,7 @@ function draw(now){
   /* notes */
   var order=NODES.filter(function(n){return n.vis&&n.ap>0}).sort(function(a,b){return (a.hub?1:0)-(b.hub?1:0)});
   order.forEach(function(n){
-    var rec=recency(n),pulse=reduce?1:1+.1*Math.sin(t/650+n.i)*rec,d=dim(n),sc=ease(n.ap),r=n.r*sc*pulse*Math.max(.7,Math.min(1.6,cam.k)),x=sx(n.x),y=sy(n.y);
+    var rec=recency(n),pulse=reduce||playing?1:1+.1*Math.sin(t/650+n.i)*rec,d=dim(n),sc=ease(n.ap),r=n.r*sc*pulse*Math.max(.7,Math.min(1.6,cam.k)),x=sx(n.x),y=sy(n.y);
     var col=n.due?T.wilt:gcol(n.g);
     cx.globalAlpha=Math.min(1,n.ap)*d*(n.hist?.55:1)*(.14+.6*rec+(n.hub?.2:0));
     var gs=r*(n.hub?4.4:3.2);cx.drawImage(sprite(col),x-gs,y-gs,gs*2,gs*2);
@@ -224,7 +250,7 @@ function draw(now){
     cx.fillStyle=col;cx.beginPath();cx.arc(x,y,r,0,6.3);cx.fill();cx.fillStyle="rgba(255,255,255,"+(T.dark?.28:.4)+")";cx.beginPath();cx.arc(x-r*.28,y-r*.3,r*.38,0,6.3);cx.fill();
     if(n.hub){   /* a hub (one of the most-mentioned notes of this project) carries two soft rings, like a fruiting body pushing up through the network */
       var ra=Math.min(1,n.ap)*d;cx.strokeStyle=col;cx.lineWidth=1.4;
-      cx.globalAlpha=ra*.55;cx.beginPath();cx.arc(x,y,r*1.7+(reduce?0:1.6*Math.sin(t/900+n.i)),0,6.3);cx.stroke();
+      cx.globalAlpha=ra*.55;cx.beginPath();cx.arc(x,y,Math.max(0,r*1.7+(reduce||playing?0:1.6*Math.sin(t/900+n.i))),0,6.3);cx.stroke();
       cx.globalAlpha=ra*.25;cx.beginPath();cx.arc(x,y,r*2.5,0,6.3);cx.stroke();
     }
     if(n.due){cx.setLineDash([2,3]);cx.strokeStyle=T.wilt;cx.lineWidth=1.2;cx.beginPath();cx.arc(x,y,r+3.5,0,6.3);cx.stroke();cx.setLineDash([])}
@@ -244,7 +270,7 @@ function draw(now){
 
 /* ---------- loop ---------- */
 function resize(){
-  DPR=Math.min(2,window.devicePixelRatio||1);W=innerWidth;H=innerHeight;
+  DPR=Math.min(2,window.devicePixelRatio||1);W=innerWidth;H=innerHeight;VS=W>700?1:Math.max(1,Math.min(1.7,(H-176)/(W-32)*.9));   /* tall phone screen: the picture is stretched vertically (positions only, nodes stay round) so the network fills the height */
   cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);
 }
 function frame(now){
@@ -254,25 +280,25 @@ function frame(now){
     while(acc>=iv&&playing){acc-=iv;if(cur>=NC){stopPlay();break}setStep(cur+1,true)}
   }
   NODES.forEach(function(n){if(n.vis&&n.ap<1)n.ap=Math.min(1,n.ap+dt/650);if(!n.vis)n.ap=0});
-  if(alpha>0){tick();tick()}
-  if(autoFit)fitTarget();
-  var k=.1;cam.x+=(cam.tx-cam.x)*k;cam.y+=(cam.ty-cam.y)*k;cam.k+=(cam.tk-cam.k)*k;
+  if(alpha>0){tick();if(!playing)tick()}
+  if(autoFit)fitTarget(playing);
+  var k=playing?.045:.1;cam.x+=(cam.tx-cam.x)*k;cam.y+=(cam.ty-cam.y)*k;cam.k+=(cam.tk-cam.k)*k;
   draw(now);
   requestAnimationFrame(frame);
 }
 function startPlay(){
-  if(cur>=NC){setStep(0,false);alpha=1}
+  if(cur>=NC){setStep(0,false);alpha=.1}
   playing=true;acc=0;document.getElementById("play").textContent="Pause";
 }
-function stopPlay(){playing=false;document.getElementById("play").textContent=cur>=NC?"Replay":"Play"}
+function stopPlay(){playing=false;if(cur>=NC)alpha=Math.max(alpha,.2);document.getElementById("play").textContent=cur>=NC?"Replay":"Play"}
 
 /* ---------- interaction ---------- */
-function world(px,py){return {x:(px-W/2)/cam.k+cam.x,y:(py-H/2)/cam.k+cam.y}}
+function world(px,py){return {x:(px-W/2)/cam.k+cam.x,y:(py-H/2)/(cam.k*VS)+cam.y}}
 function pick(px,py){
   var w=world(px,py),best=-1,bd=1e9;
   NODES.forEach(function(n){
     if(!n.vis||n.ap<.5||(match&&!match[n.i]))return;
-    var dx=n.x-w.x,dy=n.y-w.y,d=Math.sqrt(dx*dx+dy*dy),hit=(n.hub?n.r*1.4:n.r)+6/cam.k;
+    var dx=n.x-w.x,dy=(n.y-w.y)*VS,d=Math.sqrt(dx*dx+dy*dy),hit=(n.hub?n.r*1.4:n.r)+6/cam.k;
     if(d<hit&&d<bd){bd=d;best=n.i}
   });
   return best;
@@ -291,7 +317,7 @@ cv.addEventListener("pointermove",function(ev){
   if(!drag.moved&&Math.abs(dx)+Math.abs(dy)>4)drag.moved=true;
   if(!drag.moved)return;
   if(drag.id>=0){var w=world(ev.clientX,ev.clientY),n=NODES[drag.id];n.x=w.x;n.y=w.y;alpha=Math.max(alpha,.35)}
-  else{autoFit=false;cam.tx=drag.cx-dx/cam.k;cam.ty=drag.cy-dy/cam.k;cam.x=cam.tx;cam.y=cam.ty}
+  else{autoFit=false;cam.tx=drag.cx-dx/cam.k;cam.ty=drag.cy-dy/(cam.k*VS);cam.x=cam.tx;cam.y=cam.ty}
 });
 cv.addEventListener("pointerup",function(ev){
   cv.classList.remove("drag");
@@ -356,6 +382,10 @@ function paintLegend(){
     b.addEventListener("click",function(){hidden[gi]=!hidden[gi];setStep(cur,false);paintLegend()});lg.appendChild(b);
   });
 }
+document.getElementById("find").addEventListener("click",function(){
+  var h=document.getElementById("head"),o=h.classList.toggle("open");this.setAttribute("aria-expanded",o?"true":"false");if(o)q.focus();
+});
+document.getElementById("what").addEventListener("click",function(){this.classList.toggle("full")});
 var slide=document.getElementById("slide"),playBtn=document.getElementById("play");
 slide.max=NC;
 slide.addEventListener("input",function(){stopPlay();setStep(parseInt(slide.value,10),false)});
@@ -370,7 +400,7 @@ addEventListener("resize",resize);
 /* ---------- start ---------- */
 pickTheme();readTheme();resize();
 if(NN===0){document.getElementById("empty").style.display="flex"}
-document.getElementById("time").hidden=NC<2;
+document.getElementById("time").hidden=NC<2;root.classList.toggle("notime",NC<2);
 setStep(NC,false);
 NODES.forEach(function(n){n.ap=1});
 for(var w=0;w<320;w++){alpha=Math.max(alpha,.2*(w<200));tick()}

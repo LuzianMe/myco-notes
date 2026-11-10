@@ -10,6 +10,8 @@ Checks
   secrets   secret-looking strings (same patterns as the pre-commit hook)
   orphans   notes that no other note mentions by file name (info only)
   size      notes larger than MAX_NOTE_KB (default 100) and an AGENTS.md near or over the 32 KiB some agents load (warns from ENTRY_WARN_KB, default 24)
+  header    the optional freshness header (method 10.1: last_confirmed, review_after, valid_from, valid_until, supersedes, superseded_by): malformed or
+            reversed dates, a passed review_after or valid_until, last_confirmed older than STALE_DAYS (default 365) without a review_after, missing targets
 
 Usage:  tools/notes-lint.py [--root DIR] [--quiet] [--strict]
 Exit:   0 clean, 1 warnings, 2 errors (secrets). --strict turns warnings into exit 1 even for info-only runs of 'due'.
@@ -95,6 +97,7 @@ def main():
     docs_prefix, map_prefix = lay["docs"] + "/", lay["map"] + "/"
     history = tuple(lay["notes"] + "/" + d + "/" for d in lay["history"])
     max_kb, entry_warn_kb = num(conf, "MAX_NOTE_KB", 100), num(conf, "ENTRY_WARN_KB", 24)
+    stale_days = num(conf, "STALE_DAYS", 365)
     ignore = []
     ip = os.path.join(root, ".myco-notes-lint-ignore")
     if os.path.exists(ip):
@@ -175,8 +178,44 @@ def main():
                     add("WARN", rel, i, f"duplicate heading number {hm.group(2)} (first at line {seen_heads[key]})")
                 else:
                     seen_heads[key] = i
+        # freshness header (method 10.1)
+        fm, fm_end = _myco.frontmatter(text)
+        if fm:
+            dates = {}
+            for k in ("last_confirmed", "review_after", "valid_from", "valid_until"):
+                if k in fm and fm[k][0]:
+                    v, ln = fm[k]
+                    try:
+                        if not re.fullmatch(DATE, v):
+                            raise ValueError(v)
+                        dates[k] = datetime.date.fromisoformat(v)
+                    except ValueError:
+                        add("WARN", rel, ln, f"header {k} '{v}' is not a date (use YYYY-MM-DD)")
+            lc, ra, vf, vu = (dates.get(k) for k in ("last_confirmed", "review_after", "valid_from", "valid_until"))
+            if lc and lc > today:
+                add("WARN", rel, fm["last_confirmed"][1], f"last_confirmed {lc} is in the future")
+            if ra and ra < today and not is_hist:
+                add("WARN", rel, fm["review_after"][1], f"review date {ra} has passed: verify the content, then move last_confirmed and review_after")
+            elif lc and not ra and not is_hist and (today - lc).days > stale_days:
+                add("WARN", rel, fm["last_confirmed"][1], f"last confirmed {lc}, {(today - lc).days} days ago (limit {stale_days:.0f}): verify it or set review_after")
+            if vu and vu < today and not is_hist:
+                add("WARN", rel, fm["valid_until"][1], f"valid_until {vu} has passed: supersede the note or move it to the archive")
+            if vf and vu and vf > vu:
+                add("WARN", rel, fm["valid_from"][1], f"valid_from {vf} is after valid_until {vu}")
+            for k in ("supersedes", "superseded_by"):
+                if k not in fm:
+                    continue
+                for tok in [t.strip().strip("`") for t in fm[k][0].split(",") if t.strip()]:
+                    if tok in paths or join_rel(rel, tok) in paths or tok in names:
+                        for other in md_files:
+                            if other != rel and (other == tok or os.path.basename(other) == os.path.basename(tok)):
+                                mentions[other] += 1
+                    else:
+                        add("WARN", rel, fm[k][1], f"header {k} points to a missing note `{tok}`")
+                if k == "superseded_by" and fm[k][0] and not is_hist:
+                    add("INFO", rel, fm[k][1], f"superseded by {fm[k][0]}: move it to the archive when it is no longer needed")
         # fresh
-        head = "\n".join(lines[:12])
+        head = "\n".join(lines[fm_end:fm_end + 12])
         hm = re.search(rf"Last updated\s+({DATE})", head)
         if hm and not is_hist:
             cl = re.search(r"^#{1,3}\s+.*changelog.*$", text, re.M | re.I)

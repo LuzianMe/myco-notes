@@ -7,16 +7,21 @@ and commit subjects are written into it, never the text of a note.
 import json
 import os
 import re
+import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import _myco  # noqa: E402
 MAX_COMMITS = 2000
 DUE = re.compile(r"\b(after|about|due|review-by|waiting until|on or after)\s+(\d{4}-\d{2}-\d{2})\b")
 ILLUSTRATIVE = " *<>{}$|()[]"
 
 
 def due_count(text, today):
-    """Follow-up dates that have passed on lines not marked DONE (the same heuristic as notes-lint)."""
+    """Follow-up dates that have passed on lines not marked DONE (the same heuristic as notes-lint), plus a passed review_after or valid_until in the header."""
     n, in_code = 0, False
+    fm, _ = _myco.frontmatter(text)
+    n += sum(1 for k in ("review_after", "valid_until") if re.fullmatch(r"\d{4}-\d{2}-\d{2}", fm.get(k, ("",))[0]) and fm[k][0] < today)
     for line in text.split("\n"):
         if line.strip().startswith("```"):
             in_code = not in_code

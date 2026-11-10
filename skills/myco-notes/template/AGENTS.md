@@ -21,6 +21,8 @@ This repository holds the **notes** of {{PROJECT_NAME}}: the single source of tr
 ## Tools
 - `{{TOOLS_DIR}}/notes-commit "message"` : stage, check, commit (add `-p` to push the mirror).
 - If `notes-commit` stops with exit code 3 and lists new folders or files in the root, it committed nothing: ask the owner what to do with each (add as notes, track but skip the lint, ignore completely, or later) and run it again with `--folder NAME=MODE`; never choose for them. `NEW_FOLDERS` in `.myco-notes.conf` sets a default.
+- `{{TOOLS_DIR}}/resume` : bounded start-of-session briefing (repository state, pending, headline facts, notes past a review date, newest handoff, last commits). Run it first.
+- `{{TOOLS_DIR}}/asof WHEN [NOTE]` : what the notes said on a date (`--since` what changed after it, `--grep TEXT` search, `--history NOTE`). Read only.
 - `{{TOOLS_DIR}}/notes-lint.py` : reference, heading, freshness, ledger and secret checks.
 - `{{TOOLS_DIR}}/build-notes-map.py` : generate the navigable map with backlinks and history, plus `graph.html`, the notes as a network with a timeline replay.
 - `{{TOOLS_DIR}}/mirror-push`, `{{TOOLS_DIR}}/restore-drill` : second copy and proof it can be restored.
