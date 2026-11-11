@@ -106,6 +106,9 @@ chk "lint finds missing reference"      "grep -q 'missing note' /tmp/lint.$$"
 chk "lint finds passed follow-up date"  "grep -q 'has passed' /tmp/lint.$$"
 git checkout -q -- myco-notes/runbook.md
 rm -f /tmp/lint.$$
+mkdir -p .claude/skills/copy; printf '# Copy\n## 3. One\n## 3. Two\nSee `nowhere-note.md`.\n' > .claude/skills/copy/SKILL.md
+chk "lint and map leave out a skill copy under .claude/skills" "! myco-notes/tools/notes-lint.py 2>&1 | grep -q 'claude/skills' && python3 myco-notes/tools/build-notes-map.py --out $tmp/skillmap >/dev/null 2>&1 && ! grep -rq nowhere-note $tmp/skillmap"
+rm -rf .claude/skills/copy
 
 echo "freshness header, resume, asof"
 printf -- '---\nreview_after: 2020-03-01\n---\n# Fresh smoke\n' > myco-notes/plans/fresh-smoke.md
@@ -140,6 +143,8 @@ chk "workflow runs myco-notes/tools/ci-check"      "grep -q 'myco-notes/tools/ci
 git clone -q "$tmp/proj" "$tmp/clone"
 chk "hooks path is not cloned"          "[ -z \"\$(git -C $tmp/clone config core.hooksPath)\" ]"
 chk "setup-clone activates the hook in a fresh clone" "(cd $tmp/clone && myco-notes/tools/setup-clone >/dev/null 2>&1 && [ \"\$(git config core.hooksPath)\" = myco-notes/tools/hooks ])"
+git clone -q "$tmp/proj" "$tmp/cloud"; printf 'api_key = AbCdEfGhIjKlMnOpQrStUvWx12\n' > "$tmp/cloud/myco-notes/secret-test.md"
+chk "notes-commit switches the hook on in a fresh clone; secret refused" "out=\$(cd $tmp/cloud && myco-notes/tools/notes-commit 'secret in a fresh clone' 2>&1); [ \$? -ne 0 ] && echo \"\$out\" | grep -q 'switched on' && echo \"\$out\" | grep -q 'possible secret' && [ \"\$(git -C $tmp/cloud config core.hooksPath)\" = myco-notes/tools/hooks ]"
 base="$(git rev-parse HEAD)"
 echo "- team test line" >> myco-notes/plans/backlog.md
 chk "notes-commit --branch creates the branch" "myco-notes/tools/notes-commit --branch feat-a 'Team test change and why' >/dev/null && [ \"\$(git symbolic-ref --short HEAD)\" = feat-a ]"
@@ -258,6 +263,8 @@ rm -rf "$tmp/flat/notes-map"
 chk "relocate dry run changes nothing"   "\"$kit/tools/relocate\" --root $tmp/flat | grep -q 'dry run' && [ -d $tmp/flat/notes ]"
 chk "relocate --apply moves the tree"    "\"$kit/tools/relocate\" --root $tmp/flat --apply >/dev/null && [ -f $tmp/flat/myco-notes/state.md ] && [ ! -e $tmp/flat/notes ] && [ \"\$(git -C $tmp/flat config core.hooksPath)\" = myco-notes/tools/hooks ]"
 chk "moved tree: lint clean and commit works" "(cd $tmp/flat && myco-notes/tools/notes-lint.py --quiet | grep -q ' 0 warnings' && myco-notes/tools/notes-commit 'Moved to the single folder layout' | grep -q 'Moved to')"
+mkdir -p $tmp/flat/.claude/skills/myco-notes/docs; echo old > $tmp/flat/.claude/skills/myco-notes/SKILL.md; (cd $tmp/flat && git add -A && git commit -q --no-verify -m "stale skill copy")
+chk "relocate refreshes a skill copy under .claude/skills" "\"$kit/tools/relocate\" --root $tmp/flat --apply >/dev/null && cmp -s $kit/SKILL.md $tmp/flat/.claude/skills/myco-notes/SKILL.md && [ -f $tmp/flat/.claude/skills/myco-notes/docs/METHODOLOGY.md ] && [ -f $tmp/flat/.claude/skills/myco-notes/tools/bootstrap.py ]"
 
 echo "demo tree (README screenshots and the live demo)"
 chk "build_demo makes the tree, its map and the mycelium view" "python3 $repo/examples/demo/build_demo.py $tmp/demo | grep -q 'graph: 30 nodes' && [ -f $tmp/demo/myco-notes/map/graph.html ] && [ \"\$(git -C $tmp/demo rev-list --count HEAD)\" -ge 20 ]"

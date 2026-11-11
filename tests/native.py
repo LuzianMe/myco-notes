@@ -395,6 +395,11 @@ def main():
         check("hooks path is not cloned", git(clone, "config", "core.hooksPath")[1].strip() == "")
         rc, out = run(L(clone, "setup-clone", T), clone)
         check("setup-clone activates the hook in a fresh clone", rc == 0 and git(clone, "config", "core.hooksPath")[1].strip() == T + "/hooks", out)
+        cloud = os.path.join(tmp, "cloud")   # a clone nobody set up (an agent session in the cloud): notes-commit switches the hook on
+        git(tmp, "clone", "-q", proj, cloud)
+        write(os.path.join(cloud, MY, "secret-test.md"), "api_key = AbCdEfGhIjKlMnOpQrStUvWx12\n")
+        rc, out = run(L(cloud, "notes-commit", T) + ["add a secret in a fresh clone"], cloud)
+        check("notes-commit switches the hook on in a fresh clone and the secret is refused", rc != 0 and "switched on" in out and "possible secret" in out and git(cloud, "config", "core.hooksPath")[1].strip() == T + "/hooks", out)
         base = git(proj, "rev-parse", "HEAD")[1].strip()
         write(os.path.join(proj, MY, "plans", "backlog.md"), "- team test line\n", "a")
         rc, out = run(L(proj, "notes-commit", T) + ["--branch", "feat-a", "Team test change and why"], proj)

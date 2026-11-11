@@ -49,7 +49,8 @@ def walk(root, skip_rel):
     """Yield (relative folder, file names), leaving out SKIP_DIRS by name and the folders in skip_rel by relative path."""
     for dp, dn, fn in os.walk(root):
         reldir = os.path.relpath(dp, root).replace(os.sep, "/")
-        dn[:] = sorted(d for d in dn if d not in SKIP_DIRS and (d if reldir == "." else reldir + "/" + d) not in skip_rel)
+        dn[:] = sorted(d for d in dn if d not in SKIP_DIRS and (d if reldir == "." else reldir + "/" + d) not in skip_rel
+                     and (d if reldir == "." else reldir + "/" + d) not in _myco.AGENT_SKILL_DIRS)
         yield reldir, sorted(fn)
 
 

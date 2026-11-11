@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.14.0
+Cloud and phone use, tested in Claude Code cloud sessions on a private test repository.
+- **The hook switches itself on**: in a fresh clone where `core.hooksPath` is not set (a new teammate, an agent session in the cloud), `notes-commit` turns the secret-refusing hook on before committing and says so. Before, the first commits of a clone nobody had set up ran without it (the pull-request check still caught secrets).
+- **A copy of the skill in the notes repository** (`.claude/skills/myco-notes` or `.agents/skills/myco-notes`) is supported: cloud sessions load it (they do not install plugins named in the repository's settings), the lint and the map leave it out instead of counting its docs as notes, and `relocate` refreshes it with the tools.
+- **README: "From the cloud or a phone"**: what works in a cloud session, how to give it the skill, and what needs your own machine. Method section 18 covers agent sessions in the cloud.
+
 ## 0.13.5
 - **Mycelium view, phone top bar**: the title no longer runs under the Find button. The room it leaves for the buttons is measured instead of fixed (it was sized for four buttons before Depth made five), and when a short title still does not fit beside them, the buttons get a row of their own above it.
 
