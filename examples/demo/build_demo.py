@@ -187,9 +187,17 @@ def main():
         json.dump({"title": "Greenhouse Sensors (demo)", "groups": [
             {"id": "start", "name": "Start here", "blurb": "Entry point, working agreement, tracker, master record, runbook.",
              "prefixes": ["AGENTS.md", "CLAUDE.md"] + ["myco-notes/" + f for f in ("working-agreement.md", "sync-tracker.md", "state.md", "runbook.md")]},
-            {"id": "components", "name": "Components", "blurb": "One note per part of the system.", "prefixes": ["myco-notes/entities/"]},
-            {"id": "plans", "name": "Plans and decisions", "blurb": "Backlog and decision records.", "prefixes": ["myco-notes/plans/"]},
+            # The components are split by what they do, so the map shows several colours instead of one.
+            {"id": "field", "name": "In the field", "blurb": "Nodes, radio, firmware and probes.",
+             "prefixes": ["myco-notes/entities/" + f for f in ("sensor-node.md", "gateway.md", "firmware.md", "soil-probe.md")]},
+            {"id": "data", "name": "Data path", "blurb": "Broker, database, forecast and backups.",
+             "prefixes": ["myco-notes/entities/" + f for f in ("mqtt-broker.md", "timeseries-db.md", "weather-feed.md", "backup-job.md")]},
             {"id": "logs", "name": "Incidents", "blurb": "What went wrong and what changed.", "prefixes": ["myco-notes/logs/"]},
+            {"id": "houses", "name": "Greenhouses", "blurb": "The houses, their beds and valves.",
+             "prefixes": ["myco-notes/entities/" + f for f in ("greenhouse-a.md", "greenhouse-b.md", "irrigation-valve.md")]},
+            {"id": "plans", "name": "Plans and decisions", "blurb": "Backlog and decision records.", "prefixes": ["myco-notes/plans/"]},
+            {"id": "people", "name": "For the growers", "blurb": "What the growers see and hear.",
+             "prefixes": ["myco-notes/entities/" + f for f in ("dashboard.md", "alerting.md")]},
             {"id": "verify", "name": "Verification", "blurb": "Health checks.", "prefixes": ["myco-notes/verification/"]},
             {"id": "docs", "name": "Method", "blurb": "How the notes are kept.", "prefixes": ["myco-notes/docs/"]},
             {"id": "other", "name": "Other notes", "blurb": "Everything else.", "prefixes": []}]}, fh, indent=1)
