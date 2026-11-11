@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.13.0
+- **Mycelium view, depth**: notes float at different depths, recently changed ones in front and the ones untouched for longest at the back (smaller, fainter, without their shine; threads thin and fade with them). Depth is a rank among the notes in view, so it spreads evenly whatever the project's pace, and a replay pulls each commit's notes forward. The view looks from slightly above and sways gently (not with reduced motion); a pan tilts it, Shift-drag turns it. Clicking, labels and search work on the projected positions. The new Depth button returns the exact flat view; the choice is kept per browser, and `?depth=0` or `?depth=1` in the address sets it. Plain canvas, no libraries: the map is still one offline file.
+- **README images** re-recorded with depth.
+
 ## 0.12.2
 README and demo only; the skill and tools are unchanged apart from the version number.
 - **A more colourful demo**: the demo tree's components are split into four groups (in the field, data path, greenhouses, for the growers), so the map uses ten colours instead of mostly one. The live demo is rebuilt with them.
