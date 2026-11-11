@@ -1,0 +1,3 @@
+#!/bin/sh
+# capture: launcher for capture.py (the implementation, shared by Linux, macOS and Windows).
+exec "$(cd "$(dirname "$0")" && pwd -P)/_run" capture.py "$@"

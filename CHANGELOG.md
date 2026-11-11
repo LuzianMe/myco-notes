@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.15.0
+Quick notes and solo repositories (method 2.6, section 19): Myco Notes can sit behind an ordinary conversation, for example on a phone, and save what you say without ceremony.
+- **Quick notes go to an inbox**: the new `tools/capture` saves a typed or dictated note as one dated entry at the end of `<notes>/inbox/YYYY-MM.md` (owner's words, title, optional tags and related note; time in `TIMEZONE`), and with `--commit` commits just that file. No questions, no checks, no other notes touched; sorting the inbox into the notes is a separate step. The skill has a matching quick-note mode, the starter tree an inbox README and an `AGENTS.md` section, the lint treats the inbox as a record, the map shows it as its own group, and `resume` counts unsorted notes.
+- **Solo repositories**: `SOLO=1` in `.myco-notes.conf` lets an agent merge its own pull request once the server check passes. `notes-commit --pr --merge` (or `--pr` with `SOLO=1`) waits for the check, merges and deletes the branch, and refuses to merge when a check fails or never reports (exit 5). Teams keep `SOLO=0`.
+- **New settings** in the starter conf: `TIMEZONE` (filled from `bootstrap --tz`) and `SOLO`.
+
 ## 0.14.0
 Cloud and phone use, tested in Claude Code cloud sessions on a private test repository.
 - **The hook switches itself on**: in a fresh clone where `core.hooksPath` is not set (a new teammate, an agent session in the cloud), `notes-commit` turns the secret-refusing hook on before committing and says so. Before, the first commits of a clone nobody had set up ran without it (the pull-request check still caught secrets).

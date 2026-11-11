@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import zipfile
 
 sys.dont_write_bytecode = True   # the test imports _myco from the project under test; that must not leave a __pycache__ there
@@ -388,6 +389,36 @@ def main():
         git(proj, "commit", "-qam", "git mirror target")
         rc, out = run(L(proj, "mirror-push", T), proj)
         check("mirror push to a git remote (git:URL)", rc == 0 and "main" in git(bare, "branch", "--list")[1], out)
+
+        print("quick notes (inbox, capture, solo)")
+        qn, qremote = os.path.join(tmp, "qn"), os.path.join(tmp, "qn-remote.git")
+        git(tmp, "clone", "-q", proj, qn)
+        git(tmp, "init", "-q", "--bare", qremote)
+        git(qn, "remote", "set-url", "origin", qremote)
+        rc, out = run(L(qn, "capture", T) + ["--title", "Seal order", "--tag", "parts", "--related", "runbook", "Order two spare seals."], qn)
+        month = time.strftime("%Y-%m")
+        inbox = os.path.join(qn, MY, "inbox", month + ".md")
+        itext = read(inbox) if os.path.isfile(inbox) else ""
+        check("capture writes one entry in this month's inbox", rc == 0 and "Seal order\nOrder two spare seals.\nTags: parts · Related: `runbook.md`" in itext and itext.count("\n## ") == 1, out + itext)
+        write(os.path.join(qn, MY, "state.md"), "\nunrelated edit\n", "a")
+        rc, out = run(L(qn, "capture", T) + ["--commit", "A second thought"], qn)
+        files = git(qn, "show", "--name-only", "--format=%s", "HEAD")[1].split()
+        check("capture --commit commits only the inbox file", rc == 0 and files[:2] == ["Inbox:", "A"] and files[-1] == MY + "/inbox/" + month + ".md" and MY + "/state.md" not in files, out + " ".join(files))
+        git(qn, "checkout", "-q", "--", MY + "/state.md")
+        rc, out = run([sys.executable, "-B", os.path.join(qn, *T.split("/"), "notes-lint.py")], qn)
+        check("the lint treats the inbox as a record (no orphan or reference findings)", "inbox/" + month not in out, out)
+        rc, out = run(L(qn, "resume", T), qn)
+        check("resume counts unsorted quick notes", "inbox: 2 quick note(s)" in out, out)
+        cq = os.path.join(qn, ".myco-notes.conf")
+        write(cq, read(cq).replace("SOLO=0", "SOLO=1"))
+        git(qn, "commit", "-qam", "solo")
+        if not WIN:   # a fake GitHub CLI whose checks fail: solo must push, then refuse to merge (exit 5)
+            fake = os.path.join(tmp, "fakebin")
+            write(os.path.join(fake, "gh"), "#!/bin/sh\necho \"fake gh $*\"\nexit 1\n")
+            os.chmod(os.path.join(fake, "gh"), 0o755)
+            r = subprocess.run(L(qn, "capture", T) + ["--commit", "--pr", "Solo note"], cwd=qn, capture_output=True, text=True, encoding="utf-8", errors="replace", env=dict(os.environ, PATH=fake + os.pathsep + os.environ.get("PATH", "")))
+            out = r.stdout + r.stderr
+            check("solo: a failing check is not merged (pushed, exit 5, says why)", r.returncode == 5 and "check failed; not merged" in out and "fake gh pr merge" not in out and "main" in git(qremote, "branch", "--list")[1], out)
 
         print("team setup")
         clone = os.path.join(tmp, "clone")

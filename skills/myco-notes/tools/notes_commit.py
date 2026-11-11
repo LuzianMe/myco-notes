@@ -8,6 +8,8 @@
   tools/notes-commit --branch my-change "message"      commit on that branch (created from the current one if new)
   tools/notes-commit --push "message"                  also git push the current branch to origin (sets the upstream)
   tools/notes-commit --pr "message"                    --push, then open a pull request with the GitHub CLI (gh pr create --fill)
+  tools/notes-commit --pr --merge "message"            --pr, then wait for the pull request's checks and merge it if they pass
+                                                       (solo repositories, method 19.2; SOLO=1 in the conf makes --pr do this)
   tools/notes-commit --folder NAME=MODE "message"      decide what to do with a new root folder or file (MODE: add, ignorelint, ignoreall, later)
   tools/notes-commit --only PATH [--only PATH] "msg"   commit only these files or folders; other changes stay uncommitted
   tools/notes-commit --dry-run "message"               show what would be committed (and any new-folder decision); change nothing
@@ -25,9 +27,11 @@ Behaviour (configured in .myco-notes.conf at the repository root):
   - team use: --branch / --push / --pr give each change its own branch and pull request (see docs/TEAM.md)
   - with --only, the syntax checks and SYNC_GLOBS look only at the files this commit contains; other staged files stay staged
 Exit: 0 committed (or nothing to commit), 1 a check failed, 2 usage, 3 new root folders need a decision (nothing committed),
-      4 committed, but -p's mirror push did not sync (it failed, or was skipped with MIRROR_STRICT=1)
+      4 committed, but -p's mirror push did not sync (it failed, or was skipped with MIRROR_STRICT=1),
+      5 committed and pushed, but --merge did not merge (a check failed or never reported, or gh is missing): say why and stop
 """
 import argparse
+import time
 import collections
 import fnmatch
 import os
@@ -226,6 +230,29 @@ def ensure_hook(root, hooks, dry):
     print(f"notes-commit: switched on the secret-refusing hook for this clone (core.hooksPath = {hooks}); setup-clone does the rest of the per-clone setup")
 
 
+def merge_when_green(branch):
+    """Solo repositories (method 19.2): wait for the pull request's checks; merge it and delete the branch only if they pass."""
+    if not shutil.which("gh"):
+        print(f"solo: gh (GitHub CLI) not installed: merge the pull request for {branch} yourself once its check passes, then continue from the main branch")
+        return False
+    for _ in range(24):   # a check appears a few seconds after the push
+        r = subprocess.run(["gh", "pr", "checks", branch], capture_output=True, text=True, encoding="utf-8", errors="replace")
+        if "no checks reported" not in (r.stdout + r.stderr):
+            break
+        time.sleep(5)
+    else:
+        print("solo: no check reported on the pull request after 2 minutes; not merged (the check is the control, method 19.2)", file=sys.stderr)
+        return False
+    if subprocess.run(["gh", "pr", "checks", branch, "--watch", "--fail-fast"]).returncode:
+        print("solo: a check failed; not merged. Fix it and commit again.", file=sys.stderr)
+        return False
+    if subprocess.run(["gh", "pr", "merge", branch, "--merge", "--delete-branch"]).returncode:
+        print("solo: the check passed but the merge was refused (branch protection that needs a review?); not merged", file=sys.stderr)
+        return False
+    print(f"solo: checks passed; merged {branch} and deleted the branch")
+    return True
+
+
 def main():
     _myco.utf8_console()
     ap = argparse.ArgumentParser(prog="notes-commit", add_help=False)
@@ -235,18 +262,21 @@ def main():
     ap.add_argument("--branch", default="")
     ap.add_argument("--push", action="store_true")
     ap.add_argument("--pr", action="store_true")
+    ap.add_argument("--merge", action="store_true")
     ap.add_argument("--folder", action="append", default=[])
     ap.add_argument("--only", action="append", default=[])
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("-h", "--help", action="store_true")
     ap.add_argument("message", nargs="*")
     a = ap.parse_args()
+    if a.merge:
+        a.pr = True
     if a.help:
         print(__doc__)
         return 0
     msg = " ".join(a.message).strip()
     if not msg:
-        print('usage: notes-commit [-p] [--human] [--tag NAME] [--branch NAME] [--push|--pr] [--folder NAME=MODE] [--only PATH] [--dry-run] "message"', file=sys.stderr)
+        print('usage: notes-commit [-p] [--human] [--tag NAME] [--branch NAME] [--push|--pr [--merge]] [--folder NAME=MODE] [--only PATH] [--dry-run] "message"', file=sys.stderr)
         return 2
 
     root = _myco.toplevel(os.environ.get("NOTES_ROOT") or os.getcwd()) or _myco.toplevel(HERE)
@@ -358,7 +388,8 @@ def main():
         if _myco.git("remote", "get-url", "origin").returncode != 0:
             print("WARNING: no remote named origin; nothing pushed", file=sys.stderr)
             return result
-        if subprocess.run(["git", "push", "-q", "-u", "origin", cur]).returncode == 0:
+        pushed = subprocess.run(["git", "push", "-q", "-u", "origin", cur]).returncode == 0
+        if pushed:
             print(f"pushed {cur} to origin")
         else:
             print("WARNING: committed, but git push failed", file=sys.stderr)
@@ -368,6 +399,9 @@ def main():
                     print("WARNING: pull request not created (does one exist already?)", file=sys.stderr)
             else:
                 print(f"gh (GitHub CLI) not installed: open a pull request for branch {cur} in your hosting service")
+            if a.merge or conf.get("SOLO", "0").strip() == "1":
+                if not pushed or not merge_when_green(cur):
+                    return 5
     return result
 
 

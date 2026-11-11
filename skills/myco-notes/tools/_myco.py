@@ -4,7 +4,7 @@ import re
 import subprocess
 import sys
 
-VERSION = "0.14.0"   # the kit version these tools come from; moves with plugin.json and SKILL.md (tests check it)
+VERSION = "0.15.0"   # the kit version these tools come from; moves with plugin.json and SKILL.md (tests check it)
 AGENT_SKILL_DIRS = (".claude/skills", ".agents/skills")   # a copy of the skill kept in a notes repository for agents (a cloud session loads it from there): not notes, so the lint and the map leave it out
 
 IS_WINDOWS = os.name == "nt"
@@ -144,7 +144,7 @@ def layout(root, conf=None):
         "map": pick("MAP_DIR", "notes-map", my + "/map"),
         "state": _rel(conf.get("STATE_FILE")) or "state.md",
         "data": [d for d in (_rel(x) for x in conf.get("DATA_DIRS", "").split()) if d],
-        "history": [d for d in (_rel(x) for x in conf.get("HISTORY_DIRS", "archive logs").split()) if d],
+        "history": list(dict.fromkeys([d for d in (_rel(x) for x in conf.get("HISTORY_DIRS", "archive logs").split()) if d] + ["inbox"])),   # the inbox (method 19.1) is always a record
     }
 
 

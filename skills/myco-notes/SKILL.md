@@ -1,10 +1,10 @@
 ---
 name: myco-notes
-description: Keep a project's knowledge in a versioned, secret-free, cross-referenced Markdown notes tree that stays accurate. Use when a change was just made to a system or codebase and the notes must be updated and committed; when asked to "update the notes", "document this", "sync", "audit the notes" or "commit the notes"; when merging another session's handoff; or when asked to start a notes tree for a new project.
+description: Keep a project's knowledge in a versioned, secret-free, cross-referenced Markdown notes tree that stays accurate. Use when a change was just made to a system or codebase and the notes must be updated and committed; when asked to "update the notes", "document this", "sync", "audit the notes" or "commit the notes"; when the user shares a quick note, idea or voice memo to keep ("note that", "remember", "save this"); when merging another session's handoff; or when asked to start a notes tree for a new project.
 license: Apache-2.0
 compatibility: Needs git and python 3.8+ (Linux, macOS, Windows). rsync and ssh only for a remote-host mirror. Agent-neutral; any coding agent that reads SKILL.md or AGENTS.md can use it.
 metadata:
-  version: "0.14.0"
+  version: "0.15.0"
 ---
 
 # Myco Notes
@@ -19,6 +19,9 @@ Works with any agent or none. The notes root has an entry point (`AGENTS.md`, or
 Find out what this session may do: write files, run git, reach the network, run the live system's commands. If something is blocked, do not work around it: record the limit, mark every fact you could not check "not verified", put the missing step under Pending in the sync tracker, and tell the user exactly what a human must run. Never claim a check passed without evidence from this session.
 
 ## Modes (pick the one that fits the request)
+
+### 0. Quick note (the owner wants a thought, idea or fact remembered; typed or dictated)
+Do not run the Capture steps below. Save it in one step: `<tools>/capture --commit "the note"` (in the owner's words, lightly cleaned up; add `--title`, `--tag`, `--related NOTE` only when obvious). It writes one entry at the end of `<notes>/inbox/YYYY-MM.md` (method section 19.1). Then reply in one line ("Saved: <title>"). Ask nothing, verify nothing, touch no other note, add no to-do; never write a secret's value. When working through pull requests (a cloud session), push and open the pull request; if `SOLO=1` in `.myco-notes.conf`, merge it yourself once its check passes (`notes-commit --pr --merge` does this where the GitHub CLI exists) and continue from the updated main branch; if the check fails, say why and stop. Several notes in one session: one entry and one commit each. **Sorting** ("sort my inbox") is separate: move each entry into the note where it belongs using Capture mode, then mark the entry `→ moved to <note>.md (YYYY-MM-DD)`; never delete entries.
 
 ### 1. Capture (a change was just made)
 1. Read `AGENTS.md`, `<notes>/working-agreement.md`, `<notes>/sync-tracker.md` (pending list and the "what to update when X changes" matrix).
@@ -68,4 +71,4 @@ If the project has notes but no tools folder yet, copy it from the kit into the 
 `AGENTS.md`/`CLAUDE.md`; `<notes>/working-agreement.md`; `<notes>/state.md`; `<notes>/runbook.md`; `<notes>/sync-tracker.md`; `<notes>/plans/backlog.md`; `<notes>/logs/`; `<notes>/scripts/`; `<notes>/verification/verification.md`; `<notes>/archive/`; `.myco-notes.conf`; `<tools>/`; `<docs>/` (`<notes>` is `myco-notes` by default, so these are `myco-notes/state.md` and so on).
 
 ## Configuration
-`.myco-notes.conf` (shell syntax): the layout (`MYCO_DIR`, `NOTES_DIR`, `TOOLS_DIR`, `DOCS_DIR`, `MAP_DIR`, `DATA_DIRS`, `HISTORY_DIRS`, `STATE_FILE` for a master record not called `state.md`), the lint limits (`MAX_NOTE_KB`, `ENTRY_WARN_KB`, `STALE_DAYS` for the freshness header, `RESUME_BUDGET` for `resume`), `AGENT_TRAILER` (co-author line for commits made by an agent), `SYNC_GLOBS`/`SYNC_CMD` (keep the live copy of executed files equal to the committed copy), `NEW_FOLDERS` (`ask` default, `add`, `ignorelint`, `ignoreall`: what `notes-commit` does with a new root folder or loose file; `notes-commit --folder NAME=MODE` answers for one item, `NAME=*` for all, `later` leaves it out of this commit), `CHECK_SH`/`CHECK_PY`, `MIRROR_TARGET`, `POST_PUSH_CMDS`, `SECRET_ALLOW_FILE`. Optional `.myco-notes-map.json` (groups, hints, title) and `.myco-notes-lint-ignore` (regexes of findings to drop).
+`.myco-notes.conf` (shell syntax): the layout (`MYCO_DIR`, `NOTES_DIR`, `TOOLS_DIR`, `DOCS_DIR`, `MAP_DIR`, `DATA_DIRS`, `HISTORY_DIRS`, `STATE_FILE` for a master record not called `state.md`), the lint limits (`MAX_NOTE_KB`, `ENTRY_WARN_KB`, `STALE_DAYS` for the freshness header, `RESUME_BUDGET` for `resume`), `AGENT_TRAILER` (co-author line for commits made by an agent), `SYNC_GLOBS`/`SYNC_CMD` (keep the live copy of executed files equal to the committed copy), `TIMEZONE` (IANA name for the times `capture` writes), `SOLO` (1 = one owner: an agent merges its own pull request after the check passes, method 19.2), `NEW_FOLDERS` (`ask` default, `add`, `ignorelint`, `ignoreall`: what `notes-commit` does with a new root folder or loose file; `notes-commit --folder NAME=MODE` answers for one item, `NAME=*` for all, `later` leaves it out of this commit), `CHECK_SH`/`CHECK_PY`, `MIRROR_TARGET`, `POST_PUSH_CMDS`, `SECRET_ALLOW_FILE`. Optional `.myco-notes-map.json` (groups, hints, title) and `.myco-notes-lint-ignore` (regexes of findings to drop).

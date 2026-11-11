@@ -1,6 +1,6 @@
 # Myco Notes: the method
 
-Version 2.5 (general edition), 2026-11-10. It is project-independent and is written for engineers and teams (and for AI coding agents working with them) who run long, large or fast-changing projects: infrastructure, software platforms, data and ML systems, research, hardware, operations. It is meant as the specification from which a skill, a template repository or a team convention can be built.
+Version 2.6 (general edition), 2026-11-11. It is project-independent and is written for engineers and teams (and for AI coding agents working with them) who run long, large or fast-changing projects: infrastructure, software platforms, data and ML systems, research, hardware, operations. It is meant as the specification from which a skill, a template repository or a team convention can be built.
 
 The method grew out of a long-running, AI-operated engineering project in which the notes had to act as the memory of an operator that forgets everything between sessions. That constraint is useful for any project: if the notes are good enough for an operator with no memory, they are good enough for a new teammate, an auditor, or you in a year.
 
@@ -85,6 +85,7 @@ repo/
     sync-tracker.md                ledger + matrix + pending + sync log
     <entity>.md ...                one per component
     logs/<effort>.md               feature logs (history: not re-checked for dates and references)
+    inbox/YYYY-MM.md               quick notes, one file per month (history; section 19)
     plans/backlog.md, plans/*.md   plans, decisions, research, session handoffs
     archive/                       old detail (history)
     scripts/                       deployed artifacts, bundles with READMEs
@@ -427,6 +428,8 @@ Paths are relative to the kit, which is the skill folder `skills/myco-notes/` (i
 | Described commits, syntax checks, synced executed copies (7) | `tools/notes-commit`, `.myco-notes.conf` |
 | Secret refusal at commit time (8.2) | `tools/hooks/pre-commit` (versioned; activated by `git config core.hooksPath <tools folder>/hooks`), rules in `tools/secret-scan` |
 | Server-side gate that a contributor cannot bypass (8.2, 18) | `tools/ci-check`, `template/.github/workflows/notes-check.yml` |
+| Quick notes in the monthly inbox (19.1) | `tools/capture` (`--commit`, `TIMEZONE`), `template/notes/inbox/README.md`; lint and map treat `inbox/` as a record |
+| Solo repositories: the agent merges its own pull request after the check (19.2) | `SOLO` in `.myco-notes.conf`, `tools/notes-commit --pr --merge`, `tools/resume` |
 | Per-clone setup, branches and pull requests (18) | `tools/setup-clone` (and `tools/notes-commit`, which switches the hook on in a clone where it is not set), `tools/notes-commit --branch/--push/--pr`, `docs/TEAM.md` |
 | Lint: references, numbering, freshness, due dates, ledger, secrets, size (3.3, 9, 10) and the optional freshness header (10.1) | `tools/notes-lint.py` (`HISTORY_DIRS`, `DATA_DIRS`, `MAX_NOTE_KB`, `ENTRY_WARN_KB`, `STALE_DAYS`) |
 | Bounded start-of-session briefing (11.2, 12) | `tools/resume` (`--budget`, `RESUME_BUDGET`) |
@@ -447,7 +450,36 @@ A notes tree is an ordinary git repository, so a team shares it the way it share
 - **Hook settings do not travel with a clone.** Each person runs the setup step once (`tools/setup-clone`). The commit helper also switches the hook on by itself in a clone where it is not set (and says so), because some clones are never set up by hand.
 - **Agent sessions in the cloud** (an agent that works in a fresh copy of the repository on a hosted machine, started from a browser or a phone) are contributors like any other: each session starts from a new clone, works on a branch and opens a pull request that a human merges. They need only the tools in the tree and the working agreement (a copy of the skill kept in the repository for agents, under `.claude/skills/` or `.agents/skills/`, lets them load it too; it is not notes, so the lint and the map leave it out, and it is refreshed with the tools); they cannot reach machines on a private network, so mirrors and anything published from the owner's own machines happen when a local clone syncs.
 - **Branch per change, small and described.** Several people (or agents) writing the same two files, the master record and the sync log, will conflict; small pull requests, frequent merges and keeping both sides of an appended line resolve almost all of it.
-- **Roles.** A maintainer group reviews changes to the working agreement and the tools; everyone else may propose changes to the notes. An AI agent is a contributor: it works on a branch and opens a pull request; a human merges.
+- **Roles.** A maintainer group reviews changes to the working agreement and the tools; everyone else may propose changes to the notes. An AI agent is a contributor: it works on a branch and opens a pull request; a human merges (in a solo repository the owner may delegate that, section 19.2).
 - **Reading and writing through the hosting API instead of a clone** is fine for reading and for a one-line fix, but it skips the hook, the lint and the commit helper, and turns a multi-file update into many commits; keep it as the exception.
 
 Step-by-step set-up, branch protection and conflict handling are in `docs/TEAM.md`.
+
+## 19. Quick notes and solo repositories
+
+Some notes are not changes to a system but thoughts to keep: a typed or dictated line from a phone, an idea, a decision taken on the way, something someone said. Treating each one as a project change (verify, update five files, add a sync-log line, ask what is missing) makes capture so slow that it stops happening. Quick notes therefore get their own light path, and the heavier work moves to a later, separate step.
+
+### 19.1 The inbox
+- **Where:** one file per month, `<notes>/inbox/YYYY-MM.md`. New entries go at the end, so two sessions appending on the same day merge cleanly.
+- **Entry format:**
+
+```
+## YYYY-MM-DD HH:MM <short title>
+<the note, in the owner's words, lightly cleaned up: fix dictation errors and punctuation, keep the meaning and the wording>
+Tags: <a few words> · Related: `<existing-note>.md`
+```
+
+  The time carries its zone or offset. `Tags` and `Related` are optional; name a related note only when one clearly exists.
+- **Capture rules:** save first, answer briefly ("Saved: <title>"). Do not ask questions, do not verify, do not add to-dos or touch other notes unless the owner asks; an inbox entry is by definition the owner's statement, so it needs no "not verified" mark. A secret is still never written (8.1): keep where it lives, never its value. One note, one entry, one commit.
+- **Sorting (a separate step, when the owner asks, for example "sort my inbox"):** move each entry's content into the note where it belongs, following the normal capture rules (5, 6), and mark the entry `→ moved to <note>.md (YYYY-MM-DD)` instead of deleting it. Facts that need checking get "not verified" there, and open questions go to the pending list. An entry that belongs nowhere yet stays in the inbox.
+- **Lint and map:** the inbox is a record like the logs (`HISTORY_DIRS`): not re-checked for references, dates, size or orphans; the secret check applies. The map shows it as its own group.
+- **Personal archives:** a tree can be a person's archive as well as a project's notes. Its working agreement should then say that personal content is expected, which kinds of data must still stay out, and who may read the repository.
+
+### 19.2 Solo repositories
+In a repository with one owner, waiting for that owner to merge every pull request adds a step without adding a reviewer. `SOLO=1` in `.myco-notes.conf` says so:
+
+- **The agent merges its own pull request** once the server check (8.2, 18) has passed, then deletes the branch and continues from the updated main branch. If the check fails, it does not merge: it says why and stops.
+- **The check stays the control:** solo mode removes the human merge, not the scan or the lint. Branch protection that requires a review still applies; the agent cannot approve its own pull request.
+- **Without a pull request** (a local session allowed to commit to the main branch), solo mode changes nothing.
+- **Team repositories leave `SOLO` at 0**, so a human merges.
+
