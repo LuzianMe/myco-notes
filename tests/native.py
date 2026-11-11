@@ -166,6 +166,7 @@ def main():
         check("on a phone the detail panel opens as a strip with More", "panelFull" in h and '#panel.min' in h and '"More"' in h)
         check("labels take turns (rotation, fades, neighbourhood of a selection)", "updateLabels" in h and "slotCount" in h and "LDWELL" in h and "n.hub||n.i===hov" not in h)
         check("the search box folds and the panel shrinks on a larger screen too, remembered", 'id="fold"' in h and "#head.fold" in h and "togglePanel" in h and "myco-graph-" in h)
+        check("depth: recent notes in front, a Depth button for the flat view, picking on projected places", 'id="depth"' in h and "depthTargets" in h and "function proj(" in h and "n.px-px" in h and 'pref("depth"' in h)
         check("two fingers pinch to zoom, and a bud has its source's colour", "pinch" in h and "pointercancel" in h and "budRGB(e.dir>0?e.a:e.b)" in h)
         check("a missing reference is shown", gn is not None and gn.get("miss") == ["no-such-note.md"], str(gn))
         check("the history is replayed across a rename", gn is not None and gn["b"] < gn["l"] and len(g["commits"]) >= 3 and g["commits"][gn["b"]]["s"].startswith("Add a note for the graph test"), str((gn, [c["s"] for c in g["commits"]])))
