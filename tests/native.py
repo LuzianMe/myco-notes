@@ -412,13 +412,20 @@ def main():
         cq = os.path.join(qn, ".myco-notes.conf")
         write(cq, read(cq).replace("SOLO=0", "SOLO=1"))
         git(qn, "commit", "-qam", "solo")
-        if not WIN:   # a fake GitHub CLI whose checks fail: solo must push, then refuse to merge (exit 5)
+        if not WIN:   # a fake GitHub CLI (FAKE_GH=noapi|fail|pass): solo must push, then merge only after passing checks
             fake = os.path.join(tmp, "fakebin")
-            write(os.path.join(fake, "gh"), "#!/bin/sh\necho \"fake gh $*\"\nexit 1\n")
+            write(os.path.join(fake, "gh"), '#!/bin/sh\necho "fake gh $*"\ncase "$FAKE_GH:$2" in\n  noapi:*) echo "HTTP 403: GraphQL blocked" >&2; exit 1;;\n'
+                  '  *:create|*:view) exit 0;;\n  fail:checks) printf "notes-check\\tfail\\t5s\\n"; exit 1;;\n  pass:checks) printf "notes-check\\tpass\\t5s\\n"; exit 0;;\n  pass:merge) exit 0;;\nesac\nexit 1\n')
             os.chmod(os.path.join(fake, "gh"), 0o755)
-            r = subprocess.run(L(qn, "capture", T) + ["--commit", "--pr", "Solo note"], cwd=qn, capture_output=True, text=True, encoding="utf-8", errors="replace", env=dict(os.environ, PATH=fake + os.pathsep + os.environ.get("PATH", "")))
-            out = r.stdout + r.stderr
-            check("solo: a failing check is not merged (pushed, exit 5, says why)", r.returncode == 5 and "check failed; not merged" in out and "fake gh pr merge" not in out and "main" in git(qremote, "branch", "--list")[1], out)
+            res = {}
+            for mode in ("noapi", "fail", "pass"):
+                r = subprocess.run(L(qn, "capture", T) + ["--commit", "--pr", "Solo note " + mode], cwd=qn, capture_output=True, text=True, encoding="utf-8", errors="replace",
+                                   env=dict(os.environ, FAKE_GH=mode, PATH=fake + os.pathsep + os.environ.get("PATH", "")))
+                res[mode] = (r.returncode, r.stdout + r.stderr)
+            check("solo: gh without access to GitHub is reported, nothing merged (exit 5)", res["noapi"][0] == 5 and "could not create or find" in res["noapi"][1] and "pr merge" not in res["noapi"][1], res["noapi"][1])
+            check("solo: a failing check is not merged (exit 5, says why)", res["fail"][0] == 5 and "check failed; not merged" in res["fail"][1] and "pr merge" not in res["fail"][1], res["fail"][1])
+            check("solo: passing checks are merged and the branch deleted", res["pass"][0] == 0 and "fake gh pr merge main --merge --delete-branch" in res["pass"][1] and "merged main" in res["pass"][1], res["pass"][1])
+            check("solo: every note was pushed", "main" in git(qremote, "branch", "--list")[1])
 
         print("team setup")
         clone = os.path.join(tmp, "clone")

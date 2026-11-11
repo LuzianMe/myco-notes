@@ -28,7 +28,8 @@ Behaviour (configured in .myco-notes.conf at the repository root):
   - with --only, the syntax checks and SYNC_GLOBS look only at the files this commit contains; other staged files stay staged
 Exit: 0 committed (or nothing to commit), 1 a check failed, 2 usage, 3 new root folders need a decision (nothing committed),
       4 committed, but -p's mirror push did not sync (it failed, or was skipped with MIRROR_STRICT=1),
-      5 committed and pushed, but --merge did not merge (a check failed or never reported, or gh is missing): say why and stop
+      5 committed and pushed, but --merge did not merge (a check failed, stayed pending for 15 minutes or never reported, gh is missing
+        or cannot reach GitHub): say why and stop; merge it yourself once the check passes
 """
 import argparse
 import time
@@ -230,28 +231,37 @@ def ensure_hook(root, hooks, dry):
     print(f"notes-commit: switched on the secret-refusing hook for this clone (core.hooksPath = {hooks}); setup-clone does the rest of the per-clone setup")
 
 
-def merge_when_green(branch):
-    """Solo repositories (method 19.2): wait for the pull request's checks; merge it and delete the branch only if they pass."""
+def merge_when_green(branch, wait_min=15):
+    """Solo repositories (method 19.2): wait for the pull request's checks; merge it and delete the branch only if they pass.
+    gh pr checks exits 0 when all passed, 8 while some are pending, 1 when one failed (or gh could not read them)."""
     if not shutil.which("gh"):
         print(f"solo: gh (GitHub CLI) not installed: merge the pull request for {branch} yourself once its check passes, then continue from the main branch")
         return False
-    for _ in range(24):   # a check appears a few seconds after the push
+    deadline, seen = time.time() + wait_min * 60, False
+    while True:
         r = subprocess.run(["gh", "pr", "checks", branch], capture_output=True, text=True, encoding="utf-8", errors="replace")
-        if "no checks reported" not in (r.stdout + r.stderr):
+        out = (r.stdout + r.stderr).strip()
+        if r.returncode == 0 and out and "no checks reported" not in out:
             break
-        time.sleep(5)
-    else:
-        print("solo: no check reported on the pull request after 2 minutes; not merged (the check is the control, method 19.2)", file=sys.stderr)
-        return False
-    if subprocess.run(["gh", "pr", "checks", branch, "--watch", "--fail-fast"]).returncode:
-        print("solo: a check failed; not merged. Fix it and commit again.", file=sys.stderr)
-        return False
+        if "no checks reported" in out or r.returncode == 8:
+            seen = seen or r.returncode == 8
+        elif r.returncode == 1 and re.search(r"(?mi)\bfail", out):
+            print("solo: a check failed; not merged. Fix it and commit again.", file=sys.stderr)
+            return False
+        else:
+            print(f"solo: gh cannot read the pull request's checks here ({out.splitlines()[-1][:160] if out else 'no output'}); not merged. "
+                  f"Merge the pull request for {branch} with your own GitHub access once its check passes.", file=sys.stderr)
+            return False
+        if time.time() > deadline:
+            what = "still pending" if seen else "never reported"
+            print(f"solo: the check is {what} after {wait_min} minutes; not merged. Merge the pull request for {branch} once it passes.", file=sys.stderr)
+            return False
+        time.sleep(10)
     if subprocess.run(["gh", "pr", "merge", branch, "--merge", "--delete-branch"]).returncode:
         print("solo: the check passed but the merge was refused (branch protection that needs a review?); not merged", file=sys.stderr)
         return False
     print(f"solo: checks passed; merged {branch} and deleted the branch")
     return True
-
 
 def main():
     _myco.utf8_console()
@@ -395,8 +405,11 @@ def main():
             print("WARNING: committed, but git push failed", file=sys.stderr)
         if a.pr:
             if shutil.which("gh"):
-                if subprocess.run(["gh", "pr", "create", "--fill"]).returncode:
-                    print("WARNING: pull request not created (does one exist already?)", file=sys.stderr)
+                if subprocess.run(["gh", "pr", "create", "--fill"]).returncode and subprocess.run(["gh", "pr", "view", cur], capture_output=True).returncode:
+                    print(f"WARNING: no pull request for {cur}: gh could not create or find one (no access to GitHub's API here?). Open it with your own GitHub access.", file=sys.stderr)
+                    if a.merge or conf.get("SOLO", "0").strip() == "1":
+                        print("solo: then merge it yourself once its check passes (method 19.2)", file=sys.stderr)
+                        return 5
             else:
                 print(f"gh (GitHub CLI) not installed: open a pull request for branch {cur} in your hosting service")
             if a.merge or conf.get("SOLO", "0").strip() == "1":
