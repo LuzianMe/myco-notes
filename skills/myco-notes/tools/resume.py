@@ -109,6 +109,17 @@ def main():
         state.append("no commits yet")
     if entry:
         state.append(f"entry point `{entry}`; method `{lay['docs']}/METHODOLOGY.md`; tools `{lay['tools']}/`")
+    if conf.get("SOLO", "0").strip() == "1":
+        state.append("solo repository (SOLO=1): merge your own pull request once its check passes, then continue from the main branch (method 19.2)")
+    inbox = os.path.join(root, *notes.split("/"), "inbox")
+    if os.path.isdir(inbox):
+        n_in = 0
+        for f in os.listdir(inbox):
+            if re.fullmatch(r"\d{4}-\d{2}\.md", f):
+                txt = read(notes + "/inbox/" + f)
+                n_in += len(re.findall(r"(?m)^## ", txt)) - len(re.findall(r"(?m)^\u2192 moved to |^-> moved to ", txt))
+        if n_in > 0:
+            state.append(f"inbox: {n_in} quick note(s) not sorted yet (`{notes}/inbox/`; quick notes: `{lay['tools']}/capture`, method 19.1)")
 
     # --- pending, headline, open items
     pending = section_items(read(notes + "/sync-tracker.md"), r"^pending", 30)

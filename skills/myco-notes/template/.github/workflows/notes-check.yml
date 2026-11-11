@@ -1,6 +1,9 @@
 # Checks every change to the notes: secret scan of the added lines + notes-lint ({{TOOLS_DIR}}/ci-check).
 # Make the check named "notes-check" (this job) a required status check in the branch protection of main (see {{DOCS_DIR}}/TEAM.md).
-# GitHub Enterprise Server: use a runner label your instance has, and make sure actions/checkout is available to it.
+# After a change lands on main, the job notes-map builds the notes map (index, pages and graph.html, the mycelium view) and keeps
+# it with the run as a private download for 30 days: Actions > the latest run on main > Artifacts > notes-map. graph.html opens on
+# its own, also on a phone. Delete that job if you do not want it (it uses about a minute of Actions time per change).
+# GitHub Enterprise Server: use a runner label your instance has, and make sure actions/checkout and actions/upload-artifact are available to it.
 name: notes-check
 on:
   pull_request:
@@ -20,3 +23,19 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: bash {{TOOLS_DIR}}/ci-check "$BASE_SHA"
+  notes-map:
+    if: github.event_name == 'push'
+    needs: notes-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Build the notes map
+        shell: bash
+        run: python3 {{TOOLS_DIR}}/build-notes-map.py --out "$RUNNER_TEMP/notes-map"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: notes-map
+          path: ${{ runner.temp }}/notes-map
+          retention-days: 30

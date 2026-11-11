@@ -39,6 +39,7 @@ def default_groups(lay):
     return [
         ("start", "Start here", "Read in this order: entry point, working agreement, tracker, master record, runbook.", start),
         ("plans", "Plans, backlog and decisions", "What is parked, planned, waiting or decided.", [n + "plans/"]),
+        ("inbox", "Inbox", "Quick notes as they were captured, one file per month, waiting to be sorted into the notes.", [n + "inbox/"]),
         ("logs", "Effort logs and incidents", "Chronological records of large efforts and incidents.", [n + "logs/"]),
         ("verify", "Verification", "Health check and test procedures.", [n + "verification/"]),
         ("artifacts", "Deployed artifacts", "Repository copies of what runs elsewhere (READMEs of bundles).", [n + "scripts/"]),

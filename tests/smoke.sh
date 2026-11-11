@@ -140,6 +140,7 @@ chk "restore drill passes"              "myco-notes/tools/restore-drill $tmp/mir
 echo "team setup (branches, CI check, per-clone setup)"
 chk "team files exist in the bootstrapped tree" "[ -f .github/workflows/notes-check.yml ] && [ -f .github/CODEOWNERS ] && [ -f .github/pull_request_template.md ] && [ -f myco-notes/docs/TEAM.md ]"
 chk "workflow runs myco-notes/tools/ci-check"      "grep -q 'myco-notes/tools/ci-check' .github/workflows/notes-check.yml"
+chk "workflow builds the map on main and keeps it as an artifact" "grep -q 'myco-notes/tools/build-notes-map.py --out' .github/workflows/notes-check.yml && grep -q 'upload-artifact' .github/workflows/notes-check.yml && grep -q \"if: github.event_name == 'push'\" .github/workflows/notes-check.yml"
 git clone -q "$tmp/proj" "$tmp/clone"
 chk "hooks path is not cloned"          "[ -z \"\$(git -C $tmp/clone config core.hooksPath)\" ]"
 chk "setup-clone activates the hook in a fresh clone" "(cd $tmp/clone && myco-notes/tools/setup-clone >/dev/null 2>&1 && [ \"\$(git config core.hooksPath)\" = myco-notes/tools/hooks ])"
@@ -267,7 +268,7 @@ mkdir -p $tmp/flat/.claude/skills/myco-notes/docs; echo old > $tmp/flat/.claude/
 chk "relocate refreshes a skill copy under .claude/skills" "\"$kit/tools/relocate\" --root $tmp/flat --apply >/dev/null && cmp -s $kit/SKILL.md $tmp/flat/.claude/skills/myco-notes/SKILL.md && [ -f $tmp/flat/.claude/skills/myco-notes/docs/METHODOLOGY.md ] && [ -f $tmp/flat/.claude/skills/myco-notes/tools/bootstrap.py ]"
 
 echo "demo tree (README screenshots and the live demo)"
-chk "build_demo makes the tree, its map and the mycelium view" "python3 $repo/examples/demo/build_demo.py $tmp/demo | grep -q 'graph: 30 nodes' && [ -f $tmp/demo/myco-notes/map/graph.html ] && [ \"\$(git -C $tmp/demo rev-list --count HEAD)\" -ge 20 ]"
+chk "build_demo makes the tree, its map and the mycelium view" "python3 $repo/examples/demo/build_demo.py $tmp/demo | grep -q 'graph: 31 nodes' && [ -f $tmp/demo/myco-notes/map/graph.html ] && [ \"\$(git -C $tmp/demo rev-list --count HEAD)\" -ge 20 ]"
 chk "the demo tree is lint-clean apart from its two staged warnings" "(cd $tmp/demo && myco-notes/tools/notes-lint.py --quiet | grep -q ' 0 errors, 2 warnings')"
 
 chk "no .gitattributes in the kit rewrites file contents (the plugin directory refuses it)" "! git -C $repo ls-files -z '*.gitattributes' '.gitattributes' | xargs -0 -I{} grep -h -v '^#' $repo/{} | grep -q -E 'eol=|filter|export-|(^| )text( |=|$)'"

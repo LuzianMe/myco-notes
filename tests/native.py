@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import zipfile
 
 sys.dont_write_bytecode = True   # the test imports _myco from the project under test; that must not leave a __pycache__ there
@@ -388,6 +389,43 @@ def main():
         git(proj, "commit", "-qam", "git mirror target")
         rc, out = run(L(proj, "mirror-push", T), proj)
         check("mirror push to a git remote (git:URL)", rc == 0 and "main" in git(bare, "branch", "--list")[1], out)
+
+        print("quick notes (inbox, capture, solo)")
+        qn, qremote = os.path.join(tmp, "qn"), os.path.join(tmp, "qn-remote.git")
+        git(tmp, "clone", "-q", proj, qn)
+        git(tmp, "init", "-q", "--bare", qremote)
+        git(qn, "remote", "set-url", "origin", qremote)
+        rc, out = run(L(qn, "capture", T) + ["--title", "Seal order", "--tag", "parts", "--related", "runbook", "Order two spare seals."], qn)
+        month = time.strftime("%Y-%m")
+        inbox = os.path.join(qn, MY, "inbox", month + ".md")
+        itext = read(inbox) if os.path.isfile(inbox) else ""
+        check("capture writes one entry in this month's inbox", rc == 0 and "Seal order\nOrder two spare seals.\nTags: parts · Related: `runbook.md`" in itext and itext.count("\n## ") == 1, out + itext)
+        write(os.path.join(qn, MY, "state.md"), "\nunrelated edit\n", "a")
+        rc, out = run(L(qn, "capture", T) + ["--commit", "A second thought"], qn)
+        files = git(qn, "show", "--name-only", "--format=%s", "HEAD")[1].split()
+        check("capture --commit commits only the inbox file", rc == 0 and files[:2] == ["Inbox:", "A"] and files[-1] == MY + "/inbox/" + month + ".md" and MY + "/state.md" not in files, out + " ".join(files))
+        git(qn, "checkout", "-q", "--", MY + "/state.md")
+        rc, out = run([sys.executable, "-B", os.path.join(qn, *T.split("/"), "notes-lint.py")], qn)
+        check("the lint treats the inbox as a record (no orphan or reference findings)", "inbox/" + month not in out, out)
+        rc, out = run(L(qn, "resume", T), qn)
+        check("resume counts unsorted quick notes", "inbox: 2 quick note(s)" in out, out)
+        cq = os.path.join(qn, ".myco-notes.conf")
+        write(cq, read(cq).replace("SOLO=0", "SOLO=1"))
+        git(qn, "commit", "-qam", "solo")
+        if not WIN:   # a fake GitHub CLI (FAKE_GH=noapi|fail|pass): solo must push, then merge only after passing checks
+            fake = os.path.join(tmp, "fakebin")
+            write(os.path.join(fake, "gh"), '#!/bin/sh\necho "fake gh $*"\ncase "$FAKE_GH:$2" in\n  noapi:*) echo "HTTP 403: GraphQL blocked" >&2; exit 1;;\n'
+                  '  *:create|*:view) exit 0;;\n  fail:checks) printf "notes-check\\tfail\\t5s\\n"; exit 1;;\n  pass:checks) printf "notes-check\\tpass\\t5s\\n"; exit 0;;\n  pass:merge) exit 0;;\nesac\nexit 1\n')
+            os.chmod(os.path.join(fake, "gh"), 0o755)
+            res = {}
+            for mode in ("noapi", "fail", "pass"):
+                r = subprocess.run(L(qn, "capture", T) + ["--commit", "--pr", "Solo note " + mode], cwd=qn, capture_output=True, text=True, encoding="utf-8", errors="replace",
+                                   env=dict(os.environ, FAKE_GH=mode, PATH=fake + os.pathsep + os.environ.get("PATH", "")))
+                res[mode] = (r.returncode, r.stdout + r.stderr)
+            check("solo: gh without access to GitHub is reported, nothing merged (exit 5)", res["noapi"][0] == 5 and "could not create or find" in res["noapi"][1] and "pr merge" not in res["noapi"][1], res["noapi"][1])
+            check("solo: a failing check is not merged (exit 5, says why)", res["fail"][0] == 5 and "check failed; not merged" in res["fail"][1] and "pr merge" not in res["fail"][1], res["fail"][1])
+            check("solo: passing checks are squash-merged and the branch deleted", res["pass"][0] == 0 and "fake gh pr merge main --squash --delete-branch" in res["pass"][1] and "squash-merged main" in res["pass"][1], res["pass"][1])
+            check("solo: every note was pushed", "main" in git(qremote, "branch", "--list")[1])
 
         print("team setup")
         clone = os.path.join(tmp, "clone")
