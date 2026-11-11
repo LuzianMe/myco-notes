@@ -140,6 +140,7 @@ chk "restore drill passes"              "myco-notes/tools/restore-drill $tmp/mir
 echo "team setup (branches, CI check, per-clone setup)"
 chk "team files exist in the bootstrapped tree" "[ -f .github/workflows/notes-check.yml ] && [ -f .github/CODEOWNERS ] && [ -f .github/pull_request_template.md ] && [ -f myco-notes/docs/TEAM.md ]"
 chk "workflow runs myco-notes/tools/ci-check"      "grep -q 'myco-notes/tools/ci-check' .github/workflows/notes-check.yml"
+chk "workflow builds the map on main and keeps it as an artifact" "grep -q 'myco-notes/tools/build-notes-map.py --out' .github/workflows/notes-check.yml && grep -q 'upload-artifact' .github/workflows/notes-check.yml && grep -q \"if: github.event_name == 'push'\" .github/workflows/notes-check.yml"
 git clone -q "$tmp/proj" "$tmp/clone"
 chk "hooks path is not cloned"          "[ -z \"\$(git -C $tmp/clone config core.hooksPath)\" ]"
 chk "setup-clone activates the hook in a fresh clone" "(cd $tmp/clone && myco-notes/tools/setup-clone >/dev/null 2>&1 && [ \"\$(git config core.hooksPath)\" = myco-notes/tools/hooks ])"

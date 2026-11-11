@@ -51,4 +51,6 @@ Possible through the hosting API or an integration that edits files in the repos
 1. Every line that each commit of the pull request adds is scanned with the same rules as the local hook (`myco-notes/tools/secret-scan`), so a secret added in one commit and removed in the next is still caught. Reports show file, line and rule, never any text from the line. Merge commits are scanned too, and a base that cannot be found fails the check (keep `fetch-depth: 0`). If one is found, change the credential and remove it from the branch history before merging (rebase or squash the branch, then force-push it).
 2. `myco-notes/tools/notes-lint.py`: errors fail the check; warnings do not, unless you set `CI_LINT_STRICT=1` in `.myco-notes.conf`. A lint that cannot run (for example an invalid expression in `.myco-notes-lint-ignore`) fails the check.
 
+The same workflow's `notes-map` job builds the notes map after each change on main and keeps it as the run's `notes-map` artifact for 30 days (a private download; `graph.html` opens on its own). Delete the job if you do not want it.
+
 Run it locally the same way: `myco-notes/tools/ci-check origin/main`.
