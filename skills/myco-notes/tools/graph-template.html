@@ -83,7 +83,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 <div id="left"><div id="head" class="box"><button id="fold" type="button" aria-expanded="true" aria-controls="head" title="Hide the search and the legend">&minus;</button><h1>%%TITLE%%</h1><p id="stats"></p>
 <input id="q" type="search" placeholder="Find a note..." aria-label="Find a note"><div id="legend" role="group" aria-label="Show or hide a group of notes"></div></div>
 <div id="time" class="box" hidden><button id="play" type="button">Replay</button><span id="when"></span><input id="slide" type="range" min="0" value="0" aria-label="Position in the history of the notes"><div id="what"></div><label id="speedl"><span class="lbl">Speed </span><select id="speed" aria-label="Replay speed"><option value="0.5">0.5x</option><option value="1" selected>1x</option><option value="2">2x</option><option value="4">4x</option></select></label></div></div>
-<div id="tools" class="box"><button id="find" type="button" aria-expanded="false" aria-controls="head">Find</button><a href="index.html">Map</a><button id="fit" type="button" title="Fit the whole network in view">Fit</button><button id="depth" type="button" aria-pressed="true" title="Depth: recently changed notes float in front, notes untouched for longest sink to the back. Shift-drag turns the view.">Depth</button><button id="theme" type="button" title="Switch light and dark">Theme</button></div>
+<div id="tools" class="box"><button id="find" type="button" aria-expanded="false" aria-controls="head">Find</button><a href="index.html">Map</a><button id="fit" type="button" title="Fit the whole network in view">Fit</button><button id="depth" type="button" aria-pressed="true" title="Depth: recently changed notes float in front, notes untouched for longest sink to the back. Turn the view with Shift-drag, two fingers moved together, or a sideways trackpad swipe.">Depth</button><button id="theme" type="button" title="Switch light and dark">Theme</button></div>
 <aside id="panel" class="box" hidden aria-live="polite"></aside>
 <nav class="sr" aria-label="All notes"><ul>%%LINKS%%</ul></nav>
 <script id="data" type="application/json">%%DATA%%</script>
@@ -145,7 +145,8 @@ function gcol(g){return T.pal[g%T.pal.length]}
    The notes float at different depths: the most recently changed ones in front, the ones untouched for longest at the back,
    smaller, fainter and without their shine. Depth is a rank among the notes in view (ties share it), so it spreads evenly
    whatever the project's pace, and a replay pulls each commit's notes forward while the rest recede. The camera looks from
-   slightly above and sways a little (not with reduced motion); panning tilts it, Shift-drag turns it. With the Depth button
+   slightly above and sways a little (not with reduced motion); panning tilts it; Shift-drag, two fingers moved together (one finger pans) or a sideways
+   trackpad swipe turn it. With the Depth button
    off, the projection is exactly the flat view. */
 var depthOn=true,depthAmt=1,rot={x:0,y:0},tilt={x:0,y:0},ZS=0,cyw=1,syw=0,cpt=1,spt=0;
 function depthTargets(){
@@ -453,6 +454,7 @@ function pick(px,py){
   return best;
 }
 var drag=null,ptr={},pinch=null;   /* ptr: the pointers that are down; two of them (fingers) pinch to zoom around their midpoint */
+function turnTo(ry,rx){rot.y=Math.max(-.8,Math.min(.8,ry));rot.x=Math.max(-.7,Math.min(.7,rx))}   /* turning the view: Shift-drag, two fingers moved together, a sideways trackpad swipe */
 function downPts(){return Object.keys(ptr).map(function(k){return ptr[k]})}
 function pinchState(){var p=downPts(),a=p[0],b=p[1];return {d:Math.hypot(a.x-b.x,a.y-b.y)||1,mx:(a.x+b.x)/2,my:(a.y+b.y)/2}}
 function endPointer(ev){
@@ -465,7 +467,7 @@ cv.addEventListener("pointerdown",function(ev){
   ptr[ev.pointerId]={x:ev.clientX,y:ev.clientY};
   if(downPts().length>=2){
     if(drag&&drag.id>=0)NODES[drag.id].fixed=false;
-    drag=null;autoFit=false;var s=pinchState();pinch={d:s.d,k:cam.tk,w:world(s.mx,s.my)};return;
+    drag=null;autoFit=false;var s=pinchState();pinch={d:s.d,k:cam.tk,w:world(s.mx,s.my),mx:s.mx,my:s.my,ry:rot.y,rx:rot.x};return;
   }
   var i=pick(ev.clientX,ev.clientY);
   drag={id:i,sx:ev.clientX,sy:ev.clientY,cx:cam.tx,cy:cam.ty,moved:false,turn:i<0&&ev.shiftKey&&depthOn,ry:rot.y,rx:rot.x,nx:i>=0?NODES[i].x:0,ny:i>=0?NODES[i].y:0};
@@ -474,16 +476,20 @@ cv.addEventListener("pointerdown",function(ev){
 });
 cv.addEventListener("pointermove",function(ev){
   if(ptr[ev.pointerId]){ptr[ev.pointerId].x=ev.clientX;ptr[ev.pointerId].y=ev.clientY}
-  if(pinch){   /* zoom by the change of the finger distance, keeping the point under the midpoint under it (so moving both fingers also pans) */
+  if(pinch){   /* zoom by the change of the finger distance around the midpoint; moving both fingers together turns the view
+                  (with depth; one finger pans) or, in the flat view, pans */
     if(downPts().length<2)return;
     var s=pinchState();cam.tk=cam.k=Math.max(.12,Math.min(5,pinch.k*s.d/pinch.d));
-    cam.tx=cam.x=pinch.w.x-(s.mx-W/2)/cam.k;cam.ty=cam.y=pinch.w.y-(s.my-H/2)/(cam.k*VS);return;
+    var ax=depthOn?pinch.mx:s.mx,ay=depthOn?pinch.my:s.my;
+    cam.tx=cam.x=pinch.w.x-(ax-W/2)/cam.k;cam.ty=cam.y=pinch.w.y-(ay-H/2)/(cam.k*VS);
+    if(depthOn)turnTo(pinch.ry+(s.mx-pinch.mx)*.006,pinch.rx-(s.my-pinch.my)*.006);
+    return;
   }
   if(!drag){var i=pick(ev.clientX,ev.clientY);if(i!==hov){hov=i;cv.classList.toggle("hover",i>=0)}return}
   var dx=ev.clientX-drag.sx,dy=ev.clientY-drag.sy;
   if(!drag.moved&&Math.abs(dx)+Math.abs(dy)>4)drag.moved=true;
   if(!drag.moved)return;
-  if(drag.turn){rot.y=Math.max(-.8,Math.min(.8,drag.ry+dx*.005));rot.x=Math.max(-.7,Math.min(.7,drag.rx-dy*.005));return}   /* Shift-drag turns the view */
+  if(drag.turn){turnTo(drag.ry+dx*.005,drag.rx-dy*.005);return}   /* Shift-drag turns the view */
   if(drag.id>=0){var n=NODES[drag.id];
     if(depthAmt>0){n.x=drag.nx+dx/(cam.k*n.ps);n.y=drag.ny+dy/(cam.k*n.ps*VS)}else{var w=world(ev.clientX,ev.clientY);n.x=w.x;n.y=w.y}
     alpha=Math.max(alpha,.35)}
@@ -500,7 +506,12 @@ cv.addEventListener("pointerup",function(ev){
   drag=null;
 });
 cv.addEventListener("wheel",function(ev){
-  ev.preventDefault();autoFit=false;
+  ev.preventDefault();
+  /* a sideways two-finger swipe on a trackpad turns the view (with depth); a mouse wheel and a vertical swipe zoom, and so
+     does a trackpad pinch (which the browser sends as a wheel with ctrlKey) */
+  var px=ev.deltaMode===1?16:ev.deltaMode===2?400:1;
+  if(depthOn&&!ev.ctrlKey&&Math.abs(ev.deltaX)>Math.abs(ev.deltaY)){turnTo(rot.y-ev.deltaX*px*.004,rot.x);return}
+  autoFit=false;
   var before=world(ev.clientX,ev.clientY),f=Math.exp(-ev.deltaY*.0015);
   cam.tk=Math.max(.12,Math.min(5,cam.tk*f));cam.k=cam.tk;
   var after=world(ev.clientX,ev.clientY);cam.tx+=before.x-after.x;cam.ty+=before.y-after.y;cam.x=cam.tx;cam.y=cam.ty;

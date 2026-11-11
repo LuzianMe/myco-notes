@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.13.1
+- **Mycelium view, turning with two fingers**: with depth on, two fingers moved together on a touch screen turn the view (left and right turn it, up and down tilt it); spreading them still zooms, in the same gesture, and one finger still pans. On a trackpad a sideways two-finger swipe turns it; a vertical swipe, a mouse wheel and a trackpad pinch still zoom, so nothing changes for mouse users. Shift-drag still works. With depth off, two fingers pan and zoom as before.
+
 ## 0.13.0
 - **Mycelium view, depth**: notes float at different depths, recently changed ones in front and the ones untouched for longest at the back (smaller, fainter, without their shine; threads thin and fade with them). Depth is a rank among the notes in view, so it spreads evenly whatever the project's pace, and a replay pulls each commit's notes forward. The view looks from slightly above and sways gently (not with reduced motion); a pan tilts it, Shift-drag turns it. Clicking, labels and search work on the projected positions. The new Depth button returns the exact flat view; the choice is kept per browser, and `?depth=0` or `?depth=1` in the address sets it. Plain canvas, no libraries: the map is still one offline file.
 - **README images** re-recorded with depth.
