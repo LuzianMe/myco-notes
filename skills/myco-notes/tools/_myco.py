@@ -4,7 +4,7 @@ import re
 import subprocess
 import sys
 
-VERSION = "0.13.3"   # the kit version these tools come from; moves with plugin.json and SKILL.md (tests check it)
+VERSION = "0.13.4"   # the kit version these tools come from; moves with plugin.json and SKILL.md (tests check it)
 
 IS_WINDOWS = os.name == "nt"
 
