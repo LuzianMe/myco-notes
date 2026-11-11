@@ -424,7 +424,7 @@ def main():
                 res[mode] = (r.returncode, r.stdout + r.stderr)
             check("solo: gh without access to GitHub is reported, nothing merged (exit 5)", res["noapi"][0] == 5 and "could not create or find" in res["noapi"][1] and "pr merge" not in res["noapi"][1], res["noapi"][1])
             check("solo: a failing check is not merged (exit 5, says why)", res["fail"][0] == 5 and "check failed; not merged" in res["fail"][1] and "pr merge" not in res["fail"][1], res["fail"][1])
-            check("solo: passing checks are merged and the branch deleted", res["pass"][0] == 0 and "fake gh pr merge main --merge --delete-branch" in res["pass"][1] and "merged main" in res["pass"][1], res["pass"][1])
+            check("solo: passing checks are squash-merged and the branch deleted", res["pass"][0] == 0 and "fake gh pr merge main --squash --delete-branch" in res["pass"][1] and "squash-merged main" in res["pass"][1], res["pass"][1])
             check("solo: every note was pushed", "main" in git(qremote, "branch", "--list")[1])
 
         print("team setup")

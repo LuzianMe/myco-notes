@@ -478,7 +478,7 @@ Tags: <a few words> · Related: `<existing-note>.md`
 ### 19.2 Solo repositories
 In a repository with one owner, waiting for that owner to merge every pull request adds a step without adding a reviewer. `SOLO=1` in `.myco-notes.conf` says so:
 
-- **The agent merges its own pull request** once the server check (8.2, 18) has passed, then deletes the branch and continues from the updated main branch. If the check fails, it does not merge: it says why and stops.
+- **The agent merges its own pull request** once the server check (8.2, 18) has passed, as a squash merge (one commit per change on the main branch, so a stream of quick notes does not double the history), then deletes the branch and continues from the updated main branch. If the check fails, it does not merge: it says why and stops.
 - **The check stays the control:** solo mode removes the human merge, not the scan or the lint. Branch protection that requires a review still applies; the agent cannot approve its own pull request.
 - **Without a pull request** (a local session allowed to commit to the main branch), solo mode changes nothing.
 - **Team repositories leave `SOLO` at 0**, so a human merges.

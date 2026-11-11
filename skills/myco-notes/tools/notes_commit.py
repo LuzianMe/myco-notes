@@ -8,7 +8,7 @@
   tools/notes-commit --branch my-change "message"      commit on that branch (created from the current one if new)
   tools/notes-commit --push "message"                  also git push the current branch to origin (sets the upstream)
   tools/notes-commit --pr "message"                    --push, then open a pull request with the GitHub CLI (gh pr create --fill)
-  tools/notes-commit --pr --merge "message"            --pr, then wait for the pull request's checks and merge it if they pass
+  tools/notes-commit --pr --merge "message"            --pr, then wait for the pull request's checks and squash-merge it if they pass
                                                        (solo repositories, method 19.2; SOLO=1 in the conf makes --pr do this)
   tools/notes-commit --folder NAME=MODE "message"      decide what to do with a new root folder or file (MODE: add, ignorelint, ignoreall, later)
   tools/notes-commit --only PATH [--only PATH] "msg"   commit only these files or folders; other changes stay uncommitted
@@ -257,10 +257,10 @@ def merge_when_green(branch, wait_min=15):
             print(f"solo: the check is {what} after {wait_min} minutes; not merged. Merge the pull request for {branch} once it passes.", file=sys.stderr)
             return False
         time.sleep(10)
-    if subprocess.run(["gh", "pr", "merge", branch, "--merge", "--delete-branch"]).returncode:
+    if subprocess.run(["gh", "pr", "merge", branch, "--squash", "--delete-branch"]).returncode:
         print("solo: the check passed but the merge was refused (branch protection that needs a review?); not merged", file=sys.stderr)
         return False
-    print(f"solo: checks passed; merged {branch} and deleted the branch")
+    print(f"solo: checks passed; squash-merged {branch} (one commit on the main branch) and deleted the branch")
     return True
 
 def main():
