@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.13.3
+- **Mycelium view, calmer glow on small screens**: each note's glow is capped by the distance to its nearest neighbour on screen and grows fainter where it has to shrink, so a crowded view (a phone) no longer blurs into one haze; every note keeps a small halo, and a spread-out view looks as before. Notes at the back widen their glow less than in 0.13.0.
+
 ## 0.13.2
 - **Mycelium view, turn all the way round**: left and right turning has no limit any more; tilting goes up to about 70 degrees either way and stops there, so the picture never flips upside down. The network turns about its own centre.
 - **Fog follows the viewer**: notes fade with their distance from you instead of with their age, so the view stays right from any side (from the front it looks as before; from behind, the oldest notes are the near, bright ones).
