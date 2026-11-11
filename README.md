@@ -108,6 +108,14 @@ Myco Notes is the operational memory of one project or system, edited by a few p
 ## Sharing with a team
 Put the notes tree in a private repository on GitHub, GitHub Enterprise or any git host. A bootstrapped tree already contains a pull-request check (`.github/workflows/notes-check.yml`), a CODEOWNERS file and a PR template. Teammates run `myco-notes/tools/setup-clone` once after cloning and change notes with `myco-notes/tools/notes-commit --branch NAME --pr "message"`. Set-up, branch protection and conflict handling: `skills/myco-notes/docs/TEAM.md`.
 
+## From the cloud or a phone
+An agent can keep the notes without your computer: Claude Code on the web or in the Claude app's Code tab (and similar hosted agents) works in a fresh copy of a GitHub repository on a hosted machine, then pushes a branch and opens a pull request that you merge, from the phone if you like. Tested with Claude Code cloud sessions on a private test repository:
+- **The tools work there as they are** (they need only Python and git): capture, `notes-commit`, the lint, `doctor`, the map, `ci-check`, and the pull-request check on GitHub.
+- **The secret-refusing hook switches itself on.** A fresh copy has no hook settings; `notes-commit` notices and turns the hook on before the first commit (it says so). The pull-request check runs the same scan on the server anyway.
+- **The skill: keep a copy in the repository.** Cloud sessions did not install a plugin named in the repository's `.claude/settings.json`, but they do load project skills. Copy the kit's skill folder into the notes repository once: `cp -r <KIT> .claude/skills/myco-notes` (for Codex: `.agents/skills/myco-notes`; not tested yet), where `<KIT>` is the installed `skills/myco-notes` folder, and commit it. `relocate` refreshes that copy with the tools at every update, and the lint and the map leave it out. Without the copy the agent still works from the tree's `AGENTS.md`, which was enough in the test, but the skill's capture steps are more thorough.
+- **What does not work from there:** anything on your own network. Mirrors over ssh and a map published to your own server happen when a local clone pulls the merged change and syncs.
+- **Plain chat** on the phone (without the Code tab) has no lasting git repository, so it cannot keep the tree; ask it for a handoff entry and merge that in your next session.
+
 ## Platform support
 Linux, macOS and Windows (native, Git for Windows, or WSL). The tools are Python 3.8+ (standard library only) plus git; each has a launcher for every shell. In Git Bash, WSL, macOS and Linux write `myco-notes/tools/notes-commit ...`; in cmd or PowerShell write `myco-notes\tools\notes-commit ...` (a `.cmd` launcher) or `python tools\notes_commit.py ...`. Remote mirrors over ssh need rsync and ssh; a `git:URL` mirror target needs neither. The kit's tests run on all three systems in GitHub Actions.
 

@@ -427,7 +427,7 @@ Paths are relative to the kit, which is the skill folder `skills/myco-notes/` (i
 | Described commits, syntax checks, synced executed copies (7) | `tools/notes-commit`, `.myco-notes.conf` |
 | Secret refusal at commit time (8.2) | `tools/hooks/pre-commit` (versioned; activated by `git config core.hooksPath <tools folder>/hooks`), rules in `tools/secret-scan` |
 | Server-side gate that a contributor cannot bypass (8.2, 18) | `tools/ci-check`, `template/.github/workflows/notes-check.yml` |
-| Per-clone setup, branches and pull requests (18) | `tools/setup-clone`, `tools/notes-commit --branch/--push/--pr`, `docs/TEAM.md` |
+| Per-clone setup, branches and pull requests (18) | `tools/setup-clone` (and `tools/notes-commit`, which switches the hook on in a clone where it is not set), `tools/notes-commit --branch/--push/--pr`, `docs/TEAM.md` |
 | Lint: references, numbering, freshness, due dates, ledger, secrets, size (3.3, 9, 10) and the optional freshness header (10.1) | `tools/notes-lint.py` (`HISTORY_DIRS`, `DATA_DIRS`, `MAX_NOTE_KB`, `ENTRY_WARN_KB`, `STALE_DAYS`) |
 | Bounded start-of-session briefing (11.2, 12) | `tools/resume` (`--budget`, `RESUME_BUDGET`) |
 | What the notes said on a date, what changed since, history of one note (7.1) | `tools/asof` |
@@ -444,7 +444,8 @@ Paths are relative to the kit, which is the skill folder `skills/myco-notes/` (i
 A notes tree is an ordinary git repository, so a team shares it the way it shares code: one private repository on a hosting service (GitHub, GitHub Enterprise, GitLab, a self-hosted server), every change on a branch, a pull request, a review, and an automated check before merging into the main branch.
 
 - **Local hooks are a convenience, the server check is the control.** A hook lives in each clone and can be skipped; the same secret scan and lint must also run on the server for every pull request, on each of its commits, and be required before merge. A check that crashes fails.
-- **Hook settings do not travel with a clone.** Each person runs the setup step once (`tools/setup-clone`).
+- **Hook settings do not travel with a clone.** Each person runs the setup step once (`tools/setup-clone`). The commit helper also switches the hook on by itself in a clone where it is not set (and says so), because some clones are never set up by hand.
+- **Agent sessions in the cloud** (an agent that works in a fresh copy of the repository on a hosted machine, started from a browser or a phone) are contributors like any other: each session starts from a new clone, works on a branch and opens a pull request that a human merges. They need only the tools in the tree and the working agreement (a copy of the skill kept in the repository for agents, under `.claude/skills/` or `.agents/skills/`, lets them load it too; it is not notes, so the lint and the map leave it out, and it is refreshed with the tools); they cannot reach machines on a private network, so mirrors and anything published from the owner's own machines happen when a local clone syncs.
 - **Branch per change, small and described.** Several people (or agents) writing the same two files, the master record and the sync log, will conflict; small pull requests, frequent merges and keeping both sides of an appended line resolve almost all of it.
 - **Roles.** A maintainer group reviews changes to the working agreement and the tools; everyone else may propose changes to the notes. An AI agent is a contributor: it works on a branch and opens a pull request; a human merges.
 - **Reading and writing through the hosting API instead of a clone** is fine for reading and for a one-line fix, but it skips the hook, the lint and the commit helper, and turns a multi-file update into many commits; keep it as the exception.

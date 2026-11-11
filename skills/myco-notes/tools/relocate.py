@@ -17,7 +17,8 @@ Dry run by default: it prints the moves and the text changes and touches nothing
   2. rewrites path references in .md, .yml, .yaml and .json files, the conf, .gitignore and CODEOWNERS, but only where the text names a
      path that really existed (so prose such as "release notes/changes" is left alone)
   3. updates .myco-notes.conf (MYCO_DIR, NOTES_DIR, TOOLS_DIR, DOCS_DIR, MAP_DIR), .gitignore and core.hooksPath
-  4. when run from a kit folder (not from the project's own tools), refreshes the project's tools and docs from that kit
+  4. when run from a kit folder (not from the project's own tools), refreshes the project's tools and docs from that kit, and a copy of
+     the skill kept for agents under .claude/skills/myco-notes or .agents/skills/myco-notes, if the repository has one
      (--no-refresh to skip), because older tools do not understand the new layout
 It does not commit: review `git status` and `git diff`, run the lint, then commit with the notes-commit tool. The old generated map
 folder is left in place; delete it yourself when you are happy. Undo: git restore --staged --worktree . (before committing), or revert.
@@ -233,6 +234,8 @@ def main():
 
     if refresh:
         shutil.copytree(HERE, absp(root, new["tools"]), dirs_exist_ok=True, ignore=lambda d, names: [n for n in names if n in NOT_COPIED])
+        for dst_rel in skill_copies(root):
+            shutil.copytree(KIT, absp(root, dst_rel), dirs_exist_ok=True, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
         kit_docs = os.path.join(KIT, "docs")
         if os.path.isdir(kit_docs):
             os.makedirs(absp(root, new["docs"]), exist_ok=True)
@@ -274,6 +277,12 @@ def kit_version():
     return _myco.VERSION
 
 
+def skill_copies(root):
+    """Copies of the skill kept in the notes repository for agents (.claude/skills/myco-notes and the like): refreshed with the tools."""
+    return [d + "/myco-notes" for d in _myco.AGENT_SKILL_DIRS if os.path.isfile(absp(root, d + "/myco-notes/SKILL.md"))
+            and os.path.realpath(absp(root, d + "/myco-notes")) != os.path.realpath(KIT)]
+
+
 def refresh_only(root, old, conf, a, self_run):
     """The tree already has the layout: refresh its tools and docs from this kit (dry run unless --apply)."""
     my = old["myco"]
@@ -291,6 +300,14 @@ def refresh_only(root, old, conf, a, self_run):
                 if f in NOT_COPIED or (only_md and not f.endswith(".md")) or (only_md and dp != src_dir):
                     continue
                 rel = os.path.relpath(os.path.join(dp, f), src_dir).replace(os.sep, "/")
+                plan.append((os.path.join(dp, f), absp(root, dst_rel + "/" + rel), dst_rel + "/" + rel))
+    for dst_rel in skill_copies(root):   # the whole skill folder, as the kit ships it
+        for dp, dn, fn in os.walk(KIT):
+            dn[:] = [d for d in dn if d != "__pycache__"]
+            for f in sorted(fn):
+                if f.endswith(".pyc"):
+                    continue
+                rel = os.path.relpath(os.path.join(dp, f), KIT).replace(os.sep, "/")
                 plan.append((os.path.join(dp, f), absp(root, dst_rel + "/" + rel), dst_rel + "/" + rel))
     new_f = [p for p in plan if not os.path.exists(p[1])]
     changed = [p for p in plan if os.path.exists(p[1]) and not same_text(p[0], p[1])]

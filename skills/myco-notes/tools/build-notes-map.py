@@ -107,6 +107,7 @@ def main():
     files = []
     for dp, dn, fn in os.walk(root):
         dn[:] = sorted(d for d in dn if d not in SKIP_DIRS and os.path.relpath(os.path.join(dp, d), root).replace(os.sep, "/") not in skip_rel
+                     and os.path.relpath(os.path.join(dp, d), root).replace(os.sep, "/") not in _myco.AGENT_SKILL_DIRS
                        and not os.path.relpath(os.path.join(dp, d), root).replace(os.sep, "/").startswith("template"))
         for f in sorted(fn):
             if f.endswith(".md"):

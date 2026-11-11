@@ -18,7 +18,8 @@ Behaviour (configured in .myco-notes.conf at the repository root):
     (ask = the default: commit nothing, print a report and exit 3 so the agent can ask the owner; add = track and treat as notes;
     ignorelint = track but skip in the lint and the map; ignoreall = do not track, do not lint). Decisions are written to the conf and .gitignore
   - syntax-checks changed shell and python files before committing (CHECK_SH / CHECK_PY)
-  - the pre-commit hook (<tools folder>/hooks/pre-commit) refuses commits that add secret-looking lines
+  - the pre-commit hook (<tools folder>/hooks/pre-commit) refuses commits that add secret-looking lines; in a clone where
+    core.hooksPath is not set at all (a fresh clone), notes-commit switches it on first and says so
   - adds AGENT_TRAILER unless --human
   - after the commit, if a changed file matches SYNC_GLOBS, runs SYNC_CMD so the live copy equals the committed copy
   - team use: --branch / --push / --pr give each change its own branch and pull request (see docs/TEAM.md)
@@ -205,6 +206,26 @@ def preview(root, only, later):
     return 0
 
 
+def ensure_hook(root, hooks, dry):
+    """A fresh clone (a new teammate, an agent session in the cloud) has no core.hooksPath, so the secret-refusing hook
+    would not run. Switch it on here when it is not set at all; a different value set on purpose is left to doctor."""
+    if _myco.git("-C", root, "config", "core.hooksPath").stdout.strip():
+        return
+    hook = os.path.join(root, *hooks.split("/"), "pre-commit")
+    if not os.path.isfile(hook):
+        return
+    if dry:
+        print(f"notes-commit: would switch on the secret-refusing hook for this clone (core.hooksPath = {hooks})")
+        return
+    _myco.git("-C", root, "config", "core.hooksPath", hooks)
+    if not _myco.IS_WINDOWS:
+        try:
+            os.chmod(hook, os.stat(hook).st_mode | 0o111)
+        except OSError:
+            pass
+    print(f"notes-commit: switched on the secret-refusing hook for this clone (core.hooksPath = {hooks}); setup-clone does the rest of the per-clone setup")
+
+
 def main():
     _myco.utf8_console()
     ap = argparse.ArgumentParser(prog="notes-commit", add_help=False)
@@ -236,6 +257,7 @@ def main():
     check_sh, check_py = conf.get("CHECK_SH", "1") == "1", conf.get("CHECK_PY", "1") == "1"
     trailer, sync_globs, sync_cmd = conf.get("AGENT_TRAILER", ""), conf.get("SYNC_GLOBS", "").split(), conf.get("SYNC_CMD", "")
     hooks_prefix = _myco.layout(root, conf)["tools"] + "/hooks/"
+    ensure_hook(root, hooks_prefix.rstrip("/"), a.dry_run)
 
     only = [(_myco._rel(p) or p.strip()) for p in a.only]
     for p in only:
