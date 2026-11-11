@@ -183,6 +183,12 @@ function project(now,dt){
   NODES.forEach(function(n){var q=proj(n.x,n.y,n.z);n.px=q[0];n.py=q[1];n.ps=q[2];n.pz=q[3];n.wx=q[4];n.wy=q[5];n.pr=n.r*kk*q[2];
     if(n.vis){lo=Math.min(lo,n.pz);hi=Math.max(hi,n.pz)}});
   NODES.forEach(function(n){n.fz=hi>lo?depthAmt*(n.pz-lo)/(hi-lo):0});   /* fog by the distance from the viewer, not by age, so it stays right from any side */
+  /* crowding: the distance on screen to the nearest other note, so a glow never spreads far over its neighbours (a small screen packs the notes close) */
+  var gc=48,grid={};
+  NODES.forEach(function(n){if(!n.vis||n.ap<=0)return;var k=Math.floor(n.px/gc)+","+Math.floor(n.py/gc);(grid[k]||(grid[k]=[])).push(n)});
+  NODES.forEach(function(n){if(!n.vis||n.ap<=0)return;var gx=Math.floor(n.px/gc),gy=Math.floor(n.py/gc),best=gc*2;
+    for(var i=-2;i<=2;i++)for(var j=-2;j<=2;j++){var c=grid[(gx+i)+","+(gy+j)];if(c)c.forEach(function(m){if(m!==n){var d=Math.hypot(m.px-n.px,m.py-n.py);if(d<best)best=d}})}
+    n.nn=n.nn?n.nn+(best-n.nn)*.2:best});   /* eased, so a glow does not flicker as notes pass each other */
 }
 function fogOf(n){return n.fz||0}
 function when(t){return new Date(t*1000).toLocaleDateString(undefined,{year:"numeric",month:"short",day:"numeric"})}
@@ -407,7 +413,8 @@ function draw(now){
     var rec=recency(n),pulse=reduce||playing?1:1+.1*Math.sin(t/650+n.i)*rec,d=dim(n),sc=ease(n.ap),r=n.pr*sc*pulse,x=n.px,y=n.py,fz=fogOf(n),fog=1-.68*fz;   /* further back: fainter, a softer wider glow, no shine */
     var col=n.due?T.wilt:gcol(n.g);
     cx.globalAlpha=Math.min(1,n.ap)*d*(n.hist?.55:1)*(.14+.6*rec+(n.hub?.2:0)+.12*fz)*(1-.3*fz);
-    var gs=r*(n.hub?4.4:3.2)*(1+.5*fz);cx.drawImage(sprite(col),x-gs,y-gs,gs*2,gs*2);
+    var gs=r*(n.hub?4.4:3.2)*(1+.25*fz),gm=Math.max(r*1.6,(n.nn||1e9)*(n.hub?1.3:1.15));if(gs>gm){cx.globalAlpha*=.25+.75*gm/gs;gs=gm}   /* crowded: a smaller, fainter glow */
+    cx.drawImage(sprite(col),x-gs,y-gs,gs*2,gs*2);
     cx.globalAlpha=Math.min(1,n.ap)*d*(n.hist?.6:1)*fog;
     cx.fillStyle=col;cx.beginPath();cx.arc(x,y,r,0,6.3);cx.fill();cx.globalAlpha*=1-fz;cx.fillStyle="rgba(255,255,255,"+(T.dark?.28:.4)+")";cx.beginPath();cx.arc(x-r*.28,y-r*.3,r*.38,0,6.3);cx.fill();cx.globalAlpha=Math.min(1,n.ap)*d*(n.hist?.6:1)*fog;
     if(n.hub){   /* a hub (one of the most-mentioned notes of this project) carries two soft rings, like a fruiting body pushing up through the network */
