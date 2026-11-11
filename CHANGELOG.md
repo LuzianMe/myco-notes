@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.13.2
+- **Mycelium view, turn all the way round**: left and right turning has no limit any more; tilting goes up to about 70 degrees either way and stops there, so the picture never flips upside down. The network turns about its own centre.
+- **Fog follows the viewer**: notes fade with their distance from you instead of with their age, so the view stays right from any side (from the front it looks as before; from behind, the oldest notes are the near, bright ones).
+- **Fit turns back**: Fit, a double-click and the Depth button turn the view back to the front by the shortest way round.
+- **Fit measures the turned picture**, so a side view is neither cropped nor tiny; dragging a note follows the finger when the view is turned; small changes from the sway no longer make the fitted view breathe.
+
 ## 0.13.1
 - **Mycelium view, turning with two fingers**: with depth on, two fingers moved together on a touch screen turn the view (left and right turn it, up and down tilt it); spreading them still zooms, in the same gesture, and one finger still pans. On a trackpad a sideways two-finger swipe turns it; a vertical swipe, a mouse wheel and a trackpad pinch still zoom, so nothing changes for mouse users. Shift-drag still works. With depth off, two fingers pan and zoom as before.
 
