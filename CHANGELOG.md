@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.12.2
+README and demo only; the skill and tools are unchanged apart from the version number.
+- **A more colourful demo**: the demo tree's components are split into four groups (in the field, data path, greenhouses, for the growers), so the map uses ten colours instead of mostly one. The live demo is rebuilt with them.
+- **README images re-recorded**: the replay clip and the four screenshots show the current mycelium view and the new groups.
+
 ## 0.12.1
 Fixes from a second outside review (method 2.5: sections 8.2 and 8.4).
 - **Links in a mirror are never followed**: a symbolic link or Windows junction found inside the mirror is removed and replaced, not entered, and a folder that resolves outside the mirror is refused; before, a junction placed in the mirror could make a sync delete and write files outside it. Tested with a junction on Windows and a symlink elsewhere.
