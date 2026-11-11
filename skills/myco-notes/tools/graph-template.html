@@ -26,6 +26,7 @@ input[type=search]:focus-visible,button:focus-visible,a:focus-visible,input[type
 #tools{top:12px;right:12px;display:flex;gap:6px;padding:6px}
 #tools a,#tools button{font:inherit;font-size:12.5px;padding:4px 10px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--fg);text-decoration:none;cursor:pointer}
 #tools a:hover,#tools button:hover,.chip:hover{border-color:var(--accent)}
+#depth[aria-pressed=true]{border-color:var(--accent);color:var(--accent)}
 #panel{top:64px;right:12px;width:min(310px,calc(100vw - 24px));padding:14px;max-height:calc(100vh - 170px);overflow:auto}
 #panel[hidden]{display:none}#panel h2{font-size:16px;margin:0 0 2px;padding-right:22px}#panel .rel{color:var(--muted);font:12px ui-monospace,Menlo,Consolas,monospace;word-break:break-all}
 #panel dl{margin:10px 0;display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:13px}#panel dt{color:var(--muted)}#panel dd{margin:0}
@@ -82,7 +83,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 <div id="left"><div id="head" class="box"><button id="fold" type="button" aria-expanded="true" aria-controls="head" title="Hide the search and the legend">&minus;</button><h1>%%TITLE%%</h1><p id="stats"></p>
 <input id="q" type="search" placeholder="Find a note..." aria-label="Find a note"><div id="legend" role="group" aria-label="Show or hide a group of notes"></div></div>
 <div id="time" class="box" hidden><button id="play" type="button">Replay</button><span id="when"></span><input id="slide" type="range" min="0" value="0" aria-label="Position in the history of the notes"><div id="what"></div><label id="speedl"><span class="lbl">Speed </span><select id="speed" aria-label="Replay speed"><option value="0.5">0.5x</option><option value="1" selected>1x</option><option value="2">2x</option><option value="4">4x</option></select></label></div></div>
-<div id="tools" class="box"><button id="find" type="button" aria-expanded="false" aria-controls="head">Find</button><a href="index.html">Map</a><button id="fit" type="button" title="Fit the whole network in view">Fit</button><button id="theme" type="button" title="Switch light and dark">Theme</button></div>
+<div id="tools" class="box"><button id="find" type="button" aria-expanded="false" aria-controls="head">Find</button><a href="index.html">Map</a><button id="fit" type="button" title="Fit the whole network in view">Fit</button><button id="depth" type="button" aria-pressed="true" title="Depth: recently changed notes float in front, notes untouched for longest sink to the back. Shift-drag turns the view.">Depth</button><button id="theme" type="button" title="Switch light and dark">Theme</button></div>
 <aside id="panel" class="box" hidden aria-live="polite"></aside>
 <nav class="sr" aria-label="All notes"><ul>%%LINKS%%</ul></nav>
 <script id="data" type="application/json">%%DATA%%</script>
@@ -125,7 +126,7 @@ function sprite(color){
 var hidden={},adj=[],E=[];
 function hash(i){var s=Math.sin(i*127.1+311.7)*43758.5453;return s-Math.floor(s)}
 NODES.forEach(function(n,i){
-  n.i=i;n.vis=false;n.ap=0;n.vx=0;n.vy=0;n.touch=-1;
+  n.i=i;n.vis=false;n.ap=0;n.vx=0;n.vy=0;n.touch=-1;n.z=n.zt=.5;n.px=n.py=0;n.ps=1;n.pz=0;n.pr=n.r||1;
   var a=i*2.399963,r=24*Math.sqrt(i+1);n.x0=n.x=Math.cos(a)*r;n.y0=n.y=Math.sin(a)*r;
   n.r=(3.4+Math.min(7,Math.sqrt(n.in)*1.7)+Math.min(2.5,Math.log10(1+n.kb)*1.2)+(n.hub?2.5:0))*(n.hist?.8:1);
   n.low=(n.name+" "+n.title+" "+n.rel).toLowerCase();adj.push([]);
@@ -139,6 +140,37 @@ var cur=NC;                                   /* commits applied: 0..NC */
 var hov=-1,sel=-1,match=null,alpha=1,playing=false,acc=0,ripples=[];
 var cam={x:0,y:0,k:1,tx:0,ty:0,tk:1},autoFit=true,W=0,H=0,DPR=1,lastT=0,VS=1;
 function gcol(g){return T.pal[g%T.pal.length]}
+
+/* ---------- depth ----------
+   The notes float at different depths: the most recently changed ones in front, the ones untouched for longest at the back,
+   smaller, fainter and without their shine. Depth is a rank among the notes in view (ties share it), so it spreads evenly
+   whatever the project's pace, and a replay pulls each commit's notes forward while the rest recede. The camera looks from
+   slightly above and sways a little (not with reduced motion); panning tilts it, Shift-drag turns it. With the Depth button
+   off, the projection is exactly the flat view. */
+var depthOn=true,depthAmt=1,rot={x:0,y:0},tilt={x:0,y:0},ZS=0,cyw=1,syw=0,cpt=1,spt=0;
+function depthTargets(){
+  var vs=NODES.filter(function(n){return n.vis&&n.touch>=0}).sort(function(a,b){return b.touch-a.touch}),m=Math.max(1,vs.length-1),k0=0;
+  NODES.forEach(function(n){if(n.touch<0)n.zt=1});
+  vs.forEach(function(n,k){if(k&&n.touch!==vs[k-1].touch)k0=k;n.zt=Math.max(0,Math.min(1,.8*k0/m+.2*hash(n.i+11)))});
+}
+function proj(x,y,z){   /* world position and depth (0 front, 1 back) -> [screen x, screen y, scale, depth after turning] */
+  var X=x-cam.x,Y=(y-cam.y)*VS;
+  if(depthAmt<=0)return [X*cam.k+W/2,Y*cam.k+H/2,1,0];
+  var Z=(z-.5)*ZS*depthAmt,X1=X*cyw+Z*syw,Z1=Z*cyw-X*syw,Y1=Y*cpt-Z1*spt,Z2=Z1*cpt+Y*spt,f=ZS*1.9,sc=f/Math.max(f*.3,f+Z2);
+  return [X1*sc*cam.k+W/2,Y1*sc*cam.k+H/2,sc,Z2];
+}
+function project(now,dt){
+  var tg=depthOn?1:0;depthAmt+=(tg-depthAmt)*(reduce?1:Math.min(1,dt/260));if(Math.abs(tg-depthAmt)<.003)depthAmt=tg;
+  tilt.x*=.93;tilt.y*=.93;
+  var sw=reduce?0:1,yaw=depthAmt*(rot.y+tilt.y+sw*.2*Math.sin(now/6500)),pitch=depthAmt*(rot.x+tilt.x+.2+sw*.05*Math.sin(now/8300));
+  cyw=Math.cos(yaw);syw=Math.sin(yaw);cpt=Math.cos(pitch);spt=Math.sin(pitch);
+  var x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+  NODES.forEach(function(n){if(!n.vis)return;n.z+=(n.zt-n.z)*(n.ap<.05?1:Math.min(1,dt/900));x0=Math.min(x0,n.x);x1=Math.max(x1,n.x);y0=Math.min(y0,n.y);y1=Math.max(y1,n.y)});
+  var zs=Math.max(160,Math.max(x1-x0,y1-y0)*.85);ZS=ZS?ZS+(zs-ZS)*.05:zs;
+  var kk=Math.max(.7,Math.min(1.6,cam.k));
+  NODES.forEach(function(n){var q=proj(n.x,n.y,n.z);n.px=q[0];n.py=q[1];n.ps=q[2];n.pz=q[3];n.pr=n.r*kk*q[2]});
+}
+function fogOf(n){return depthAmt*n.z}
 function when(t){return new Date(t*1000).toLocaleDateString(undefined,{year:"numeric",month:"short",day:"numeric"})}
 
 /* ---------- history (timeline) ---------- */
@@ -158,6 +190,7 @@ function setStep(v,rip){
   });
   NODES.forEach(function(n){n.touch=-1});
   for(var c=0;c<v;c++){var cm=D.commits[c];for(var j=0;j<cm.n.length;j++)NODES[cm.n[j]].touch=c}
+  depthTargets();
   if(rip&&!reduce&&v>0){D.commits[v-1].n.forEach(function(i){if(NODES[i].vis)ripples.push({i:i,t:performance.now(),born:D.commits[v-1].a.indexOf(i)>=0})})}
   var sl=document.getElementById("slide");sl.value=v;
   var small=window.matchMedia&&matchMedia("(max-width:640px)").matches;   /* on a phone: "Nov 1 · 5/134" */
@@ -213,15 +246,13 @@ function fitTarget(soft){
   var x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
   vs.forEach(function(n){x0=Math.min(x0,n.x-n.r*2);x1=Math.max(x1,n.x+n.r*2);y0=Math.min(y0,n.y-n.r*2);y1=Math.max(y1,n.y+n.r*2)});
   var wide=W>700,bw=Math.max(80,x1-x0),bh=Math.max(80,y1-y0)*VS,padX=wide?382:32,padY=wide?80:176;
-  var nk=Math.max(.15,Math.min(2.2,Math.min((W-padX)/bw,(H-padY)/bh))),nx=(x0+x1)/2-(wide?171/nk:0),ny=(y0+y1)/2;   /* centre the network in the space right of the left column */
+  var nk=Math.max(.15,Math.min(2.2,Math.min((W-padX)/bw,(H-padY)/bh)))*(1-.1*depthAmt),nx=(x0+x1)/2-(wide?171/nk:0),ny=(y0+y1)/2;   /* centre the network in the space right of the left column */
   /* soft (during a replay): ignore small changes of the bounding box, so one node drifting at the edge does not make the whole picture breathe */
   if(soft&&cam.fit&&Math.abs(nk-cam.tk)/cam.tk<.07&&Math.hypot(nx-cam.tx,ny-cam.ty)*cam.tk<30)return;
   cam.tk=nk;cam.tx=nx;cam.ty=ny;cam.fit=true;cam.fk=nk;
 }
 
 /* ---------- drawing ---------- */
-function sx(x){return (x-cam.x)*cam.k+W/2}
-function sy(y){return (y-cam.y)*cam.k*VS+H/2}
 function dim(n){
   var a=1;
   if(match&&!match[n.i])a=Math.min(a,.14);
@@ -237,10 +268,10 @@ function curve(e,t){
    as it goes and ends in a small swollen tip (a hyphal tip) on the rim of the target. Two notes that mention each other are
    joined by an even thread with a tip at both ends, like two hyphae that met and fused. A new thread grows along its length
    instead of fading in. Everything is in screen pixels. */
-function srad(n){return n.r*Math.max(.7,Math.min(1.6,cam.k))}
+function srad(n){return n.pr}
 function hyphaPath(e){
   var P=[],N=16,s,p;
-  for(s=0;s<=N;s++){p=curve(e,s/N);P.push([sx(p.x),sy(p.y)])}
+  for(s=0;s<=N;s++){p=curve(e,s/N);var q=proj(p.x,p.y,e.a.z+(e.b.z-e.a.z)*s/N);P.push([q[0],q[1]])}
   return clipEnd(clipEnd(P,srad(e.b)+1.5).reverse(),srad(e.a)+1.5).reverse();   /* from the rim of a to the rim of b */
 }
 function clipEnd(P,r){   /* drop the points inside the circle of radius r around the last point, ending exactly on its rim */
@@ -306,11 +337,11 @@ function label(txt,x,y,bold,a){
 var LDWELL=reduce?11000:7000,LFADE=reduce?1:1400,LGAP=reduce?0:1100,lastAdd=-1e9,spotFor=-2;
 NODES.forEach(function(n){n.la=0;n.lt=0;n.lu=0;n.ls=-1e9});
 function forced(n){return n.i===hov||n.i===sel||(match&&match[n.i])}
-function onScreen(n){var x=sx(n.x),y=sy(n.y);return x>24&&x<W-24&&y>24&&y<H-24}
+function onScreen(n){var x=n.px,y=n.py;return x>24&&x<W-24&&y>24&&y<H-24}
 function slotCount(pool){   /* about the square root of the notes in view; zoomed in past the fitted view, up to three times more */
   var z=Math.max(1,Math.min(3,cam.k/(cam.fk||cam.k))),b=sel>=0?8:Math.round(Math.sqrt(pool)*.9*z);if(W<640)b--;return Math.max(2,Math.min(sel>=0?8:16,b))}
-function lrad(n){return n.r*Math.max(.7,Math.min(1.6,cam.k))}
-function lbox(n){var w=n.name.length*6.6-14,x=sx(n.x),y=sy(n.y)+lrad(n)*(n.hub?2.5:1)+14;return [x-w/2-8,y-13,x+w/2+8,y+5]}
+function lrad(n){return n.pr}
+function lbox(n){var w=n.name.length*6.6-14,x=n.px,y=n.py+lrad(n)*(n.hub?2.5:1)+14;return [x-w/2-8,y-13,x+w/2+8,y+5]}
 function overlaps(b,c){return b[0]<c[2]&&c[0]<b[2]&&b[1]<c[3]&&c[1]<b[3]}
 function updateLabels(now,dt){
   var fresh0=sel!==spotFor;
@@ -345,40 +376,42 @@ function draw(now){
   cx.setTransform(DPR,0,0,DPR,0,0);cx.clearRect(0,0,W,H);
   var focus=sel>=0?sel:hov,t=now;
   /* hyphae */
-  E.forEach(function(e){
-    if(!edgeVis(e))return;
+  var es=E.filter(edgeVis);
+  if(depthAmt>0)es.sort(function(p,q){return (q.a.pz+q.b.pz)-(p.a.pz+p.b.pz)});
+  es.forEach(function(e){
     var a=Math.min(e.a.ap,e.b.ap);if(a<=0)return;
     var hot=focus>=0&&(e.a.i===focus||e.b.i===focus),d=Math.min(dim(e.a),dim(e.b));
     var w=Math.min(2.6,.6+Math.sqrt(e.w)*.45)*(hot?1.5:1)*Math.min(1.4,cam.k+.3),al=(hot?.85:.26)*Math.min(1,a*2)*(hot?1:Math.max(d,.35));
+    var ef=(fogOf(e.a)+fogOf(e.b))/2;w*=(e.a.ps+e.b.ps)/2;al*=1-.7*ef;
     hypha(e,w,a,"rgba("+T.hypha+","+al.toFixed(3)+")",Math.min(1,al*3).toFixed(3));
     /* on a lit thread, sap flows from the note that mentions to the note it names (both ways on a fused thread) */
-    if(hot&&!reduce&&a>=1){for(var s=0;s<2;s++){var u=((t*.00035+e.k*.37+s*.5)%1),back=e.dir<0||(e.dir===0&&s===1),p=curve(e,back?1-u:u);cx.fillStyle="rgba("+T.hypha+",.95)";cx.beginPath();cx.arc(sx(p.x),sy(p.y),2.1,0,6.3);cx.fill()}}
+    if(hot&&!reduce&&a>=1){for(var s=0;s<2;s++){var u=((t*.00035+e.k*.37+s*.5)%1),back=e.dir<0||(e.dir===0&&s===1),tu=back?1-u:u,p=curve(e,tu),q=proj(p.x,p.y,e.a.z+(e.b.z-e.a.z)*tu);cx.fillStyle="rgba("+T.hypha+",.95)";cx.beginPath();cx.arc(q[0],q[1],2.1*q[2],0,6.3);cx.fill()}}
   });
   /* notes */
-  var order=NODES.filter(function(n){return n.vis&&n.ap>0}).sort(function(a,b){return (a.hub?1:0)-(b.hub?1:0)});
+  var order=NODES.filter(function(n){return n.vis&&n.ap>0}).sort(function(a,b){return depthAmt>0?b.pz-a.pz:(a.hub?1:0)-(b.hub?1:0)});   /* with depth: back to front */
   order.forEach(function(n){
-    var rec=recency(n),pulse=reduce||playing?1:1+.1*Math.sin(t/650+n.i)*rec,d=dim(n),sc=ease(n.ap),r=n.r*sc*pulse*Math.max(.7,Math.min(1.6,cam.k)),x=sx(n.x),y=sy(n.y);
+    var rec=recency(n),pulse=reduce||playing?1:1+.1*Math.sin(t/650+n.i)*rec,d=dim(n),sc=ease(n.ap),r=n.pr*sc*pulse,x=n.px,y=n.py,fz=fogOf(n),fog=1-.68*fz;   /* further back: fainter, a softer wider glow, no shine */
     var col=n.due?T.wilt:gcol(n.g);
-    cx.globalAlpha=Math.min(1,n.ap)*d*(n.hist?.55:1)*(.14+.6*rec+(n.hub?.2:0));
-    var gs=r*(n.hub?4.4:3.2);cx.drawImage(sprite(col),x-gs,y-gs,gs*2,gs*2);
-    cx.globalAlpha=Math.min(1,n.ap)*d*(n.hist?.6:1);
-    cx.fillStyle=col;cx.beginPath();cx.arc(x,y,r,0,6.3);cx.fill();cx.fillStyle="rgba(255,255,255,"+(T.dark?.28:.4)+")";cx.beginPath();cx.arc(x-r*.28,y-r*.3,r*.38,0,6.3);cx.fill();
+    cx.globalAlpha=Math.min(1,n.ap)*d*(n.hist?.55:1)*(.14+.6*rec+(n.hub?.2:0)+.12*fz)*(1-.3*fz);
+    var gs=r*(n.hub?4.4:3.2)*(1+.5*fz);cx.drawImage(sprite(col),x-gs,y-gs,gs*2,gs*2);
+    cx.globalAlpha=Math.min(1,n.ap)*d*(n.hist?.6:1)*fog;
+    cx.fillStyle=col;cx.beginPath();cx.arc(x,y,r,0,6.3);cx.fill();cx.globalAlpha*=1-fz;cx.fillStyle="rgba(255,255,255,"+(T.dark?.28:.4)+")";cx.beginPath();cx.arc(x-r*.28,y-r*.3,r*.38,0,6.3);cx.fill();cx.globalAlpha=Math.min(1,n.ap)*d*(n.hist?.6:1)*fog;
     if(n.hub){   /* a hub (one of the most-mentioned notes of this project) carries two soft rings, like a fruiting body pushing up through the network */
-      var ra=Math.min(1,n.ap)*d;cx.strokeStyle=col;cx.lineWidth=1.4;
+      var ra=Math.min(1,n.ap)*d*fog;cx.strokeStyle=col;cx.lineWidth=1.4;
       cx.globalAlpha=ra*.55;cx.beginPath();cx.arc(x,y,Math.max(0,r*1.7+(reduce||playing?0:1.6*Math.sin(t/900+n.i))),0,6.3);cx.stroke();
       cx.globalAlpha=ra*.25;cx.beginPath();cx.arc(x,y,r*2.5,0,6.3);cx.stroke();
     }
     if(n.due){cx.setLineDash([2,3]);cx.strokeStyle=T.wilt;cx.lineWidth=1.2;cx.beginPath();cx.arc(x,y,r+3.5,0,6.3);cx.stroke();cx.setLineDash([])}
     if(n.miss&&(cam.k>.7||focus===n.i)){var ang=hash(n.i+9)*6.28,x2=x+Math.cos(ang)*(r+13),y2=y+Math.sin(ang)*(r+13);cx.setLineDash([2,2]);cx.strokeStyle=T.wilt;cx.lineWidth=1;cx.beginPath();cx.moveTo(x+Math.cos(ang)*r,y+Math.sin(ang)*r);cx.lineTo(x2,y2);cx.stroke();cx.setLineDash([]);cx.fillStyle=T.wilt;cx.font="10px system-ui";cx.textAlign="center";cx.fillText("?",x2+Math.cos(ang)*4,y2+Math.sin(ang)*4+3)}
     cx.globalAlpha=1;
-    if(n.la>.01&&d>.5){var la=n.la*n.la*(3-2*n.la);label(n.name.replace(/\.md$/,""),x,y+r*(n.hub?2.5:1)+14+(1-la)*5,n.hub||n.i===sel,la)}   /* a name rises a few pixels as it fades in */
+    if(n.la>.01&&d>.5){var la=n.la*n.la*(3-2*n.la);label(n.name.replace(/\.md$/,""),x,y+r*(n.hub?2.5:1)+14+(1-la)*5,n.hub||n.i===sel,la*(forced(n)?1:1-.4*fz))}   /* a name rises a few pixels as it fades in */
   });
   /* ripples: a new or changed note lets out a ring */
   ripples=ripples.filter(function(rp){return t-rp.t<1100});
   ripples.forEach(function(rp){
-    var n=NODES[rp.i];if(!n.vis)return;var p=(t-rp.t)/1100,x=sx(n.x),y=sy(n.y);
+    var n=NODES[rp.i];if(!n.vis)return;var p=(t-rp.t)/1100,x=n.px,y=n.py;
     cx.strokeStyle=gcol(n.g);cx.globalAlpha=(1-p)*(rp.born?.9:.55);cx.lineWidth=rp.born?2.4:1.4;
-    cx.beginPath();cx.arc(x,y,n.r*Math.max(.7,cam.k)+8+p*(rp.born?46:26),0,6.3);cx.stroke();cx.globalAlpha=1;
+    cx.beginPath();cx.arc(x,y,(n.r*Math.max(.7,cam.k)+8+p*(rp.born?46:26))*n.ps,0,6.3);cx.stroke();cx.globalAlpha=1;
   });
 }
 
@@ -397,6 +430,7 @@ function frame(now){
   if(alpha>0){tick();if(!playing)tick()}
   if(autoFit)fitTarget(playing);
   var k=playing?.045:.1;cam.x+=(cam.tx-cam.x)*k;cam.y+=(cam.ty-cam.y)*k;cam.k+=(cam.tk-cam.k)*k;
+  project(now,dt);
   updateLabels(now,dt);
   draw(now);
   requestAnimationFrame(frame);
@@ -410,10 +444,10 @@ function stopPlay(){playing=false;if(cur>=NC)alpha=Math.max(alpha,.2);document.g
 /* ---------- interaction ---------- */
 function world(px,py){return {x:(px-W/2)/cam.k+cam.x,y:(py-H/2)/(cam.k*VS)+cam.y}}
 function pick(px,py){
-  var w=world(px,py),best=-1,bd=1e9;
-  NODES.forEach(function(n){
+  var best=-1,bd=1e9;
+  NODES.forEach(function(n){   /* on screen, where the note is drawn (with depth, its projected place and size) */
     if(!n.vis||n.ap<.5||(match&&!match[n.i]))return;
-    var dx=n.x-w.x,dy=(n.y-w.y)*VS,d=Math.sqrt(dx*dx+dy*dy),hit=(n.hub?n.r*1.4:n.r)+6/cam.k;
+    var d=Math.hypot(n.px-px,n.py-py),hit=(n.hub?n.r*1.4:n.r)*cam.k*n.ps+6;
     if(d<hit&&d<bd){bd=d;best=n.i}
   });
   return best;
@@ -434,7 +468,7 @@ cv.addEventListener("pointerdown",function(ev){
     drag=null;autoFit=false;var s=pinchState();pinch={d:s.d,k:cam.tk,w:world(s.mx,s.my)};return;
   }
   var i=pick(ev.clientX,ev.clientY);
-  drag={id:i,sx:ev.clientX,sy:ev.clientY,cx:cam.tx,cy:cam.ty,moved:false};
+  drag={id:i,sx:ev.clientX,sy:ev.clientY,cx:cam.tx,cy:cam.ty,moved:false,turn:i<0&&ev.shiftKey&&depthOn,ry:rot.y,rx:rot.x,nx:i>=0?NODES[i].x:0,ny:i>=0?NODES[i].y:0};
   if(i>=0){NODES[i].fixed=true}
   cv.classList.add("drag");
 });
@@ -449,8 +483,12 @@ cv.addEventListener("pointermove",function(ev){
   var dx=ev.clientX-drag.sx,dy=ev.clientY-drag.sy;
   if(!drag.moved&&Math.abs(dx)+Math.abs(dy)>4)drag.moved=true;
   if(!drag.moved)return;
-  if(drag.id>=0){var w=world(ev.clientX,ev.clientY),n=NODES[drag.id];n.x=w.x;n.y=w.y;alpha=Math.max(alpha,.35)}
-  else{autoFit=false;cam.tx=drag.cx-dx/cam.k;cam.ty=drag.cy-dy/(cam.k*VS);cam.x=cam.tx;cam.y=cam.ty}
+  if(drag.turn){rot.y=Math.max(-.8,Math.min(.8,drag.ry+dx*.005));rot.x=Math.max(-.7,Math.min(.7,drag.rx-dy*.005));return}   /* Shift-drag turns the view */
+  if(drag.id>=0){var n=NODES[drag.id];
+    if(depthAmt>0){n.x=drag.nx+dx/(cam.k*n.ps);n.y=drag.ny+dy/(cam.k*n.ps*VS)}else{var w=world(ev.clientX,ev.clientY);n.x=w.x;n.y=w.y}
+    alpha=Math.max(alpha,.35)}
+  else{autoFit=false;cam.tx=drag.cx-dx/cam.k;cam.ty=drag.cy-dy/(cam.k*VS);cam.x=cam.tx;cam.y=cam.ty;
+    if(depthOn&&!reduce){tilt.y=Math.max(-.3,Math.min(.3,tilt.y+(ev.movementX||0)*.002));tilt.x=Math.max(-.2,Math.min(.2,tilt.x-(ev.movementY||0)*.002))}}   /* a pan tilts the view a little; it springs back */
 });
 cv.addEventListener("pointercancel",function(ev){endPointer(ev);if(drag&&drag.id>=0)NODES[drag.id].fixed=false;drag=null;cv.classList.remove("drag")});
 cv.addEventListener("pointerup",function(ev){
@@ -551,6 +589,12 @@ document.addEventListener("keydown",function(ev){
 });
 addEventListener("resize",resize);
 
+var dpq=new URLSearchParams(location.search).get("depth");
+depthOn=dpq?dpq!=="0":pref("depth")!=="off";depthAmt=depthOn?1:0;
+function paintDepth(){document.getElementById("depth").setAttribute("aria-pressed",depthOn?"true":"false")}
+document.getElementById("depth").addEventListener("click",function(){depthOn=!depthOn;rot.x=rot.y=0;pref("depth",depthOn?"on":"off");paintDepth();if(autoFit)fitTarget()});
+paintDepth();
+
 /* ---------- start ---------- */
 pickTheme();readTheme();resize();
 if(NN===0){document.getElementById("empty").style.display="flex"}
@@ -558,7 +602,7 @@ document.getElementById("time").hidden=NC<2;root.classList.toggle("notime",NC<2)
 setStep(NC,false);
 NODES.forEach(function(n){n.ap=1});
 for(var w=0;w<320;w++){alpha=Math.max(alpha,.2*(w<200));tick()}
-alpha=0;fitTarget();cam.x=cam.tx;cam.y=cam.ty;cam.k=cam.tk;
+alpha=0;fitTarget();cam.x=cam.tx;cam.y=cam.ty;cam.k=cam.tk;NODES.forEach(function(n){n.z=n.zt});project(0,16);
 requestAnimationFrame(frame);
 if(NC>1&&(location.hash==="#replay"||new URLSearchParams(location.search).get("replay"))){setTimeout(function(){startPlay()},700)}
 })();
