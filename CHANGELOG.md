@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.13.5
+- **Mycelium view, phone top bar**: the title no longer runs under the Find button. The room it leaves for the buttons is measured instead of fixed (it was sized for four buttons before Depth made five), and when a short title still does not fit beside them, the buttons get a row of their own above it.
+
 ## 0.13.4
 - **Mycelium view, right-drag turns**: with depth on, dragging with the right mouse button turns the view, even when it starts on a note (no context menu over the network); Shift-drag, two fingers and the sideways trackpad swipe still work.
 - **A hint on how to turn**: with depth on, a short line at the bottom says how to turn the view (with a mouse or trackpad: Shift-drag, right-drag or a sideways swipe; on a touch screen: two fingers) and that Fit faces the front. It fades after a few seconds, shows on at most three visits and never again once you have turned the view (remembered per browser). The Depth button's tooltip mentions right-drag too.
