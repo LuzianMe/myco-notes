@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.13.4
+- **Mycelium view, right-drag turns**: with depth on, dragging with the right mouse button turns the view, even when it starts on a note (no context menu over the network); Shift-drag, two fingers and the sideways trackpad swipe still work.
+- **A hint on how to turn**: with depth on, a short line at the bottom says how to turn the view (with a mouse or trackpad: Shift-drag, right-drag or a sideways swipe; on a touch screen: two fingers) and that Fit faces the front. It fades after a few seconds, shows on at most three visits and never again once you have turned the view (remembered per browser). The Depth button's tooltip mentions right-drag too.
+
 ## 0.13.3
 - **Mycelium view, calmer glow on small screens**: each note's glow is capped by the distance to its nearest neighbour on screen and grows fainter where it has to shrink, so a crowded view (a phone) no longer blurs into one haze; every note keeps a small halo, and a spread-out view looks as before. Notes at the back widen their glow less than in 0.13.0.
 
