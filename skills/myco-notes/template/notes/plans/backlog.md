@@ -1,3 +1,6 @@
+---
+summary: Parked decisions, waiting items and ideas, each with its owner and what it waits on
+---
 # Backlog (parked decisions, waiting items, ideas)
 
 Created {{DATE}}. Detail of what was done is in `../state.md` (changelog). Format for every line: what, owner, waiting on (date, event or decision), where details are. Finished items are marked `~~item~~ **DONE <date>:** result`, then moved to the done list at the next cleanup.

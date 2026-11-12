@@ -1,0 +1,3 @@
+#!/bin/sh
+# index: launcher for notes_index.py (the implementation, shared by Linux, macOS and Windows).
+exec "$(cd "$(dirname "$0")" && pwd -P)/_run" notes_index.py "$@"

@@ -13,6 +13,9 @@ Checks
   size      notes larger than MAX_NOTE_KB (default 100) and an AGENTS.md near or over the 32 KiB some agents load (warns from ENTRY_WARN_KB, default 24)
   header    the optional freshness header (method 10.1: last_confirmed, review_after, valid_from, valid_until, supersedes, superseded_by): malformed or
             reversed dates, a passed review_after or valid_until, last_confirmed older than STALE_DAYS (default 365) without a review_after, missing targets
+  summary   notes outside the history folders without a one-line `summary` in the header (one info line for all of them; tools/index --missing
+            lists them) and summaries longer than 200 characters (method 10.1)
+  synclog   the newest line of the sync log in sync-tracker.md must read '- **YYYY-MM-DD kind:** text' (method 4); older lines are history
 
 Usage:  tools/notes-lint.py [--root DIR] [--quiet] [--strict]
 Exit:   0 clean, 1 warnings, 2 errors (secrets), 3 the lint could not run (for example an invalid ignore expression). --strict turns
@@ -111,6 +114,7 @@ def main():
         findings.append((level, f, line, text))
 
     texts = {}
+    no_summary = []
     mentions = {f: 0 for f in md_files}
     for rel in md_files:
         texts[rel] = open(os.path.join(root, rel), encoding="utf-8", errors="replace").read()
@@ -175,6 +179,11 @@ def main():
                     seen_heads[key] = i
         # freshness header (method 10.1)
         fm, fm_end = _myco.frontmatter(text)
+        if "summary" in fm and len(fm["summary"][0]) > _myco.SUMMARY_MAX:
+            add("WARN", rel, fm["summary"][1], f"summary is {len(fm['summary'][0])} characters (limit {_myco.SUMMARY_MAX}): one line on what the note holds and when to read it")
+        if not (fm.get("summary") or ("",))[0].strip() and not is_hist and os.path.basename(rel) not in ("AGENTS.md", "CLAUDE.md") \
+                and not rel.startswith((".github/", docs_prefix, "template/")):
+            no_summary.append(rel)
         if fm:
             dates = {}
             for k in ("last_confirmed", "review_after", "valid_from", "valid_until"):
@@ -257,6 +266,28 @@ def main():
                         add("WARN", rel, i, f"ledger row '{cells[0]}' has no refresh method")
                     if len(cells) >= 5 and re.search(r"pending|behind|stale", cells[4], re.I):
                         add("INFO", rel, i, f"ledger row '{cells[0]}' status: {cells[4][:60]}")
+
+    # sync log: the newest line follows the format (method 4); older lines are history and keep their form
+    for rel in md_files:
+        if os.path.basename(rel) != "sync-tracker.md" or rel.startswith(history):
+            continue
+        inside = False
+        for i, line in enumerate(texts[rel].split("\n"), 1):
+            if re.match(r"^#{2,3}\s+Sync log", line, re.I):
+                inside = True
+                continue
+            if inside and line.startswith("#"):
+                break
+            if inside and re.match(r"^\s*[-*]\s+\S", line):
+                if not _myco.LOG_LINE.match(line):
+                    add("WARN", rel, i, "newest sync-log line is not in the form '- **YYYY-MM-DD kind:** text' (kind: " + ", ".join(_myco.LOG_KINDS)
+                        + "; method 4); write the next line in that form, older lines can stay")
+                break
+
+    # summaries (info, one line for all)
+    if no_summary:
+        shown = ", ".join(no_summary[:5]) + (f" and {len(no_summary) - 5} more" if len(no_summary) > 5 else "")
+        add("INFO", no_summary[0], 1, f"{len(no_summary)} note(s) without a one-line summary in the header (method 10.1; `tools/index --missing` lists them): {shown}")
 
     # orphans (info)
     entry = {"AGENTS.md", "CLAUDE.md", "README.md"}

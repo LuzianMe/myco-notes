@@ -117,6 +117,8 @@ chk "lint reports a passed review_after in a header" "grep -q 'review date 2020-
 rm -f /tmp/lint.$$
 chk "resume prints a briefing with a footer" "myco-notes/tools/resume | grep -q 'budget 6000 characters'"
 chk "resume lists the note past its review date" "myco-notes/tools/resume | grep -q 'fresh-smoke.md'"
+chk "index lists a starter note with its summary" "myco-notes/tools/index | grep -q 'state.md\`: Master record'"
+chk "index --missing names a note without a summary" "myco-notes/tools/index --missing | grep -q 'fresh-smoke.md'"
 chk "asof shows the notes at HEAD"      "myco-notes/tools/asof HEAD state.md | grep -q 'master record'"
 chk "asof rejects a date before the history" "! myco-notes/tools/asof 2001-01-01"
 rm -f myco-notes/plans/fresh-smoke.md

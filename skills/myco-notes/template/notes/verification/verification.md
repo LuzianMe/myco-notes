@@ -1,3 +1,6 @@
+---
+summary: How to check that the system is healthy (read-only steps) and the conditions accepted as known
+---
 # Verification guide (health check / test procedure)
 
 Created {{DATE}}. Everything here is READ-ONLY unless a step says otherwise. Fixes need the owner's explicit approval afterwards.

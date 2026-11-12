@@ -112,8 +112,40 @@ def frontmatter(text):
             return fm, i + 1
         m = re.match(r"^([A-Za-z_][A-Za-z0-9_-]*)\s*:\s*(.*)$", raw)
         if m:
-            fm[m.group(1).lower().replace("-", "_")] = (re.sub(r"\s+#.*$", "", m.group(2)).strip().strip("\"'"), i + 1)
+            key = m.group(1).lower().replace("-", "_")
+            val = m.group(2) if key == "summary" else re.sub(r"\s+#.*$", "", m.group(2))   # a summary may contain " #"
+            fm[key] = (val.strip().strip("\"'"), i + 1)
     return {}, 0
+
+
+SUMMARY_MAX = 200   # characters (method 10.1)
+LOG_KINDS = ("change", "note", "answer", "review", "audit", "import", "merge", "upgrade", "setup", "drill")   # sync-log line kinds (method 4)
+LOG_LINE = re.compile(r"^- \*\*\d{4}-\d{2}-\d{2} (" + "|".join(LOG_KINDS) + r")( \([^)]*\))?:\*\*\s+\S")
+
+
+def first_sentence(text, fm_end=0):
+    """The first sentence of the first plain paragraph after the title (no heading, table, list, quote or code), for a note
+    without a summary. Markdown emphasis and link syntax are dropped; at most SUMMARY_MAX characters."""
+    in_code = False
+    for line in text.split("\n")[fm_end:]:
+        s = line.strip()
+        if s.startswith("```"):
+            in_code = not in_code
+            continue
+        if in_code or not s or s.startswith(("#", "|", ">", "-", "*", "<", "---")) or re.match(r"^\d+[.)]\s", s):
+            continue
+        s = re.sub(r"\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|([^\]]+))?\]\]|\[([^\]]+)\]\([^)]*\)|[`*_]", lambda m: m.group(2) or m.group(1) or m.group(3) or "", s)
+        m = re.match(r"(.+?[.!?])(\s|$)", s)
+        s = m.group(1) if m else s
+        return s if len(s) <= SUMMARY_MAX else s[:SUMMARY_MAX - 3].rstrip() + "..."
+    return ""
+
+
+def note_summary(text):
+    """(summary, from_header) of a note: the `summary` key of its header (method 10.1), else its first sentence (from_header False)."""
+    fm, end = frontmatter(text)
+    s = fm.get("summary", ("", 0))[0].strip()
+    return (s, True) if s else (first_sentence(text, end), False)
 
 
 def _rel(p):

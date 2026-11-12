@@ -1,3 +1,6 @@
+---
+summary: What lives in scripts/: repository copies of every deployed script and configuration, and how they are kept equal to the live copies
+---
 # Deployed artifacts (repository copies)
 
 Every script, configuration, manifest, query, schema or notebook that runs somewhere else has a copy here. The live copy and this copy must be identical; `{{TOOLS_DIR}}/notes-commit` can sync designated files to where they run (see `.myco-notes.conf`).
