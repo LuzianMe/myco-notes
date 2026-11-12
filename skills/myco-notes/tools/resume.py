@@ -80,13 +80,7 @@ def waiting_reviews(root, notes):
         if not re.fullmatch(r"review-.*\.md", f):
             continue
         text = open(os.path.join(d, f), encoding="utf-8", errors="replace").read()
-        num, open_ = None, []
-        for line in text.split("\n"):
-            hm = re.match(r"^#{2,3}\s+(\d+)[.)]?\s", line)
-            if hm:
-                num = hm.group(1)
-            elif num and re.match(r"^\s*\**Status:?\**:?\s*proposed", line, re.I):
-                open_.append(num)
+        open_ = _myco.review_proposals(text)[1]
         if open_:
             items.append(f"`{notes}/plans/{f}`: {len(open_)} proposal(s) waiting for the owner's answer ({', '.join(open_)}); apply none before a yes (method 21.3)")
     return items

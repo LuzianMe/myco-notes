@@ -22,6 +22,7 @@ Context: current SQL `LIKE` search takes 1.8 s p95. Options: (1) managed search 
 - **2026-03-14 change (17:40 UTC, key rotation):** runbook, state.md and both backup scripts updated and committed; mirror pushed. **NOT synced:** the offline recovery copy still holds the old key reference (refresh at the next maintenance window, pending item 3); the search index is two days behind.
 
 ## Review proposal (in `notes/plans/review-2026-03-20.md`, method section 21)
+The file's header lists what is still waiting (`open: 1, 2, 3` when written, `open: none` when all are answered; the lint checks it):
 ```
 ## 2. Two retention periods for the database backups
 Kind: contradiction
@@ -30,7 +31,7 @@ Found: state.md says backups are kept 14 days, the runbook says 30. The backup j
 Proposed fix: runbook.md line 88, replace "kept for 30 days" with "kept for 14 days (scripts/db-backup.conf, verified 2026-03-20; was 30 until the 2026-02-11 change)".
 Status: proposed
 ```
-The owner answers "2 yes"; the line becomes `Status: applied 2026-03-20` and the fix is committed with the review file.
+The owner answers "2 yes"; the line becomes `Status: applied 2026-03-20`, the header's `open:` loses the 2, and the fix is committed with the review file.
 
 ## Commit messages
 - `Rotate backup key per job; document restore drill and the failure of the first attempt`

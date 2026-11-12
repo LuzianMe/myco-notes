@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.17.2
+- **A review file's header is checked** (method 2.8.2, section 21.2): it carries an `open:` line with the proposals still waiting (`open: none` when all are answered), and the lint warns when the line is missing or does not match the `Status:` lines, saying what it should be. In the second real review the summary and opening of both review files fell behind after the fixes were applied; now that cannot pass the lint.
+- **Proposed text goes in code blocks**: replacement text and new notes in a proposal sit in fenced code blocks, so the name of a note the proposal would create is not reported as a missing reference while the proposal waits.
+
 ## 0.17.1
 Two gaps found in the first real review (method 2.8.1, section 21):
 - **Side effects go into the proposal**: before proposing a fix that moves, shortens or deletes text (for example moving an old changelog into `logs/`), the agent checks which notes that text was the only one to mention and adds the link that keeps them connected to the same proposal. After applying, it compares the lint with the run before the review; anything the fixes caused becomes a new proposal instead of a silent fix.
