@@ -144,7 +144,7 @@ def layout(root, conf=None):
         "map": pick("MAP_DIR", "notes-map", my + "/map"),
         "state": _rel(conf.get("STATE_FILE")) or "state.md",
         "data": [d for d in (_rel(x) for x in conf.get("DATA_DIRS", "").split()) if d],
-        "history": list(dict.fromkeys([d for d in (_rel(x) for x in conf.get("HISTORY_DIRS", "archive logs").split()) if d] + ["inbox"])),   # the inbox (method 19.1) is always a record
+        "history": list(dict.fromkeys([d for d in (_rel(x) for x in conf.get("HISTORY_DIRS", "archive logs").split()) if d] + ["inbox", "imported"])),   # the inbox (19.1) and imported originals (20) are always records
     }
 
 
@@ -179,3 +179,71 @@ def human_size(nbytes):
         if nbytes < 1024 or unit == "T":
             return f"{nbytes:.0f}{unit}" if unit == "B" else f"{nbytes:.1f}{unit}"
         nbytes /= 1024
+
+
+WIKI_LINK = re.compile(r"!?\[\[([^\]\n|#]*)(?:#[^\]\n|]*)?(?:\|[^\]\n]*)?\]\]")
+MD_LINK = re.compile(r"!?\[[^\]\n]*\]\(\s*<?([^)\s>]+)>?(?:\s+\"[^\"]*\")?\s*\)")
+
+
+def links(text):
+    """Links in a note other than file-name mentions (method 9): wiki links ([[Name]], [[Name|text]], [[Name#heading]], ![[embed]])
+    and Markdown links to relative paths ([text](../a/b.md), ![](img.png)). Fenced code blocks and inline code are skipped.
+    Yields (kind, target, line number): kind 'wiki' (target is a note name or path without .md, or a file name) or 'path' (a relative
+    path with %-escapes decoded and any #anchor removed). Web, mail and other scheme links and pure #anchors are left out."""
+    from urllib.parse import unquote
+    in_code = False
+    for i, line in enumerate(text.split("\n"), 1):
+        if line.lstrip().startswith(("```", "~~~")):
+            in_code = not in_code
+            continue
+        if in_code:
+            continue
+        line = re.sub(r"`[^`\n]*`", "", line)
+        for m in WIKI_LINK.finditer(line):
+            t = m.group(1).strip()
+            if t:
+                yield "wiki", t, i
+        for m in MD_LINK.finditer(line):
+            t = m.group(1).strip()
+            if re.match(r"^[A-Za-z][A-Za-z0-9+.-]*:", t) or t.startswith(("#", "//")):
+                continue
+            t = unquote(t.split("#", 1)[0].split("?", 1)[0])
+            if t:
+                yield "path", t, i
+
+
+class LinkIndex:
+    """Resolves links (see links()) to repository paths. md_files and all_paths are repository-relative with forward slashes."""
+
+    def __init__(self, md_files, all_paths=()):
+        self.paths = set(all_paths) | set(md_files)
+        self.by_stem, self.by_name = {}, {}
+        for f in md_files:
+            self.by_stem.setdefault(f[:-3].rsplit("/", 1)[-1].lower(), []).append(f)
+            self.by_stem.setdefault(f[:-3].lower(), []).append(f)
+        for f in self.paths:
+            self.by_name.setdefault(f.rsplit("/", 1)[-1].lower(), []).append(f)
+
+    def resolve(self, kind, target, from_rel):
+        """The repository path a link points to, or None when nothing matches. A wiki name shared by several notes picks the one
+        nearest to the linking note (same folder first)."""
+        if kind == "path":
+            if target.startswith("/"):
+                cand = [target.lstrip("/")]
+            else:
+                cand = [os.path.normpath(os.path.join(os.path.dirname(from_rel), target)).replace(os.sep, "/"), target]
+            for c in cand:
+                if c in self.paths:
+                    return c
+                if not os.path.splitext(c)[1] and c + ".md" in self.paths:
+                    return c + ".md"
+            return None
+        t = target.replace("\\", "/").strip("/")
+        low = t.lower()
+        hits = self.by_stem.get(low[:-3] if low.endswith(".md") else low) or self.by_name.get(low.rsplit("/", 1)[-1] if "/" not in low else low) or []
+        if not hits and "/" in low:
+            hits = [f for f in self.paths if f.lower().endswith("/" + low) or f.lower().endswith("/" + low + ".md")]
+        if not hits:
+            return None
+        here = os.path.dirname(from_rel)
+        return sorted(set(hits), key=lambda f: (os.path.dirname(f) != here, not f.startswith(here + "/") if here else 0, f.count("/"), f))[0]

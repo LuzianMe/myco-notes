@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+Adopting existing notes (method 2.7, section 20): a folder of Markdown notes written by hand, exported from a notes app or made with other AIs can become a Myco Notes tree without losing anything.
+- **Two ways in**: `bootstrap NEW --import FOLDER` creates a new tree and copies the folder as found into `<notes>/imported/<name>/`, leaving the original untouched; `bootstrap FOLDER --adopt` turns the folder itself into a tree after writing a verified zip backup next to it (`--backup-to`, `--no-backup`), commits the notes as found first, and tags an existing repository's last commit `before-myco-notes`. Notes stay at their paths; an existing `AGENTS.md` or `CLAUDE.md` is kept as `*.pre-myco.md`; `.gitignore` and `.gitattributes` are extended; `.obsidian/`, `.trash/` and similar folders are left out.
+- **Secrets first**: the collection is scanned before the first commit; files with a secret-looking string are left uncommitted and listed with the value hidden (exit 4).
+- **Import log**: `<notes>/logs/import-<name>.md` records the choice, the backup, an inventory (notes, links, header keys, attachments) and one row per note, so the first pass can run in batches across sessions. The skill has a matching mode (3a) that asks where and how far before anything happens.
+- **Wiki links and relative links count**: the lint and the map now read `[[Note]]`, `[[Note|text]]`, `[[Note#heading]]`, `![[embed]]` and `[text](../note.md)` as relations (no orphans, map edges), and the lint warns when one points nowhere. Imported originals are a record (not re-checked) and have their own group in the map.
+
 ## 0.15.1
 - **Cloud and phone use is marked experimental**: the README section "From the cloud or a phone", method sections 18 and 19, the skill's quick-note mode and the starter `AGENTS.md` say so, and the README lists the known issues (no GitHub CLI API access in Claude Code cloud sessions, agents not always taking the light path, slow starts and queued checks, manual first set-up, the map as a zip, Codex untested). A solo merge says it is experimental when it starts waiting, and the skill tells the agent to report a failed step in one line instead of retrying.
 

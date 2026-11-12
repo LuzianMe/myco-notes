@@ -17,23 +17,192 @@ An agent setting up a tree for a person asks them which one they want first.
 
 Copies template/ into <target-dir>, fills the {{PLACEHOLDERS}}, copies tools/ and docs/*.md, makes git use the versioned hooks
 (core.hooksPath = <tools folder>/hooks), and makes the baseline commit. The target must be empty or not exist.
+
+Existing notes (method section 20):
+  bootstrap <new-dir> --name "Notes" --import <folder>     a new tree; the folder is copied as found into <notes>/imported/<folder name>/
+                                                            (the folder itself is not touched; app settings such as .obsidian/ are left out)
+  bootstrap <folder> --name "Notes" --adopt [--backup-to DIR | --no-backup]
+                                                            the folder becomes the tree, its notes stay where they are. First a zip
+                                                            of the whole folder is written next to it (or into DIR), and a folder that
+                                                            is already a git repository (with a clean working tree) gets the tag
+                                                            before-myco-notes. Existing AGENTS.md, CLAUDE.md and other files the
+                                                            template would overwrite are kept as <name>.pre-myco<ext>; .gitignore and
+                                                            .gitattributes are extended.
+Both scan the collection for secrets first: a file with a secret-looking string is not committed (listed, value hidden).
+Both write the import log <notes>/logs/import-<name>.md: the choice, the backup, an inventory and one row per note to work through.
+Exit: 0 done, 1 refused (nothing changed), 2 usage, 4 done but files with secrets were left uncommitted (listed).
 """
 import argparse
 import datetime
 import os
+import re
 import shutil
 import subprocess
 import sys
+import zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 KIT = os.path.dirname(HERE)
 sys.dont_write_bytecode = True
 sys.path.insert(0, HERE)
 import _myco  # noqa: E402
+import secret_scan  # noqa: E402
 
 NOT_COPIED = {"bootstrap", "bootstrap.cmd", "bootstrap.py", "__pycache__"}
 TEXT_EXT = (".md", ".yml", ".yaml")
 TEXT_NAMES = {".myco-notes.conf", ".gitignore", "CODEOWNERS"}
+NOT_NOTES = {".git", ".obsidian", ".trash", ".logseq", ".foam", ".vscode", ".idea", "node_modules", "__pycache__", ".DS_Store", "Thumbs.db", "desktop.ini"}
+APPENDED = {".gitignore", ".gitattributes"}   # adopt: extended, never replaced
+
+
+def check_adopt(target, lay, a):
+    """--adopt: refuse anything that could lose or mix up the owner's files. Returns whether the folder is already a git repository, or an exit code."""
+    if not os.path.isdir(target) or not os.listdir(target):
+        print(f"bootstrap: --adopt needs an existing folder with notes in it; {target} is missing or empty (leave out --adopt for a new tree)", file=sys.stderr)
+        return 1
+    if os.path.exists(os.path.join(target, ".myco-notes.conf")):
+        print("bootstrap: this folder is a Myco Notes tree already; to update its tools run relocate.py --root from the kit", file=sys.stderr)
+        return 1
+    for d in ([lay["myco"]] if lay["myco"] else [lay["notes"], lay["tools"], lay["docs"]]):
+        if os.path.exists(os.path.join(target, *d.split("/"))):
+            print(f"bootstrap: the folder already has {d}/; choose another name for the Myco Notes folder with --myco-dir", file=sys.stderr)
+            return 1
+    top = _myco.toplevel(target)
+    if top and _myco.overlap(top, target) != "same":
+        print(f"bootstrap: {target} is inside another git repository ({top}); adopt that repository's root folder, or copy the notes with --import", file=sys.stderr)
+        return 1
+    if top and _myco.git("-C", target, "status", "--porcelain").stdout.strip():
+        print("bootstrap: the folder's git repository has uncommitted changes; commit or stash them first, so the take-over starts from a known state", file=sys.stderr)
+        return 1
+    return bool(top)
+
+
+def make_backup(target, to):
+    """A zip of the whole folder (with its .git, if any) outside it; verified by reading it back. Returns its path, or None."""
+    dest_dir = os.path.abspath(to) if to else os.path.dirname(target)
+    if _myco.overlap(target, dest_dir) in ("same", "inside"):
+        print("bootstrap: the backup must go outside the folder being adopted (--backup-to)", file=sys.stderr)
+        return None
+    os.makedirs(dest_dir, exist_ok=True)
+    base = os.path.basename(target.rstrip(os.sep)) or "notes"
+    path = os.path.join(dest_dir, f"{base}-before-myco-notes-{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.zip")
+    count = 0
+    try:
+        with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+            for dp, dn, fn in os.walk(target):
+                dn.sort()
+                for f in sorted(fn):
+                    full = os.path.join(dp, f)
+                    if os.path.isfile(full):
+                        z.write(full, base + "/" + os.path.relpath(full, target).replace(os.sep, "/"))
+                        count += 1
+        with zipfile.ZipFile(path) as z:
+            if z.testzip() is not None or len(z.namelist()) != count:
+                raise OSError("the archive does not read back complete")
+    except OSError as e:
+        print(f"bootstrap: backup failed ({e}); nothing was changed", file=sys.stderr)
+        return None
+    print(f"bootstrap: backup written: {path} ({_myco.human_size(os.path.getsize(path))}, {count} files)")
+    return path
+
+
+def collect(root):
+    """The owner's files under root (relative, forward slashes), without version-control data and notes-app settings or caches."""
+    out = []
+    for dp, dn, fn in os.walk(root):
+        dn[:] = sorted(d for d in dn if d not in NOT_NOTES)
+        for f in sorted(fn):
+            if f not in NOT_NOTES:
+                out.append(os.path.relpath(os.path.join(dp, f), root).replace(os.sep, "/"))
+    return out
+
+
+def scan(root, rels):
+    """Secret-looking strings in text files: [(rel, line, kind)]; values are never returned."""
+    hits = []
+    for rel in rels:
+        p = os.path.join(root, *rel.split("/"))
+        try:
+            if os.path.getsize(p) > 5 * 1024 * 1024:
+                continue
+            with open(p, "rb") as fh:
+                raw = fh.read()
+        except OSError:
+            continue
+        if b"\0" in raw[:8192]:
+            continue
+        for i, line in enumerate(raw.decode("utf-8", errors="replace").split("\n"), 1):
+            hit = secret_scan.find(line)
+            if hit:
+                hits.append((rel, i, hit[0]))
+    return hits
+
+
+def write_import_log(target, lay, project, mode, files, hits, backup, kept, had_git, source=None, name=None):
+    """The import log (method 20.3): the choice, the backup, an inventory and one row per note. Returns its path in the tree."""
+    name = name or re.sub(r"[^A-Za-z0-9._-]+", "-", os.path.basename(target)).strip("-.") or "notes"
+    rel_log = f"{lay['notes']}/logs/import-{name}.md"
+    md = [f for f in files if f.lower().endswith(".md")]
+    other = [f for f in files if not f.lower().endswith(".md")]
+    size = lambda f: os.path.getsize(os.path.join(target, *f.split("/")))
+    index = _myco.LinkIndex(md, files)
+    held = {h[0] for h in hits}
+    rows, keys, styles, broken = [], {}, {"wiki": 0, "path": 0}, 0
+    for f in md:
+        with open(os.path.join(target, *f.split("/")), encoding="utf-8", errors="replace") as fh:
+            text = fh.read()
+        fm, end = _myco.frontmatter(text)
+        for k in fm:
+            keys[k] = keys.get(k, 0) + 1
+        h = re.search(r"^#\s+(.+)$", "\n".join(text.split("\n")[end:]), re.M)
+        title = re.sub(r"[|`]", "", h.group(1)).strip()[:70] if h else "(no heading)"
+        n_links = 0
+        for kind, tgt, _ln in _myco.links(text):
+            styles[kind] += 1
+            n_links += 1
+            if index.resolve(kind, tgt, f) is None:
+                broken += 1
+        rows.append(f"| `{f}` | {title} | {max(1, round(size(f) / 1024))} | {n_links} | {'held: secret' if f in held else 'pending'} |")
+    today = datetime.date.today().isoformat()
+    where = (f"A new tree; the notes were copied as found from the folder `{os.path.basename(source)}` into `{lay['notes']}/imported/{name}/`. The original folder was not changed."
+             if source else "In place: the notes stay at their paths in this folder; the Myco Notes files were added around them.")
+    if backup:
+        where += f" Backup of the folder as it was: `{os.path.basename(backup)}` ({'next to this folder' if os.path.dirname(backup) == os.path.dirname(target) else 'in the backup folder chosen'})."
+    elif not source:
+        where += " No backup archive was made (--no-backup)."
+    if had_git:
+        where += " The last commit before the take-over is tagged `before-myco-notes`."
+    lines = [
+        f"# Import log: {project}",
+        "",
+        f"Effort log (method section 20). Started {today}. Later entry wins; the import is finished when no row below is `pending`.",
+        "",
+        "## Choice",
+        f"- **Where:** {where}",
+        "- **How far:** _(ask the owner: keep the structure, or reorganise into the method's roles; method 20.1)_",
+        "",
+        "## Inventory (as found)",
+        f"- {len(md)} notes, {len(other)} other files ({_myco.human_size(sum(size(f) for f in other)) if other else '0B'}).",
+        f"- Links: {styles['wiki']} wiki links, {styles['path']} relative links, {broken} pointing nowhere (the lint lists them).",
+        "- Header keys: " + (", ".join(f"{k} ({v})" for k, v in sorted(keys.items(), key=lambda kv: -kv[1])[:12]) or "none") + ".",
+        f"- Secrets: {len(hits)} secret-looking string(s) in {len(held)} file(s); those files are not committed (marked `held`)." if hits else "- Secrets: none found.",
+    ]
+    if kept:
+        lines.append("- Kept under a new name (merge into the working agreement): " + ", ".join(f"`{o}` (was {n})" for o, n in kept) + ".")
+    if other:
+        exts = {}
+        for f in other:
+            e = os.path.splitext(f)[1].lower() or "(none)"
+            exts[e] = exts.get(e, 0) + 1
+        lines.append("- Other files by type: " + ", ".join(f"{e} {c}" for e, c in sorted(exts.items(), key=lambda kv: -kv[1])[:10]) + ".")
+    lines += ["", "## Decisions and open questions", "_(duplicates, contradictions, what was left out and why; newest first)_", "",
+              "## Notes", "Status: `pending`, `kept`, `merged into x.md`, `became x.md`, `left out: reason`, `held: secret`.", "",
+              "| Note | Title | KB | Links | Status |", "|---|---|---|---|---|", *rows, ""]
+    path = os.path.join(target, *rel_log.split("/"))
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write("\n".join(lines))
+    return rel_log
 
 
 def main():
@@ -48,7 +217,17 @@ def main():
     ap.add_argument("--myco-dir", default="myco-notes")
     ap.add_argument("--data-dir", action="append", default=[])
     ap.add_argument("--new-folders", choices=("ask", "add", "ignorelint", "ignoreall"), default="ask")
+    ap.add_argument("--import", dest="source", default=None, metavar="FOLDER")
+    ap.add_argument("--adopt", action="store_true")
+    ap.add_argument("--backup-to", default=None)
+    ap.add_argument("--no-backup", action="store_true")
     a = ap.parse_args()
+    if a.source and a.adopt:
+        print("bootstrap: use either --import FOLDER (a new tree with a copy) or --adopt (the folder itself), not both", file=sys.stderr)
+        return 2
+    if (a.backup_to or a.no_backup) and not a.adopt:
+        print("bootstrap: --backup-to and --no-backup go with --adopt", file=sys.stderr)
+        return 2
     owner = a.owner or _myco.git("config", "user.name").stdout.strip() or "owner"
 
     my = _myco._rel(a.myco_dir) if a.layout == "nested" else ""
@@ -62,43 +241,123 @@ def main():
         return os.path.join(target, *rel.split("/"))
 
     target = os.path.abspath(a.target)
-    if os.path.exists(target) and os.listdir(target):
-        print(f"bootstrap: {target} exists and is not empty", file=sys.stderr)
-        return 1
+    had_git, backup, kept = False, None, []
+    if a.adopt:
+        r = check_adopt(target, lay, a)
+        if type(r) is int:   # an exit code (a bool means: refused or not, already a git repository)
+            return r
+        had_git = r
+    else:
+        if os.path.exists(target) and os.listdir(target):
+            print(f"bootstrap: {target} exists and is not empty" + ("" if a.source else " (to take over the notes in it, add --adopt; method section 20)"), file=sys.stderr)
+            return 1
+        if a.source:
+            src = os.path.abspath(a.source)
+            if not os.path.isdir(src) or not os.listdir(src):
+                print(f"bootstrap: --import {a.source}: not a folder, or empty", file=sys.stderr)
+                return 1
+            if _myco.overlap(src, target):
+                print("bootstrap: the new tree and the imported folder must not contain each other", file=sys.stderr)
+                return 1
+    if a.adopt and not a.no_backup:
+        backup = make_backup(target, a.backup_to)
+        if not backup:
+            return 1
+    if a.adopt and had_git and _myco.git("-C", target, "rev-parse", "-q", "--verify", "HEAD").returncode == 0:
+        if _myco.git("-C", target, "tag", "before-myco-notes").returncode == 0:
+            print("bootstrap: tagged the last commit before the take-over: before-myco-notes")
+    collection = sorted(collect(target)) if a.adopt else []   # the owner's files, before anything is added
     os.makedirs(target, exist_ok=True)
+    hits = scan(target, collection)
+    held, rc = sorted({h[0] for h in hits}), 0
+    if not had_git:
+        if _myco.git("-C", target, "init", "-q", "-b", "main").returncode != 0:  # git older than 2.28
+            _myco.git("-C", target, "init", "-q")
+            _myco.git("-C", target, "symbolic-ref", "HEAD", "refs/heads/main")
+
+    def commit(msg, paths=None):
+        if a.no_commit:
+            return
+        if paths is None:
+            _myco.git("-C", target, "add", "-A")
+        for i in range(0, len(paths or []), 200):   # in chunks (command-line length); paths the owner's .gitignore excludes stay out
+            _myco.git("-C", target, "-c", "advice.addIgnoredFile=false", "add", "-A", "--", *paths[i:i + 200])
+        for i in range(0, len(held), 200):
+            _myco.git("-C", target, "rm", "-q", "--cached", "--ignore-unmatch", "--", *held[i:i + 200])
+        if not _myco.git("-C", target, "diff", "--cached", "--quiet").returncode:
+            return
+        r = subprocess.run(["git", "-C", target, "commit", "-q", "-m", msg], capture_output=True, text=True, encoding="utf-8", errors="replace")
+        if r.returncode:
+            print(f"bootstrap: commit failed ({(r.stderr or r.stdout).strip()}); set git user.name and user.email, then commit", file=sys.stderr)
+        else:
+            print(_myco.git("-C", target, "log", "--oneline", "-1").stdout.strip())
+
+    if a.adopt and not had_git:   # the owner's notes exactly as found, before anything is added (secrets held back)
+        commit("Before Myco Notes: the notes as found", collection)
+
+    written = []   # files this run writes from the template (placeholders are filled only in these, never in the owner's notes)
+
+    def put(src, dest):
+        if os.path.exists(dest):
+            name = os.path.basename(dest)
+            if name in APPENDED:
+                with open(src, encoding="utf-8", newline="") as fh:
+                    extra = fh.read()
+                with open(dest, encoding="utf-8", newline="") as fh:
+                    old_text = fh.read()
+                with open(dest, "a", encoding="utf-8", newline="") as fh:
+                    fh.write(("" if old_text.endswith("\n") or not old_text else "\n") + "\n# Added by Myco Notes\n" + extra)
+                written.append(dest)
+                return
+            stem, ext = os.path.splitext(dest)
+            keep = stem + ".pre-myco" + ext
+            n = 2
+            while os.path.exists(keep):
+                keep, n = f"{stem}.pre-myco{n}{ext}", n + 1
+            os.replace(dest, keep)
+            kept.append((os.path.relpath(keep, target).replace(os.sep, "/"), os.path.relpath(dest, target).replace(os.sep, "/")))
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        shutil.copy2(src, dest)
+        written.append(dest)
+
+    def put_tree(src, dest, skip=()):
+        for dp, dn, fn in os.walk(src):
+            dn[:] = [d for d in dn if d not in skip]
+            for f in fn:
+                if f in skip:
+                    continue
+                put(os.path.join(dp, f), os.path.join(dest, os.path.relpath(os.path.join(dp, f), src)))
 
     tpl = os.path.join(KIT, "template")
     for item in sorted(os.listdir(tpl)):
         src = os.path.join(tpl, item)
         if item == "notes":   # the template's notes folder lands in the notes folder of the chosen layout
-            shutil.copytree(src, at(lay["notes"]), dirs_exist_ok=True)
+            put_tree(src, at(lay["notes"]))
         elif os.path.isdir(src):
-            shutil.copytree(src, os.path.join(target, item), dirs_exist_ok=True)
+            put_tree(src, os.path.join(target, item))
         else:   # template/gitattributes becomes the tree's .gitattributes (in the kit it must not apply to the kit's own files)
-            shutil.copy2(src, os.path.join(target, "." + item if item == "gitattributes" else item))
-    shutil.copytree(HERE, at(lay["tools"]), dirs_exist_ok=True, ignore=lambda d, names: [n for n in names if n in NOT_COPIED])
+            put(src, os.path.join(target, "." + item if item == "gitattributes" else item))
+    put_tree(HERE, at(lay["tools"]), skip=NOT_COPIED)
     docs = os.path.join(KIT, "docs")
     os.makedirs(at(lay["docs"]), exist_ok=True)
     if os.path.isdir(docs):
         for f in os.listdir(docs):
             if f.endswith(".md"):
-                shutil.copy2(os.path.join(docs, f), os.path.join(at(lay["docs"]), f))
+                put(os.path.join(docs, f), os.path.join(at(lay["docs"]), f))
 
     subs = (("{{PROJECT_NAME}}", a.name), ("{{OWNER}}", owner), ("{{TIMEZONE}}", a.tz), ("{{DATE}}", datetime.date.today().isoformat()),
             ("{{MYCO_DIR}}", lay["myco"]), ("{{NOTES_DIR}}", lay["notes"]), ("{{TOOLS_DIR}}", lay["tools"]), ("{{DOCS_DIR}}", lay["docs"]),
             ("{{MAP_DIR}}", lay["map"]), ("{{DATA_DIRS}}", " ".join(data)), ("{{NEW_FOLDERS}}", a.new_folders), ("{{KIT_VERSION}}", _myco.VERSION))
     tools_abs = os.path.normcase(at(lay["tools"]))
-    for dp, dn, fn in os.walk(target):
-        dn[:] = [d for d in dn if d != ".git" and os.path.normcase(os.path.join(dp, d)) != tools_abs]
-        for f in fn:
-            if f.endswith(TEXT_EXT) or f in TEXT_NAMES:
-                p = os.path.join(dp, f)
-                with open(p, encoding="utf-8", newline="") as fh:
-                    s = fh.read()
-                for k, v in subs:
-                    s = s.replace(k, v)
-                with open(p, "w", encoding="utf-8", newline="") as fh:
-                    fh.write(s)
+    for p in written:
+        f = os.path.basename(p)
+        if (f.endswith(TEXT_EXT) or f in TEXT_NAMES) and not os.path.normcase(p).startswith(tools_abs + os.sep):
+            with open(p, encoding="utf-8", newline="") as fh:
+                s = fh.read()
+            for k, v in subs:
+                s = s.replace(k, v)
+            with open(p, "w", encoding="utf-8", newline="") as fh:
+                fh.write(s)
 
     if data:
         for d in data:
@@ -109,6 +368,12 @@ def main():
         with open(os.path.join(target, "AGENTS.md"), "a", encoding="utf-8", newline="") as fh:
             fh.write("- Project data folders (inputs and outputs, not notes; ignored by git): " + ", ".join(f"`{d}/`" for d in data) + ".\n")
 
+    if a.adopt:
+        present = [d for d in (".obsidian", ".trash", ".logseq") if os.path.isdir(at(d))]
+        if present:
+            with open(os.path.join(target, ".gitignore"), "a", encoding="utf-8", newline="") as fh:
+                fh.write("\n# Settings and caches of the notes app used before (method 20.2): not notes\n" + "".join(f"{d}/\n" for d in present))
+
     if not _myco.IS_WINDOWS:
         for d in (lay["tools"], lay["tools"] + "/hooks"):
             full = at(d)
@@ -117,19 +382,47 @@ def main():
                 if os.path.isfile(p):
                     os.chmod(p, os.stat(p).st_mode | 0o111)
 
-    if _myco.git("-C", target, "init", "-q", "-b", "main").returncode != 0:  # git older than 2.28
-        _myco.git("-C", target, "init", "-q")
-        _myco.git("-C", target, "symbolic-ref", "HEAD", "refs/heads/main")
     _myco.git("-C", target, "config", "core.hooksPath", lay["tools"] + "/hooks")
-    print(f"bootstrap: created {target}")
-    if not a.no_commit:
-        _myco.git("-C", target, "add", "-A")
-        r = subprocess.run(["git", "-C", target, "commit", "-q", "-m", "Baseline: notes tree created from the Myco Notes template"], capture_output=True, text=True, encoding="utf-8", errors="replace")
-        if r.returncode:
-            print(f"bootstrap: baseline commit failed ({r.stderr.strip()}); set git user.name and user.email, then commit", file=sys.stderr)
-        else:
-            print(_myco.git("-C", target, "log", "--oneline", "-1").stdout.strip())
+    print(f"bootstrap: {'took over' if a.adopt else 'created'} {target}")
+    for old_name, new_name in kept:
+        print(f"bootstrap: kept your {new_name} as {old_name} (merge what it says into the working agreement)")
+
+    if a.adopt:
+        log = write_import_log(target, lay, a.name, "in place", collection, hits, backup, kept, had_git)
+        commit("Baseline: Myco Notes added around the existing notes (method section 20)")
+    elif a.source:
+        commit("Baseline: notes tree created from the Myco Notes template")
+        name = re.sub(r"[^A-Za-z0-9._-]+", "-", os.path.basename(os.path.abspath(a.source))).strip("-.") or "notes"
+        base = lay["notes"] + "/imported/" + name
+        copied = []
+        for rel in collect(os.path.abspath(a.source)):
+            dest = at(base + "/" + rel)
+            os.makedirs(os.path.dirname(dest), exist_ok=True)
+            shutil.copy2(os.path.join(os.path.abspath(a.source), *rel.split("/")), dest)
+            copied.append(base + "/" + rel)
+        hits = scan(target, copied)
+        held = sorted({h[0] for h in hits})
+        log = write_import_log(target, lay, a.name, "new folder", copied, hits, None, kept, False, source=os.path.abspath(a.source), name=name)
+        commit(f"Import: the notes from {os.path.basename(os.path.abspath(a.source))} as found (method section 20)")
+    else:
+        commit("Baseline: notes tree created from the Myco Notes template")
+    sys.stdout.flush()
+    if held:
+        rc = 4
+        print(f"bootstrap: {len(held)} file(s) look like they contain a secret and were NOT committed (values hidden):", file=sys.stderr)
+        for f, ln, kind in sorted(hits)[:40]:
+            print(f"  {f}:{ln} ({kind})", file=sys.stderr)
+        print("  Remove each value (or move it where secrets live), then commit them with notes-commit.", file=sys.stderr)
     n, t, d_ = lay["notes"], lay["tools"], lay["docs"]
+    if a.adopt or a.source:
+        print(f"""
+Next: the first pass (method section 20.4), guided by the import log {log}.
+  1. Read the collection; write {n}/{lay['state']} (what it is about, main subjects, open questions) and {n}/working-agreement.md.
+  2. Connect notes that belong together; reorganise only if the owner chose to, in batches of about 20 files, one commit each,
+     updating each row of the import log ({t}/notes-commit "Import: ...").
+  3. python3 {t}/notes-lint.py and python3 {t}/build-notes-map.py to see the network.
+  Never delete originals during the import.""")
+        return rc
     print(f"""
 Next steps:
   1. Edit {n}/working-agreement.md and {n}/state.md (headline facts, components).
@@ -140,7 +433,7 @@ Next steps:
      (New folders and files in the root: NEW_FOLDERS={a.new_folders} in .myco-notes.conf; with 'ask' notes-commit stops and lists them.)
   6. Sharing with a team (GitHub or GitHub Enterprise): see {d_}/TEAM.md; teammates run {t}/setup-clone after cloning.
   (On Windows in cmd or PowerShell write {t.replace('/', chr(92))}\\notes-commit; in Git Bash, WSL, macOS and Linux write {t}/notes-commit.)""")
-    return 0
+    return rc
 
 
 if __name__ == "__main__":
