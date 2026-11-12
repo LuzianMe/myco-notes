@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.15.1
 - **Cloud and phone use is marked experimental**: the README section "From the cloud or a phone", method sections 18 and 19, the skill's quick-note mode and the starter `AGENTS.md` say so, and the README lists the known issues (no GitHub CLI API access in Claude Code cloud sessions, agents not always taking the light path, slow starts and queued checks, manual first set-up, the map as a zip, Codex untested). A solo merge says it is experimental when it starts waiting, and the skill tells the agent to report a failed step in one line instead of retrying.
 
 ## 0.15.0
