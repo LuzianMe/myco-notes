@@ -9,7 +9,7 @@ Checks
   due       follow-up dates that have passed ("after 2026-11-04", "review-by 2026-12-01") on lines not marked DONE (heuristic; words: after, about, due, review-by, waiting until, on or after)
   ledger    sync-tracker rows without a last-synced date or a refresh method
   secrets   secret-looking strings (the rules of tools/secret_scan.py, the same as the pre-commit hook and CI; values are not shown)
-  orphans   notes that no other note mentions by file name or links to (info only)
+  orphans   notes that no other note mentions by file name or links to (info only; names the records, such as logs, that still mention one)
   size      notes larger than MAX_NOTE_KB (default 100) and an AGENTS.md near or over the 32 KiB some agents load (warns from ENTRY_WARN_KB, default 24)
   header    the optional freshness header (method 10.1: last_confirmed, review_after, valid_from, valid_until, supersedes, superseded_by): malformed or
             reversed dates, a passed review_after or valid_until, last_confirmed older than STALE_DAYS (default 365) without a review_after, missing targets
@@ -293,7 +293,11 @@ def main():
     entry = {"AGENTS.md", "CLAUDE.md", "README.md"}
     for rel in md_files:
         if mentions[rel] == 0 and os.path.basename(rel) not in entry and not rel.startswith((".github/", docs_prefix, "template/") + history):
-            add("INFO", rel, 1, "no other note mentions this file by name")
+            base, stem = os.path.basename(rel), os.path.basename(rel)[:-3].lower()
+            recs = [h for h in md_files if h.startswith(history) and h != rel
+                    and (base in texts[h] or re.search(r"\[\[\s*" + re.escape(stem) + r"\s*[\]|#]", texts[h], re.I))]
+            add("INFO", rel, 1, "no other note mentions this file by name" + (
+                f" (only records do: {', '.join(recs[:3])}{' and more' if len(recs) > 3 else ''}; link it from a current note, method 21.1)" if recs else ""))
 
     order = {"ERROR": 0, "WARN": 1, "INFO": 2}
     findings.sort(key=lambda x: (order[x[0]], x[1], x[2]))

@@ -1,6 +1,6 @@
 # Myco Notes: the method
 
-Version 2.8 (general edition), 2026-11-12. It is project-independent and is written for engineers and teams (and for AI coding agents working with them) who run long, large or fast-changing projects: infrastructure, software platforms, data and ML systems, research, hardware, operations. It is meant as the specification from which a skill, a template repository or a team convention can be built.
+Version 2.8.1 (general edition), 2026-11-12. It is project-independent and is written for engineers and teams (and for AI coding agents working with them) who run long, large or fast-changing projects: infrastructure, software platforms, data and ML systems, research, hardware, operations. It is meant as the specification from which a skill, a template repository or a team convention can be built.
 
 The method grew out of a long-running, AI-operated engineering project in which the notes had to act as the memory of an operator that forgets everything between sessions. That constraint is useful for any project: if the notes are good enough for an operator with no memory, they are good enough for a new teammate, an auditor, or you in a year.
 
@@ -541,6 +541,8 @@ The lint (9) checks what a script can check: names, dates, sizes, links. It cann
 
 Read earlier review files first: a fix the owner declined is not proposed again unless something changed, and then the proposal says what changed.
 
+**Side effects belong in the proposal.** Before proposing a fix that moves, shortens or deletes text (condensing a note, moving an old changelog into `logs/` or the archive, merging two notes), check what that text was the only place to mention: a note named nowhere else becomes an orphan, because mentions from records do not count (the lint says which records still name it). The proposal then includes the link that keeps the note connected (a line in the note that stays, the read order or an index note), so the owner approves the whole change, not half of it.
+
 ### 21.2 The review file
 The proposals go into `<notes>/plans/review-YYYY-MM-DD.md`, which is committed (it is a plan, not a change to the notes). Each proposal is numbered and complete enough to be applied without further thought:
 
@@ -561,7 +563,9 @@ The owner sees a short numbered list (title and one line on the fix) and the pat
 - **Changed:** the owner's version is not applied straight away either. Rewrite the proposal with their change, set `Status: proposed (revised YYYY-MM-DD)`, show it again and apply it only on a yes. Only fixes the owner has seen in their final form go live.
 - **No answer:** nothing is applied. The proposals stay `proposed` and `tools/resume` lists them at the start of every session until they are answered. An unattended run never applies a proposal.
 - A fix that depends on another says so (`Needs: 2`); if 2 is declined, the dependent fix is shown again, rewritten, before anything is applied.
-- Afterwards run the lint and add one sync-log line: `- **YYYY-MM-DD review:** applied 1, 3, 4; declined 2; 5 revised, waiting (plans/review-YYYY-MM-DD.md)`.
+- Afterwards run the lint and compare it with the run before the review. A finding the applied fixes caused (a new orphan, a broken link) is not fixed silently: it becomes a new proposal in the same file, shown to the owner like the others.
+- Update the top of the review file to match: its summary and the opening paragraph say what was applied, declined and still waiting (an opening that says "nothing has been changed" is no longer true once fixes are applied).
+- Add one sync-log line: `- **YYYY-MM-DD review:** applied 1, 3, 4; declined 2; 5 revised, waiting (plans/review-YYYY-MM-DD.md)`.
 
 ### 21.4 Bringing an older tree up to newer rules (upgrade)
 When the method gains a rule (2.8 added summaries and the sync-log format), trees made earlier do not follow it yet. They are not rewritten silently:

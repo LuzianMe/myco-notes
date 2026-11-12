@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.17.1
+Two gaps found in the first real review (method 2.8.1, section 21):
+- **Side effects go into the proposal**: before proposing a fix that moves, shortens or deletes text (for example moving an old changelog into `logs/`), the agent checks which notes that text was the only one to mention and adds the link that keeps them connected to the same proposal. After applying, it compares the lint with the run before the review; anything the fixes caused becomes a new proposal instead of a silent fix.
+- **The review file says what happened**: after applying, its summary and opening paragraph are updated to say what was applied, declined and still waiting.
+- **Lint**: an orphan note that only records (logs, archive, inbox, imported) still mention now names them, so a mention lost in a move is easy to spot.
+
 ## 0.17.0
 Answers, summaries and reviews (method 2.8, section 21), with ideas from Andrej Karpathy's "LLM Wiki" note.
 - **One-line summaries and a note index**: a note's header can carry `summary:` (one line, at most 200 characters, what the note holds and when to read it). The new `tools/index` lists every note with its summary, or its first sentence marked as such, grouped by folder (`--missing` lists the notes without one; history folders are counted, `--all` lists them). The map shows the summary under each note, `resume` says how many notes still lack one, and the lint lists them in one info line and warns about summaries over 200 characters. The starter notes come with summaries.
