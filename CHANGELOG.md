@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.15.1
+- **Cloud and phone use is marked experimental**: the README section "From the cloud or a phone", method sections 18 and 19, the skill's quick-note mode and the starter `AGENTS.md` say so, and the README lists the known issues (no GitHub CLI API access in Claude Code cloud sessions, agents not always taking the light path, slow starts and queued checks, manual first set-up, the map as a zip, Codex untested). A solo merge says it is experimental when it starts waiting, and the skill tells the agent to report a failed step in one line instead of retrying.
+
 ## 0.15.0
 Quick notes and solo repositories (method 2.6, section 19): Myco Notes can sit behind an ordinary conversation, for example on a phone, and save what you say without ceremony.
 - **Quick notes go to an inbox**: the new `tools/capture` saves a typed or dictated note as one dated entry at the end of `<notes>/inbox/YYYY-MM.md` (owner's words, title, optional tags and related note; time in `TIMEZONE`), and with `--commit` commits just that file. No questions, no checks, no other notes touched; sorting the inbox into the notes is a separate step. The skill has a matching quick-note mode, the starter tree an inbox README and an `AGENTS.md` section, the lint treats the inbox as a record, the map shows it as its own group, and `resume` counts unsorted notes.

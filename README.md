@@ -109,7 +109,9 @@ Myco Notes is the operational memory of one project or system, edited by a few p
 ## Sharing with a team
 Put the notes tree in a private repository on GitHub, GitHub Enterprise or any git host. A bootstrapped tree already contains a pull-request check (`.github/workflows/notes-check.yml`), a CODEOWNERS file and a PR template. Teammates run `myco-notes/tools/setup-clone` once after cloning and change notes with `myco-notes/tools/notes-commit --branch NAME --pr "message"`. Set-up, branch protection and conflict handling: `skills/myco-notes/docs/TEAM.md`.
 
-## From the cloud or a phone
+## From the cloud or a phone (experimental)
+> **Experimental.** This works, and was tested end to end from a phone, but it depends on hosted agents and GitHub behaving the way they did in the tests, and it has rough edges (listed under *Known issues* below). Expect to step in now and then; the notes themselves are always safe in git, and nothing is merged unless the check passed.
+
 An agent can keep the notes without your computer: Claude Code on the web or in the Claude app's Code tab (and similar hosted agents) works in a fresh copy of a GitHub repository on a hosted machine and pushes a branch with a pull request. Used that way, Myco Notes can sit behind an ordinary conversation: you type or dictate a thought, the agent answers in a line, and in the background the note is saved in your repository, where any later agent (or another subscription) can pick it up.
 - **Quick notes go to an inbox.** "Remember that…" or a voice memo becomes one dated entry in `myco-notes/inbox/YYYY-MM.md` (`tools/capture`), with no questions, no checks and no other files touched. Sorting the inbox into the notes is a separate step you ask for when you like ("sort my inbox"). Method section 19.
 - **Solo repositories merge themselves.** With `SOLO=1` in `.myco-notes.conf` the agent squash-merges its own pull request once the check on GitHub passes (one commit per change on main), so a note needs nothing more from you; if the check fails it stops and says why. Teams keep `SOLO=0` and a human merges.
@@ -122,6 +124,14 @@ Tested with Claude Code cloud sessions on a private test repository:
 - **The skill: keep a copy in the repository.** Cloud sessions did not install a plugin named in the repository's `.claude/settings.json`, but they do load project skills. Copy the kit's skill folder into the notes repository once: `cp -r <KIT> .claude/skills/myco-notes` (for Codex: `.agents/skills/myco-notes`; not tested yet), where `<KIT>` is the installed `skills/myco-notes` folder, and commit it. `relocate` refreshes that copy with the tools at every update, and the lint and the map leave it out. Without the copy the agent still works from the tree's `AGENTS.md`, which was enough in the test, but the skill's capture steps are more thorough.
 - **What does not work from there:** anything on your own network. Mirrors over ssh and a map published to your own server happen when a local clone pulls the merged change and syncs.
 - **Plain chat** on the phone (without the Code tab) has no lasting git repository, so it cannot keep the tree; ask it for a handoff entry and merge that in your next session.
+
+Known issues:
+- **The GitHub CLI cannot reach GitHub's API in Claude Code cloud sessions**, so `notes-commit --pr` cannot open or merge the pull request itself (exit 5). The agent then uses its own GitHub tools; whether that works, and how many steps it shows you, depends on the agent and its connector.
+- **The agent does not always follow the light path.** It may still ask questions, wait in the conversation for the check, or leave the pull request for you to merge. Saying "just save it" or "merge it yourself" usually sets it right; `SOLO=1` must be in the repository's `.myco-notes.conf`.
+- **Slow starts and slow checks.** Each new cloud session starts a fresh machine, and GitHub Actions runs sometimes wait in a queue for minutes; a solo merge gives up after 15 minutes and leaves the pull request open.
+- **Starting a new tree from the phone is manual.** A cloud session needs an existing repository, and `bootstrap` expects an empty folder, so the first set-up takes an empty private repository made by hand and a longer prompt (or a desktop session driven from the phone).
+- **The map is a zip download,** kept 30 days with the Actions run, not a page you can bookmark.
+- **Codex** (cloud tasks, `.agents/skills`) has not been tested yet; its internet access is off by default, so it may not be able to push or open pull requests without a set-up change.
 
 ## Platform support
 Linux, macOS and Windows (native, Git for Windows, or WSL). The tools are Python 3.8+ (standard library only) plus git; each has a launcher for every shell. In Git Bash, WSL, macOS and Linux write `myco-notes/tools/notes-commit ...`; in cmd or PowerShell write `myco-notes\tools\notes-commit ...` (a `.cmd` launcher) or `python tools\notes_commit.py ...`. Remote mirrors over ssh need rsync and ssh; a `git:URL` mirror target needs neither. The kit's tests run on all three systems in GitHub Actions.

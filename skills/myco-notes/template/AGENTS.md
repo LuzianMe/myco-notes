@@ -20,7 +20,7 @@ This repository holds the **notes** of {{PROJECT_NAME}}: the single source of tr
 
 ## Quick notes (a thought to keep, typed or dictated)
 When the owner just wants something remembered ("note that…", "remember…", a voice memo), do not run the full update: save it as one entry in this month's inbox with `{{TOOLS_DIR}}/capture --commit "the note"` (add `--title`, `--tag`, `--related NOTE` when obvious), reply in one line ("Saved: <title>"), ask nothing. Sorting the inbox into the notes is a separate step, when asked. Format: `{{NOTES_DIR}}/inbox/README.md`.
-Working through pull requests (a cloud session, a branch per change): push and open the pull request; if `SOLO=1` in `.myco-notes.conf`, squash-merge it yourself once its check passes, then continue from the updated main branch; if the check fails, say why and stop. Reply "Saved" without waiting for a slow check; if `notes-commit` exits 5 because the GitHub CLI cannot reach GitHub, use your own GitHub tools. With `SOLO=0` a human merges.
+Working through pull requests (a cloud session, a branch per change; experimental, method section 19): push and open the pull request; if `SOLO=1` in `.myco-notes.conf`, squash-merge it yourself once its check passes, then continue from the updated main branch; if the check fails, say why and stop. Reply "Saved" without waiting for a slow check; if `notes-commit` exits 5 because the GitHub CLI cannot reach GitHub, use your own GitHub tools. With `SOLO=0` a human merges.
 
 ## Tools
 - `{{TOOLS_DIR}}/notes-commit "message"` : stage, check, commit (add `-p` to push the mirror; `--only PATH` commits only those paths, `--dry-run` shows what would go in).
