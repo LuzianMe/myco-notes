@@ -655,6 +655,10 @@ def main():
         rc, out = run(L(sp, "resume", T), sp)
         check("resume lists the review proposals still waiting, not applied or declined ones", "## Waiting for the owner (review proposals)" in out and "2 proposal(s) waiting for the owner's answer (2, 3)" in out, out)
         check("resume says how many notes have no summary", "summaries: 1 of" in out, out)
+        write(os.path.join(sp, MY, "lonely.md"), "---\nsummary: A note only a log still names\n---\n# Lonely\n")
+        write(os.path.join(sp, MY, "logs", "moved-changelog.md"), "---\nsummary: Old changelog\n---\n# Moved\n- 2026-11-09: wrote `lonely.md`\n")
+        rc, out = run(slint, sp)
+        check("lint: an orphan that only a record mentions names that record", f"lonely.md:1 no other note mentions this file by name (only records do: {MY}/logs/moved-changelog.md" in out, out)
     finally:
         def _force(func, path, _exc):
             os.chmod(path, 0o700)
