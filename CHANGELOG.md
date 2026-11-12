@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.16.0
 Adopting existing notes (method 2.7, section 20): a folder of Markdown notes written by hand, exported from a notes app or made with other AIs can become a Myco Notes tree without losing anything.
 - **Two ways in**: `bootstrap NEW --import FOLDER` creates a new tree and copies the folder as found into `<notes>/imported/<name>/`, leaving the original untouched; `bootstrap FOLDER --adopt` turns the folder itself into a tree after writing a verified zip backup next to it (`--backup-to`, `--no-backup`), commits the notes as found first, and tags an existing repository's last commit `before-myco-notes`. Notes stay at their paths; an existing `AGENTS.md` or `CLAUDE.md` is kept as `*.pre-myco.md`; `.gitignore` and `.gitattributes` are extended; `.obsidian/`, `.trash/` and similar folders are left out.
 - **Secrets first**: the collection is scanned before the first commit; files with a secret-looking string are left uncommitted and listed with the value hidden (exit 4).
