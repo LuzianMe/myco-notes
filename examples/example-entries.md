@@ -19,7 +19,18 @@ Timeline (UTC): 09:12 first alert; 09:20 consumer lag 120k; 09:31 identified ful
 Context: current SQL `LIKE` search takes 1.8 s p95. Options: (1) managed search service, 400 USD/month, 2 days; (2) self-hosted engine on the existing cluster, 0 USD, 6 days, adds an on-call surface; (3) database full-text index, 0 USD, 1 day, p95 expected 300 ms. Chosen: option 3, by the platform owner. Why: lowest change and enough speed. Not chosen: 1 (cost), 2 (operational load). Review trigger: p95 above 500 ms for a week, or more than 5 million products.
 
 ## Sync-log line (in `notes/sync-tracker.md`)
-- **2026-03-14 (17:40 UTC, key rotation):** runbook, state.md and both backup scripts updated and committed; mirror pushed. **NOT synced:** the offline recovery copy still holds the old key reference (refresh at the next maintenance window, pending item 3); the search index is two days behind.
+- **2026-03-14 change (17:40 UTC, key rotation):** runbook, state.md and both backup scripts updated and committed; mirror pushed. **NOT synced:** the offline recovery copy still holds the old key reference (refresh at the next maintenance window, pending item 3); the search index is two days behind.
+
+## Review proposal (in `notes/plans/review-2026-03-20.md`, method section 21)
+```
+## 2. Two retention periods for the database backups
+Kind: contradiction
+Where: `state.md` (Backups and recovery, line 31); `runbook.md` ("How do I restore the database?", line 88)
+Found: state.md says backups are kept 14 days, the runbook says 30. The backup job's config (scripts/db-backup.conf) says 14.
+Proposed fix: runbook.md line 88, replace "kept for 30 days" with "kept for 14 days (scripts/db-backup.conf, verified 2026-03-20; was 30 until the 2026-02-11 change)".
+Status: proposed
+```
+The owner answers "2 yes"; the line becomes `Status: applied 2026-03-20` and the fix is committed with the review file.
 
 ## Commit messages
 - `Rotate backup key per job; document restore drill and the failure of the first attempt`

@@ -2,8 +2,8 @@
 """resume: a bounded start-of-session briefing for a Myco Notes tree (Python standard library only).
 
 Prints, as Markdown and within a character budget, what a session needs before it touches anything (method 11.2):
-the repository state, the pending list of the sync tracker, the headline facts and open items of the master record, notes past a review
-or follow-up date, the newest handoff and the last commits. It reads; it never writes. It is a view, not a source: open the note for any fact
+the repository state, review proposals waiting for the owner's answer (method 21), the pending list of the sync tracker, the headline
+facts and open items of the master record, notes past a review or follow-up date, the newest handoff and the last commits. It reads; it never writes. It is a view, not a source: open the note for any fact
 you will act on.
 
 Budget: --budget N characters (default 6000; RESUME_BUDGET in .myco-notes.conf). Items are kept whole or left out, never cut in half; the
@@ -70,6 +70,28 @@ def newest_handoff(root, notes):
     return [item + (f" - {status}" if status else "")]
 
 
+def waiting_reviews(root, notes):
+    """Review files in <notes>/plans/ (method 21.2) with proposals still waiting for an answer: one item per file, numbers listed."""
+    d = os.path.join(root, *notes.split("/"), "plans")
+    items = []
+    if not os.path.isdir(d):
+        return items
+    for f in sorted(os.listdir(d), reverse=True):
+        if not re.fullmatch(r"review-.*\.md", f):
+            continue
+        text = open(os.path.join(d, f), encoding="utf-8", errors="replace").read()
+        num, open_ = None, []
+        for line in text.split("\n"):
+            hm = re.match(r"^#{2,3}\s+(\d+)[.)]?\s", line)
+            if hm:
+                num = hm.group(1)
+            elif num and re.match(r"^\s*\**Status:?\**:?\s*proposed", line, re.I):
+                open_.append(num)
+        if open_:
+            items.append(f"`{notes}/plans/{f}`: {len(open_)} proposal(s) waiting for the owner's answer ({', '.join(open_)}); apply none before a yes (method 21.3)")
+    return items
+
+
 def main():
     _myco.utf8_console()
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -121,6 +143,18 @@ def main():
         if n_in > 0:
             state.append(f"inbox: {n_in} quick note(s) not sorted yet (`{notes}/inbox/`; quick notes: `{lay['tools']}/capture`, method 19.1)")
 
+    try:
+        import notes_index
+        rows = notes_index.collect(root, lay)
+        nos = [r for r in rows if not r[3] and not r[2]]
+        if nos:
+            state.append(f"summaries: {len(nos)} of {len([r for r in rows if not r[3]])} notes have none; `{lay['tools']}/index` lists every note with its summary (method 10.1)")
+        else:
+            state.append(f"note index: `{lay['tools']}/index` (every note with its one-line summary); read it to find the right note")
+    except Exception:
+        pass
+    reviews = waiting_reviews(root, notes)
+
     # --- pending, headline, open items
     pending = section_items(read(notes + "/sync-tracker.md"), r"^pending", 30)
     st = read(notes + "/" + lay["state"])
@@ -153,7 +187,7 @@ def main():
     log = _myco.git("-C", root, "log", "-5", "--format=%h %ad %s", "--date=short")
     recent = [l.strip() for l in log.stdout.split("\n") if l.strip()] if log.returncode == 0 else []
 
-    sections = [("Repository", state), ("Pending (sync tracker)", pending), ("Headline facts (master record)", headline),
+    sections = [("Repository", state), ("Waiting for the owner (review proposals)", reviews), ("Pending (sync tracker)", pending), ("Headline facts (master record)", headline),
                 ("Open items (master record)", openi), ("Past a review or follow-up date", due), ("Newest handoff", handoff),
                 ("Last commits", recent)]
     head_txt = f"# {project}: resume, {today}\n"

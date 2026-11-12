@@ -1,9 +1,12 @@
+---
+summary: What is pending, which copies of the notes are behind, what to update when something changes, and the sync log
+---
 # Sync tracker (read this when asked to "update the notes", and after any change)
 
 Created {{DATE}}. One place that says which copies of the project's documentation exist, when each was last brought in line with reality, how to refresh it, and what is pending. Times are {{TIMEZONE}}. No secrets in this file.
 
 ## Rules (follow at the end of every session that changed something)
-1. After a change, update the notes it touches (see the matrix below), add ONE line to the sync log, move the "last synced" date of each target you really updated, then commit everything together with `{{TOOLS_DIR}}/notes-commit "what and why"`.
+1. After a change, update the notes it touches (see the matrix below), add ONE line to the sync log (`- **YYYY-MM-DD kind:** what`, kind one of change, note, answer, review, audit, import, merge, upgrade, setup, drill), move the "last synced" date of each target you really updated, then commit everything together with `{{TOOLS_DIR}}/notes-commit "what and why"`.
 2. If a target could not be updated (media not available, machine asleep, a password needed, the owner's yes missing), write it under **Pending** with what is needed. Never mark something synced that was not.
 3. At the start of a session read this file with `working-agreement.md` and `state.md`; ask the owner about pending items that need them, once per session.
 4. No copy-suffix files (`.bak`, `-old`) for files in this repository; history is git. Copy-suffix backups are for files OUTSIDE the repository, before changing them.
@@ -34,4 +37,4 @@ Created {{DATE}}. One place that says which copies of the project's documentatio
 | Anything else | at least a dated changelog line in `state.md` and one line in the sync log |
 
 ## Sync log (newest first)
-- **{{DATE}} ({{TIMEZONE}}):** notes tree created from the Myco Notes template. Nothing else synced; mirror, snapshots, map and offline copy are pending.
+- **{{DATE}} setup:** notes tree created from the Myco Notes template. Nothing else synced; mirror, snapshots, map and offline copy are pending.

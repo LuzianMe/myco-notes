@@ -1,3 +1,6 @@
+---
+summary: Master record: what {{PROJECT_NAME}} is and runs now (inventory, access, backups, secrets locations), open items and the changelog
+---
 # {{PROJECT_NAME}}: master record (current state)
 
 Last updated {{DATE}} ({{TIMEZONE}}). Last full audit: none yet. No secrets are stored here; section 1 says where they live. Related files: `working-agreement.md`, `runbook.md`, `sync-tracker.md`, `plans/backlog.md`.

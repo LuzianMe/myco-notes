@@ -1,3 +1,6 @@
+---
+summary: How people and agents work on {{PROJECT_NAME}}: approvals, safety rules, things never to do; read first in every session
+---
 # Working agreement ({{PROJECT_NAME}})
 
 Created {{DATE}}. This file says how people and agents work on this project. Where a point is a rule the owner stated in words it says so (with the date); where it is a reading of a reaction it is marked **(inferred, confirm)**. Keep it short; change it only when the owner states a new rule.

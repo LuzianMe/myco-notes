@@ -1,3 +1,6 @@
+---
+summary: How-to answers with tested commands, verification and undo, plus the lessons list; read the entry for the task at hand
+---
 # {{PROJECT_NAME}}: runbook (question and answer style)
 
 Created {{DATE}}. Each entry is a question a person (or an AI reader) would ask, with a tested answer: where it lives, the command, how to verify, how to undo, known traps. No secrets; say where they are. If this file and `state.md` disagree, the more detailed note wins and the other is corrected. Times are {{TIMEZONE}}.

@@ -345,6 +345,9 @@ def refresh_only(root, old, conf, a, self_run):
         agents = ""
     if agents and "exit code 3" not in agents:
         tips.append("AGENTS.md does not tell agents what to do when notes-commit exits with code 3 (new root folders). Add the bullet from the kit's template/AGENTS.md (the one starting 'If notes-commit stops with exit code 3').")
+    if agents and "summary:" not in agents:
+        tips.append("AGENTS.md has no 'Questions and reviews' section (note index, keeping answers, reviews with proposed fixes, summaries, the sync-log form). Propose it from the kit's template/AGENTS.md to the owner.")
+    tips.append(f"Offer the owner an upgrade review (method 21.4): {old['tools']}/index --missing lists the notes without a summary; propose summaries in batches of about 20 and apply only what the owner confirms. Records (logs, archive, inbox, older sync-log lines) keep their form.")
     print("\nrelocate: " + ("done, nothing committed. Next:" if a.apply else "this was a dry run. With --apply it copies the files above, then:"))
     print(f"  1. git status and git diff --stat; run {old['tools']}/notes-lint.py and python3 {old['tools']}/build-notes-map.py (it writes the graph view too).")
     print(f"  2. Commit: {old['tools']}/notes-commit \"Update the Myco Notes tools and docs to {kit_version()}\"")

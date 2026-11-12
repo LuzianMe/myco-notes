@@ -16,6 +16,7 @@ The output folder is emptied and rebuilt, so --out must not be the repository or
 missing, or a map this tool built (it leaves a .myco-notes-map marker there).
 Two notes whose paths give the same page name (a/b.md and a-b.md) keep apart: the later one gets a short hash of its path.
 Optional config: .myco-notes-map.json  {"title": "...", "groups": [{"id","name","blurb","prefixes":["myco-notes/plans/"]}], "hints": {"myco-notes/state.md": "one line"}}
+        (a hint replaces the note's own one-line `summary` from its header, method 10.1; without either, the first paragraph is shown)
 Folders: the notes folder, docs folder and map folder come from .myco-notes.conf (see tools/_myco.py layout); DATA_DIRS (project data that is not notes) are left out.
 Needs only the Python standard library; if the 'markdown' package is installed pages are rendered nicely, otherwise as preformatted text.
 """
@@ -135,7 +136,7 @@ def main():
                 group = gid
                 break
         info[rel] = dict(id=slug(rel), rel=rel, name=os.path.basename(rel), title=ttl, group=group, text=text, shown=shown, fm={k: v[0] for k, v in fm.items()}, out={}, inn={},
-                         hint=hints.get(rel) or (para[:170] + ("..." if len(para) > 170 else "")),
+                         hint=hints.get(rel) or (fm["summary"][0] if fm.get("summary", ("",))[0] else "") or (para[:170] + ("..." if len(para) > 170 else "")),
                          mtime=os.path.getmtime(os.path.join(root, rel)), size=len(text.encode("utf-8")))
     taken = {}
     for rel in sorted(info):                       # a/b.md and a-b.md give the same page name: the later one gets a path hash
