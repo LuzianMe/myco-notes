@@ -46,7 +46,7 @@ Mycelium is the underground network of threads (hyphae) that connects the trees 
 
 | Part | What it is |
 |---|---|
-| `SKILL.md` | The skill: a quick-note mode and five working modes (capture, audit, bootstrap, merge, restore/review) plus resume/hand-off, guard rails and an execution-environment check. |
+| `SKILL.md` | The skill: a quick-note mode and six working modes (capture, audit, bootstrap, adopt existing notes, merge, restore/review) plus resume/hand-off, guard rails and an execution-environment check. |
 | `docs/METHODOLOGY.md` | The full method: principles, file roles, entry formats, how to capture information, when to update, relations between files and datasets, git versioning, security, freshness, procedures, working with AI agents, anti-patterns. |
 | `template/` | A ready starter tree: entry point (`AGENTS.md` / `CLAUDE.md`), working agreement, master record, runbook with a lessons list, sync tracker (derived-copy ledger, dependency matrix, pending list, sync log), backlog, verification guide, artifact and archive folders, `.gitignore`, config. |
 | `tools/notes-commit` | One command to commit with a described message: syntax checks, optional AI co-author trailer, optional sync of executed files, optional mirror push, optional milestone tag, `--only PATH` to commit just those paths, `--dry-run` to preview, and for teams `--branch`, `--push`, `--pr`. |
@@ -58,7 +58,7 @@ Mycelium is the underground network of threads (hyphae) that connects the trees 
 | `tools/build-notes-map.py` | Builds a static, searchable map: notes grouped by purpose, **who mentions whom**, backlinks, per-note git history, recent commits, and the **mycelium view** (`graph.html`): the notes as a living network with a timeline that replays the git history. Refuses to build if a note contains a secret. |
 | `tools/mirror-push`, `tools/restore-drill` | A second copy of the repository (by default only what git tracks; refuses targets that overlap the tree; `--dry-run`, `--strict`), and proof that it can be restored, with separate verdicts for the history and the working copy. |
 | `tools/doctor` | Read-only health check: kit version (and whether the tools are older than the kit you run it from), hook, layout, missing settings. |
-| `tools/bootstrap` | Creates a new notes repository from the template in one command, with everything in one `myco-notes/` folder and optional project data folders (`--data-dir`). |
+| `tools/bootstrap` | Creates a new notes repository from the template in one command, with everything in one `myco-notes/` folder and optional project data folders (`--data-dir`). Takes over an existing folder of notes: `--import FOLDER` (a new tree with a copy) or `--adopt` (the folder itself, after a zip backup). |
 | `tools/relocate` | Moves an older tree (notes/, tools/, docs/ at the root) into the single folder, or renames that folder: dry run first, keeps your folder names, rewrites the path references. |
 | `tools/ci-check`, `tools/setup-clone`, `docs/TEAM.md`, `template/.github/` | Team use: a pull-request check (secret scan + lint), per-clone setup, CODEOWNERS and PR template, and the step-by-step guide for GitHub or GitHub Enterprise. |
 
@@ -97,7 +97,7 @@ Use the tools directly (below). The method is plain Markdown plus git.
 ## What it runs and what it sends
 Everything runs on your machine, inside the notes repository you point it at. Nothing is sent anywhere unless you configure it.
 - **The skill** tells the agent to edit Markdown files in the notes tree and to run the kit's own Python scripts (`notes-commit`, `notes-lint.py`, `build-notes-map.py`, `resume`, `asof` and the others in `tools/`) and `git`. No package is downloaded or installed; the scripts use the Python standard library only.
-- **Writes** go to the notes repository: its files, its git history, and `core.hooksPath` in its git config (so the secret-refusing pre-commit hook runs). `bootstrap` creates a new tree in the folder you name.
+- **Writes** go to the notes repository: its files, its git history, and `core.hooksPath` in its git config (so the secret-refusing pre-commit hook runs). `bootstrap` creates a new tree in the folder you name; with `--adopt` it adds the tree's files to an existing folder after writing a zip backup next to it.
 - **Network:** none by default, and no telemetry. Only when you set it up: `mirror-push` copies the repository to the `MIRROR_TARGET` you configure (a local folder, `git push --mirror` to a git URL, or rsync over ssh); `notes-commit --push` / `--pr` runs `git push` to your `origin` and, with `--pr`, `gh pr create` if the GitHub CLI is installed; `POST_PUSH_CMDS` and `SYNC_CMD` run commands you write yourself in `.myco-notes.conf`.
 - **The map and the mycelium view** are static HTML files with no scripts or fonts from the network; they contain note titles, paths, counts and commit subjects (the map pages also the note text), and are written only to the gitignored map folder.
 - **Secrets:** the notes say where a secret lives, never its value; the pre-commit hook, the map builder and the CI check refuse text that looks like a credential.
@@ -105,6 +105,15 @@ Everything runs on your machine, inside the notes repository you point it at. No
 
 ## When it is not a fit
 Myco Notes is the operational memory of one project or system, edited by a few people and agents, in one git repository, over months or years. It is the wrong tool for: memory about a person or a stream of small facts (a typed one-fact-per-file store fits better); many writers updating at once (writes here are plain edits protected by git, the hook and the lint, not transactions); ranked retrieval or graph queries over thousands of records (add a search index, or a real store); facts that a tool must check for meaning (the freshness header and `asof` check dates and history, not whether two sentences contradict); and a tree nobody will keep current in the same session as the change. The full list is in `skills/myco-notes/docs/METHODOLOGY.md` section 1.1.
+
+## Already have notes?
+If you have a folder of Markdown notes already (written by hand, exported from a notes app such as Obsidian, or made with other AIs), ask your agent to bring it in ("make this folder a Myco Notes tree"). It asks you two things first:
+- **Where:** a **new folder** (recommended if the notes will be reorganised; your folder is copied into `myco-notes/imported/` and stays untouched as the backup) or **in place** (the folder stays where it is, for example a vault you open every day; a zip of the whole folder is written next to it first, and a folder that is already a git repository gets the tag `before-myco-notes`).
+- **How far:** **keep the structure** (add the master record, the working agreement and links; rename nothing) or **reorganise** into one note per subject with the method's names, links and headers.
+
+Before the first commit the whole collection is scanned for secrets; a file with a pasted key or password is not committed and is listed (value hidden). Settings folders such as `.obsidian/` are left out, and an `AGENTS.md` or `CLAUDE.md` from an earlier tool is kept as `*.pre-myco.md`. Existing `[[wiki links]]` and relative Markdown links keep working: the lint and the map read them. Then the agent works through the collection in batches, one commit each, and keeps an import log (`myco-notes/logs/import-<name>.md`) with one row per original note and what became of it, so another session can carry on where it stopped. Nothing original is deleted during the import. Method section 20.
+
+Without an agent: `tools/bootstrap ~/notes-tree --name "My notes" --import ~/old-notes` or `tools/bootstrap ~/old-notes --name "My notes" --adopt`.
 
 ## Sharing with a team
 Put the notes tree in a private repository on GitHub, GitHub Enterprise or any git host. A bootstrapped tree already contains a pull-request check (`.github/workflows/notes-check.yml`), a CODEOWNERS file and a PR template. Teammates run `myco-notes/tools/setup-clone` once after cloning and change notes with `myco-notes/tools/notes-commit --branch NAME --pr "message"`. Set-up, branch protection and conflict handling: `skills/myco-notes/docs/TEAM.md`.
@@ -129,7 +138,7 @@ Known issues:
 - **The GitHub CLI cannot reach GitHub's API in Claude Code cloud sessions**, so `notes-commit --pr` cannot open or merge the pull request itself (exit 5). The agent then uses its own GitHub tools; whether that works, and how many steps it shows you, depends on the agent and its connector.
 - **The agent does not always follow the light path.** It may still ask questions, wait in the conversation for the check, or leave the pull request for you to merge. Saying "just save it" or "merge it yourself" usually sets it right; `SOLO=1` must be in the repository's `.myco-notes.conf`.
 - **Slow starts and slow checks.** Each new cloud session starts a fresh machine, and GitHub Actions runs sometimes wait in a queue for minutes; a solo merge gives up after 15 minutes and leaves the pull request open.
-- **Starting a new tree from the phone is manual.** A cloud session needs an existing repository, and `bootstrap` expects an empty folder, so the first set-up takes an empty private repository made by hand and a longer prompt (or a desktop session driven from the phone).
+- **Starting a new tree from the phone is manual.** A cloud session needs an existing repository, so the first set-up takes a private repository made by hand (or a desktop session driven from the phone). In it the agent can run `bootstrap . --adopt --no-backup` (git history is the backup there); that path has not been tried in a cloud session yet.
 - **The map is a zip download,** kept 30 days with the Actions run, not a page you can bookmark.
 - **Codex** (cloud tasks, `.agents/skills`) has not been tested yet; its internet access is off by default, so it may not be able to push or open pull requests without a set-up change.
 

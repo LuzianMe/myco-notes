@@ -2,13 +2,14 @@
 """notes-lint: cheap consistency checks for a Myco Notes tree (Python standard library only).
 
 Checks
-  refs      backticked names of notes (*.md) and of repository paths that do not exist
+  refs      backticked names of notes (*.md) and of repository paths that do not exist; wiki links ([[Note]]) and relative
+            Markdown links ([text](../note.md)) that point nowhere
   headings  duplicate numbered headings in one file ("## 9." twice)
   fresh     "Last updated <date>" header older than the newest changelog entry in the same file
   due       follow-up dates that have passed ("after 2026-11-04", "review-by 2026-12-01") on lines not marked DONE (heuristic; words: after, about, due, review-by, waiting until, on or after)
   ledger    sync-tracker rows without a last-synced date or a refresh method
   secrets   secret-looking strings (the rules of tools/secret_scan.py, the same as the pre-commit hook and CI; values are not shown)
-  orphans   notes that no other note mentions by file name (info only)
+  orphans   notes that no other note mentions by file name or links to (info only)
   size      notes larger than MAX_NOTE_KB (default 100) and an AGENTS.md near or over the 32 KiB some agents load (warns from ENTRY_WARN_KB, default 24)
   header    the optional freshness header (method 10.1: last_confirmed, review_after, valid_from, valid_until, supersedes, superseded_by): malformed or
             reversed dates, a passed review_after or valid_until, last_confirmed older than STALE_DAYS (default 365) without a review_after, missing targets
@@ -18,7 +19,7 @@ Exit:   0 clean, 1 warnings, 2 errors (secrets), 3 the lint could not run (for e
         warnings into exit 1 even for info-only runs of 'due'. The last line is always the 'notes-lint: N notes, ...' summary when it finished.
 Ignore: put regular expressions (one per line) in .myco-notes-lint-ignore; a finding whose text matches is dropped.
 Layout (.myco-notes.conf): the generated map folder and DATA_DIRS (project data that is not notes) are not read as notes; the folders in
-        HISTORY_DIRS (default "archive logs", inside the notes folder) are records, so references, follow-up dates, size and orphans are not
+        HISTORY_DIRS (default "archive logs", inside the notes folder; inbox and imported always) are records, so references, follow-up dates, size and orphans are not
         checked there (secrets always are).
 """
 import argparse, datetime, os, re, subprocess, sys
@@ -29,7 +30,7 @@ sys.path.insert(0, HERE)
 import _myco  # noqa: E402
 import secret_scan  # noqa: E402
 
-SKIP_DIRS = {".git", "site", "notes-map", "node_modules", "__pycache__"}
+SKIP_DIRS = {".git", "site", "notes-map", "node_modules", "__pycache__", ".obsidian", ".trash"}
 DATE = r"\d{4}-\d{2}-\d{2}"
 
 
@@ -216,6 +217,19 @@ def main():
             entries = [e for e in re.findall(rf"^- \*\*({DATE})", text[cl.end():] if cl else "", re.M) if e <= (today + datetime.timedelta(days=1)).isoformat()]
             if entries and max(entries) > hm.group(1):
                 add("WARN", rel, 1, f"header says last updated {hm.group(1)} but the changelog has entries up to {max(entries)}")
+
+    # wiki links and relative Markdown links (method 9): they count as mentions; a link to nothing is reported
+    index = _myco.LinkIndex(md_files, paths)
+    for rel, text in texts.items():
+        if rel.startswith((docs_prefix, "template/")):
+            continue
+        for kind, tgt, ln in _myco.links(text):
+            found = index.resolve(kind, tgt, rel)
+            if found is None:
+                if not rel.startswith(history):
+                    add("WARN", rel, ln, f"link to missing note or file {'[[' + tgt + ']]' if kind == 'wiki' else tgt}")
+            elif found != rel and found in mentions:
+                mentions[found] += 1
 
     # ledger completeness
     for rel in md_files:

@@ -9,7 +9,8 @@ What it produces
   raw/<slug>.md     the original files
   graph.html        the mycelium view: notes as a living network (mentions, groups, freshness, follow-ups gone stale, missing references) with a
                     timeline that replays the git history; one self-contained file, opens by double-click; only titles, paths and commit subjects
-Relations are file-name mentions: a note that writes `runbook.md` in backticks (or plain text) mentions that note.
+Relations are file-name mentions: a note that writes `runbook.md` in backticks (or plain text) mentions that note; wiki links
+([[Note name]], [[Note name|text]]) and Markdown links to relative paths ([text](../a/note.md)) count too.
 It refuses to build if any note contains a secret-looking string (publication gate; the rules of tools/secret_scan.py, value hidden).
 The output folder is emptied and rebuilt, so --out must not be the repository or a folder that contains it, and must be empty,
 missing, or a map this tool built (it leaves a .myco-notes-map marker there).
@@ -28,7 +29,7 @@ import notes_graph  # noqa: E402
 import secret_scan  # noqa: E402
 import hashlib  # noqa: E402
 
-SKIP_DIRS = {".git", "site", "notes-map", "node_modules", "__pycache__"}
+SKIP_DIRS = {".git", "site", "notes-map", "node_modules", "__pycache__", ".obsidian", ".trash"}
 MARKER = ".myco-notes-map"   # marks a folder this tool made, so it may empty and rebuild it
 MAP_FILES = {"index.html", "graph.html", "p", "raw", MARKER}
 
@@ -44,6 +45,7 @@ def default_groups(lay):
         ("verify", "Verification", "Health check and test procedures.", [n + "verification/"]),
         ("artifacts", "Deployed artifacts", "Repository copies of what runs elsewhere (READMEs of bundles).", [n + "scripts/"]),
         ("archive", "Archive", "Old detail kept for history.", [n + "archive/"]),
+        ("imported", "Imported, as found", "Notes taken over from an older collection, unchanged (method section 20); the import log says what became of each.", [n + "imported/"]),
         ("docs", "Method", "How the notes are kept.", [lay["docs"] + "/"]),
         ("other", "Other notes", "Everything else (entity notes and new files appear here automatically).", []),
     ]
@@ -156,6 +158,12 @@ def main():
                 if tgt != rel:
                     info[tgt]["inn"][d["id"]] = info[tgt]["inn"].get(d["id"], 0) + 1
                     d["out"][info[tgt]["id"]] = d["out"].get(info[tgt]["id"], 0) + 1
+    index = _myco.LinkIndex(list(info))          # wiki links and relative Markdown links count as mentions too (method 9)
+    for rel, d in info.items():
+        for tgt in {index.resolve(k, t, rel) for k, t, _ in _myco.links(d["text"])}:
+            if tgt and tgt != rel and tgt in info and info[tgt]["id"] not in d["out"]:
+                info[tgt]["inn"][d["id"]] = info[tgt]["inn"].get(d["id"], 0) + 1
+                d["out"][info[tgt]["id"]] = 1
     byid = {d["id"]: d for d in info.values()}
 
     def log_rows(extra):

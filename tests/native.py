@@ -427,6 +427,81 @@ def main():
             check("solo: passing checks are squash-merged and the branch deleted", res["pass"][0] == 0 and "fake gh pr merge main --squash --delete-branch" in res["pass"][1] and "squash-merged main" in res["pass"][1], res["pass"][1])
             check("solo: every note was pushed", "main" in git(qremote, "branch", "--list")[1])
 
+        print("adopting existing notes (import into a new tree, adopt in place)")
+        old = os.path.join(tmp, "old-notes")
+        write(os.path.join(old, "recipes", "sourdough.md"), "# Sourdough\nFeed 1:1:1. See [bread](../Bread%20basics.md) and [[Prompting]].\n![[crumb.png]]\n")
+        write(os.path.join(old, "Bread basics.md"), "---\ntags: [baking]\n---\n# Bread basics\nFlour, water.\n")
+        write(os.path.join(old, "prompting.md"), "# Prompting\n- [[Sourdough|the starter]]\n- [[Nowhere]]\n")
+        write(os.path.join(old, "img", "crumb.png"), "png")
+        write(os.path.join(old, ".obsidian", "app.json"), "{}")
+        write(os.path.join(old, "AGENTS.md"), "# Old agent file\nBe brief.\n")
+        write(os.path.join(old, "keys.md"), "token ghp_" + "abcdefghijklmnopqrstuvwxyz0123456789AB\n")
+        before = sorted(os.path.relpath(os.path.join(dp, f), old) for dp, _dn, fn in os.walk(old) for f in fn)
+        imp = os.path.join(tmp, "imported-tree")
+        rc, out = run(L(kit, "bootstrap") + [imp, "--name", "Kitchen", "--owner", "Tester", "--import", old], tmp)
+        base = MY + "/imported/old-notes/"
+        tracked = git(imp, "ls-files")[1].split("\n")
+        check("import: exit 4 and the file with a secret is listed, value hidden, not committed",
+              rc == 4 and "keys.md:1" in out and "abcdefghij" not in out and base + "keys.md" not in tracked, out)
+        check("import: notes copied as found and committed; app settings left out",
+              base + "recipes/sourdough.md" in tracked and base + "Bread basics.md" in tracked and not any(".obsidian" in t for t in tracked)
+              and "Import:" in git(imp, "log", "--format=%s")[1], "\n".join(tracked[:20]))
+        check("import: the original folder is untouched",
+              before == sorted(os.path.relpath(os.path.join(dp, f), old) for dp, _dn, fn in os.walk(old) for f in fn) and not os.path.isdir(os.path.join(old, ".git")))
+        log = read(os.path.join(imp, MY, "logs", "import-old-notes.md")) if os.path.isfile(os.path.join(imp, MY, "logs", "import-old-notes.md")) else ""
+        check("import: the import log has the inventory and one row per note", "5 notes" in log and "4 wiki links, 1 relative links, 1 pointing nowhere" in log
+              and "| `" + base + "prompting.md` | Prompting | 1 | 2 | pending |" in log and "held: secret" in log and tmp not in log, log)
+        os.remove(os.path.join(imp, *(base + "keys.md").split("/")))
+        rc, out = run([sys.executable, "-B", os.path.join(imp, *T.split("/"), "notes-lint.py")], imp)
+        check("import: the lint treats imported originals as a record", "imported/" not in out, out)
+
+        ad = os.path.join(tmp, "vault")
+        shutil.copytree(old, ad)
+        os.remove(os.path.join(ad, "keys.md"))
+        write(os.path.join(ad, ".gitignore"), "*.tmp\n")
+        write(os.path.join(ad, "scratch.tmp"), "x")
+        bdir = os.path.join(tmp, "backups")
+        rc, out = run(L(kit, "bootstrap") + [ad, "--name", "Vault", "--owner", "Tester", "--adopt", "--backup-to", bdir], tmp)
+        zips = [f for f in os.listdir(bdir)] if os.path.isdir(bdir) else []
+        names = zipfile.ZipFile(os.path.join(bdir, zips[0])).namelist() if zips else []
+        check("adopt: a verified zip backup of the whole folder is written outside it", rc == 0 and len(zips) == 1 and "vault/AGENTS.md" in names and "vault/.obsidian/app.json" in names, out)
+        subjects = git(ad, "log", "--format=%s")[1].strip().split("\n")
+        first = git(ad, "show", "--name-only", "--format=", "HEAD~1")[1].split("\n")
+        check("adopt: the notes are committed as found first, then the tree is added", len(subjects) == 2 and subjects[1].startswith("Before Myco Notes")
+              and "AGENTS.md" in first and "recipes/sourdough.md" in first and not any(f.startswith(MY) for f in first), "\n".join(subjects + first))
+        check("adopt: notes stay at their paths; the old AGENTS.md is kept; .obsidian ignored; the owner's .gitignore still applies",
+              os.path.isfile(os.path.join(ad, "recipes", "sourdough.md")) and read(os.path.join(ad, "AGENTS.pre-myco.md")).startswith("# Old agent file")
+              and "{{" not in read(os.path.join(ad, "AGENTS.md")) and ".obsidian/" in read(os.path.join(ad, ".gitignore")) and "*.tmp" in read(os.path.join(ad, ".gitignore"))
+              and "scratch.tmp" not in git(ad, "ls-files")[1] and not git(ad, "status", "--porcelain")[1].strip(), git(ad, "status", "--porcelain")[1])
+        rc, out = run([sys.executable, "-B", os.path.join(ad, *T.split("/"), "notes-lint.py")], ad)
+        check("lint: wiki links and relative links count as mentions; a link to nothing is reported",
+              "link to missing note or file [[Nowhere]]" in out and "Bread basics.md:1 no other note" not in out and "sourdough.md:1 no other note" not in out
+              and "crumb" not in out, out)
+        rc, out = run([sys.executable, "-B", os.path.join(ad, *T.split("/"), "build-notes-map.py")], ad)
+        page = read(os.path.join(ad, MY, "map", "p", "prompting.html")) if rc == 0 else ""
+        check("map: wiki links become relations", "recipes-sourdough.html" in page, out)
+        rc, out = run(L(kit, "bootstrap") + [ad, "--name", "Vault", "--adopt", "--no-backup"], tmp)
+        check("adopt refuses a folder that is a tree already", rc == 1 and "already" in out, out)
+        gv = os.path.join(tmp, "vault-git")   # a folder of notes that is already a git repository
+        write(os.path.join(gv, "a.md"), "# A\n")
+        git(tmp, "init", "-q", gv)
+        git(gv, "add", "-A")
+        git(gv, "commit", "-qm", "my notes")
+        write(os.path.join(gv, "a.md"), "# A changed\n")
+        rc, out = run(L(kit, "bootstrap") + [gv, "--name", "Vault", "--adopt", "--no-backup"], tmp)
+        check("adopt refuses a repository with uncommitted changes, and changes nothing", rc == 1 and "uncommitted" in out and not os.path.isdir(os.path.join(gv, MY)), out)
+        git(gv, "checkout", "-q", "--", ".")
+        rc, out = run(L(kit, "bootstrap") + [gv, "--name", "Vault", "--adopt", "--backup-to", os.path.join(gv, "bk")], tmp)
+        check("adopt refuses a backup inside the folder", rc == 1 and "outside" in out and not os.path.isdir(os.path.join(gv, "bk")), out)
+        rc, out = run(L(kit, "bootstrap") + [gv, "--name", "Vault", "--adopt", "--no-backup"], tmp)
+        check("adopt in an existing repository tags the last commit before-myco-notes and adds one commit",
+              rc == 0 and "before-myco-notes" in git(gv, "tag")[1] and git(gv, "rev-list", "--count", "HEAD")[1].strip() == "2", out)
+        write(os.path.join(gv, "sub", "n.md"), "# N\n")
+        rc, out = run(L(kit, "bootstrap") + [os.path.join(gv, "sub"), "--name", "Vault", "--adopt", "--no-backup"], tmp)
+        check("adopt refuses a folder inside another repository", rc == 1 and "inside another git repository" in out, out)
+        rc, out = run(L(kit, "bootstrap") + [os.path.join(tmp, "x"), "--name", "X", "--import", old, "--adopt"], tmp)
+        check("--import and --adopt together are a usage error", rc == 2, out)
+
         print("team setup")
         clone = os.path.join(tmp, "clone")
         git(tmp, "clone", "-q", proj, clone)
