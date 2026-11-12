@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.17.0
 Answers, summaries and reviews (method 2.8, section 21), with ideas from Andrej Karpathy's "LLM Wiki" note.
 - **One-line summaries and a note index**: a note's header can carry `summary:` (one line, at most 200 characters, what the note holds and when to read it). The new `tools/index` lists every note with its summary, or its first sentence marked as such, grouped by folder (`--missing` lists the notes without one; history folders are counted, `--all` lists them). The map shows the summary under each note, `resume` says how many notes still lack one, and the lint lists them in one info line and warns about summaries over 200 characters. The starter notes come with summaries.
 - **Keep answers that took work** (method 5, item 15): when answering needed several notes, a live check or research, the agent offers in one line to keep the answer as a note, and where; it saves only on a yes. The skill has a matching answer mode that reads the index first.

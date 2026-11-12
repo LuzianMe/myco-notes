@@ -4,7 +4,7 @@ import re
 import subprocess
 import sys
 
-VERSION = "0.16.0"   # the kit version these tools come from; moves with plugin.json and SKILL.md (tests check it)
+VERSION = "0.17.0"   # the kit version these tools come from; moves with plugin.json and SKILL.md (tests check it)
 AGENT_SKILL_DIRS = (".claude/skills", ".agents/skills")   # a copy of the skill kept in a notes repository for agents (a cloud session loads it from there): not notes, so the lint and the map leave it out
 
 IS_WINDOWS = os.name == "nt"
