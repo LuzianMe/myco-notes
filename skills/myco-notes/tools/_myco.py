@@ -4,7 +4,7 @@ import re
 import subprocess
 import sys
 
-VERSION = "0.17.1"   # the kit version these tools come from; moves with plugin.json and SKILL.md (tests check it)
+VERSION = "0.17.2"   # the kit version these tools come from; moves with plugin.json and SKILL.md (tests check it)
 AGENT_SKILL_DIRS = (".claude/skills", ".agents/skills")   # a copy of the skill kept in a notes repository for agents (a cloud session loads it from there): not notes, so the lint and the map leave it out
 
 IS_WINDOWS = os.name == "nt"
@@ -121,6 +121,34 @@ def frontmatter(text):
 SUMMARY_MAX = 200   # characters (method 10.1)
 LOG_KINDS = ("change", "note", "answer", "review", "audit", "import", "merge", "upgrade", "setup", "drill")   # sync-log line kinds (method 4)
 LOG_LINE = re.compile(r"^- \*\*\d{4}-\d{2}-\d{2} (" + "|".join(LOG_KINDS) + r")( \([^)]*\))?:\*\*\s+\S")
+
+
+REVIEW_FILE = re.compile(r"^review-.*\.md$")   # <notes>/plans/review-YYYY-MM-DD.md (method 21.2)
+
+
+def review_proposals(text):
+    """(numbers of all proposals, numbers still waiting) of a review file: '## N. title' headings, each with a 'Status:' line;
+    a status starting with 'proposed' (also 'proposed (revised ...)') is waiting."""
+    num, allp, waiting = None, [], []
+    for line in text.split("\n"):
+        hm = re.match(r"^#{2,3}\s+(\d+)[.)]?\s", line)
+        if hm:
+            num = hm.group(1)
+        elif num and re.match(r"^\s*\**Status:?\**:?\s*\S", line, re.I):
+            allp.append(num)
+            if re.match(r"^\s*\**Status:?\**:?\s*proposed", line, re.I):
+                waiting.append(num)
+            num = None
+    return allp, waiting
+
+
+def parse_open(value):
+    """The numbers in a review file's 'open:' header ('none', '' or '-' is no number); None when it cannot be read."""
+    v = value.strip().lower()
+    if v in ("none", "-", ""):
+        return []
+    parts = [p.strip() for p in v.split(",") if p.strip()]
+    return parts if all(p.isdigit() for p in parts) else None
 
 
 def first_sentence(text, fm_end=0):

@@ -1,6 +1,6 @@
 # Myco Notes: the method
 
-Version 2.8.1 (general edition), 2026-11-12. It is project-independent and is written for engineers and teams (and for AI coding agents working with them) who run long, large or fast-changing projects: infrastructure, software platforms, data and ML systems, research, hardware, operations. It is meant as the specification from which a skill, a template repository or a team convention can be built.
+Version 2.8.2 (general edition), 2026-11-13. It is project-independent and is written for engineers and teams (and for AI coding agents working with them) who run long, large or fast-changing projects: infrastructure, software platforms, data and ML systems, research, hardware, operations. It is meant as the specification from which a skill, a template repository or a team convention can be built.
 
 The method grew out of a long-running, AI-operated engineering project in which the notes had to act as the memory of an operator that forgets everything between sessions. That constraint is useful for any project: if the notes are good enough for an operator with no memory, they are good enough for a new teammate, an auditor, or you in a year.
 
@@ -544,7 +544,7 @@ Read earlier review files first: a fix the owner declined is not proposed again 
 **Side effects belong in the proposal.** Before proposing a fix that moves, shortens or deletes text (condensing a note, moving an old changelog into `logs/` or the archive, merging two notes), check what that text was the only place to mention: a note named nowhere else becomes an orphan, because mentions from records do not count (the lint says which records still name it). The proposal then includes the link that keeps the note connected (a line in the note that stays, the read order or an index note), so the owner approves the whole change, not half of it.
 
 ### 21.2 The review file
-The proposals go into `<notes>/plans/review-YYYY-MM-DD.md`, which is committed (it is a plan, not a change to the notes). Each proposal is numbered and complete enough to be applied without further thought:
+The proposals go into `<notes>/plans/review-YYYY-MM-DD.md`, which is committed (it is a plan, not a change to the notes). Its header carries a `summary` and an `open` line listing the numbers still waiting for an answer (`open: 1, 2, 3` when it is written, `open: none` when everything is answered); the lint warns when `open` does not match the `Status:` lines below, so the header cannot fall behind. Each proposal is numbered and complete enough to be applied without further thought:
 
 ```
 ## 3. <short title>
@@ -555,6 +555,8 @@ Proposed fix: the exact edit for each file (the text to replace and the new text
 Status: proposed
 ```
 
+Put the replacement text and any new note in fenced code blocks (three backticks). Inside them a name such as `frigate.md` for a note the proposal would create is not read as a reference, so the lint does not warn about a note that does not exist yet.
+
 The owner sees a short numbered list (title and one line on the fix) and the path of the file for the details. They answer per number: *yes*, *no* (a reason is welcome) or a change ("3: keep the NAS value instead"); *all* is a yes to every proposal that is still `proposed`.
 
 ### 21.3 Applying the answer
@@ -564,7 +566,7 @@ The owner sees a short numbered list (title and one line on the fix) and the pat
 - **No answer:** nothing is applied. The proposals stay `proposed` and `tools/resume` lists them at the start of every session until they are answered. An unattended run never applies a proposal.
 - A fix that depends on another says so (`Needs: 2`); if 2 is declined, the dependent fix is shown again, rewritten, before anything is applied.
 - Afterwards run the lint and compare it with the run before the review. A finding the applied fixes caused (a new orphan, a broken link) is not fixed silently: it becomes a new proposal in the same file, shown to the owner like the others.
-- Update the top of the review file to match: its summary and the opening paragraph say what was applied, declined and still waiting (an opening that says "nothing has been changed" is no longer true once fixes are applied).
+- Update the top of the review file to match: the `open` line (the lint checks it), the summary and the opening paragraph say what was applied, declined and still waiting (an opening that says "nothing has been changed" is no longer true once fixes are applied). A proposal carried over from an earlier review file is answered in its own file, so that file's header changes too.
 - Add one sync-log line: `- **YYYY-MM-DD review:** applied 1, 3, 4; declined 2; 5 revised, waiting (plans/review-YYYY-MM-DD.md)`.
 
 ### 21.4 Bringing an older tree up to newer rules (upgrade)

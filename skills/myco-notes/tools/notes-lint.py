@@ -16,6 +16,8 @@ Checks
   summary   notes outside the history folders without a one-line `summary` in the header (one info line for all of them; tools/index --missing
             lists them) and summaries longer than 200 characters (method 10.1)
   synclog   the newest line of the sync log in sync-tracker.md must read '- **YYYY-MM-DD kind:** text' (method 4); older lines are history
+  reviews   a review file (<notes>/plans/review-*.md, method 21.2) needs an 'open:' header line that lists exactly the proposals whose
+            Status is still 'proposed' ('open: none' when all are answered)
 
 Usage:  tools/notes-lint.py [--root DIR] [--quiet] [--strict]
 Exit:   0 clean, 1 warnings, 2 errors (secrets), 3 the lint could not run (for example an invalid ignore expression). --strict turns
@@ -283,6 +285,24 @@ def main():
                     add("WARN", rel, i, "newest sync-log line is not in the form '- **YYYY-MM-DD kind:** text' (kind: " + ", ".join(_myco.LOG_KINDS)
                         + "; method 4); write the next line in that form, older lines can stay")
                 break
+
+    # review files: the 'open' header matches the Status lines (method 21.2)
+    for rel in md_files:
+        if not (rel.startswith(lay["notes"] + "/plans/") and _myco.REVIEW_FILE.match(os.path.basename(rel))):
+            continue
+        allp, waiting = _myco.review_proposals(texts[rel])
+        if not allp:
+            continue
+        fm, _ = _myco.frontmatter(texts[rel])
+        want = ", ".join(waiting) if waiting else "none"
+        if "open" not in fm:
+            add("WARN", rel, 1, f"review file has no 'open:' line in its header: add 'open: {want}' (method 21.2)")
+            continue
+        have = _myco.parse_open(fm["open"][0])
+        if have is None:
+            add("WARN", rel, fm["open"][1], f"header open '{fm['open'][0]}' is not a list of numbers or 'none': it should be 'open: {want}'")
+        elif sorted(have, key=int) != sorted(waiting, key=int):
+            add("WARN", rel, fm["open"][1], f"header says open: {fm['open'][0] or 'none'} but the Status lines say {want}: update the open line, the summary and the opening paragraph (method 21.3)")
 
     # summaries (info, one line for all)
     if no_summary:
