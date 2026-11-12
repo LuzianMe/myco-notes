@@ -237,6 +237,7 @@ def merge_when_green(branch, wait_min=15):
     if not shutil.which("gh"):
         print(f"solo: gh (GitHub CLI) not installed: merge the pull request for {branch} yourself once its check passes, then continue from the main branch")
         return False
+    print(f"solo (experimental, method section 19): waiting up to {wait_min} minutes for the check on {branch}, then merging")
     deadline, seen = time.time() + wait_min * 60, False
     while True:
         r = subprocess.run(["gh", "pr", "checks", branch], capture_output=True, text=True, encoding="utf-8", errors="replace")
