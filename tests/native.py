@@ -727,6 +727,24 @@ def main():
         run([sys.executable, "-B", os.path.join(rp, *T.split("/"), "notes_commit.py"), "Review: nothing to propose"], rp)
         rc, out = run(L(rp, "index", T) + ["--review-scope"], rp)
         check("review scope: a committed review that found nothing moves the start, so the same edit is not read again", "Nothing changed in the notes since the last review" in out, out)
+        NCr = [sys.executable, "-B", os.path.join(rp, *T.split("/"), "notes_commit.py")]
+        os.remove(os.path.join(rp, MY, "getting-started.md"))   # a repository made before the owner's page existed
+        cf = os.path.join(rp, ".myco-notes.conf")
+        cur = read(cf)
+        write(cf, re.sub(r"(?m)^KIT_VERSION=.*$", "KIT_VERSION=0.20.0", cur))
+        write(os.path.join(rp, "AGENTS.md"), read(os.path.join(rp, "AGENTS.md")).replace(f"`{MY}/getting-started.md`", "the owner's notes"))
+        run(NCr + ["An older repository"], rp)
+        write(os.path.join(rp, MY, "plans", "review-2026-01-03.md"), "---\nsummary: Third review: nothing to propose\nscope: full\nopen: none\n---\n# Review\n\nNothing to propose.\n")
+        run(NCr + ["Review: nothing to propose"], rp)
+        write(cf, cur)
+        run(NCr + ["Kit updated"], rp)
+        rc, out = run(L(rp, "index", T) + ["--review-scope"], rp)
+        check("review scope: after a kit update the starter notes added since are offered once, as upgrade proposals",
+              f"the kit added `{MY}/getting-started.md` in 0.21.0" in out and "only on a yes" in out and "sources/README.md" not in out, out)
+        rc, out = run(L(rp, "index", T) + ["--review-scope", "--full"], rp)
+        check("review scope: a full review offers the missing starter note too", f"`{MY}/getting-started.md`" in out and "upgrade" in out, out)
+        write(os.path.join(rp, MY, "plans", "review-2026-01-04.md"), "---\nsummary: Fourth review: owner's page declined\nscope: full\nopen: none\n---\n# Review\n\n## 1. Owner's page\nStatus: declined 2026-01-04: not wanted\n")
+        run(NCr + ["Review: owner's page declined"], rp)
 
         print("sources: ingest, citations, changed copies")
         sq = os.path.join(tmp, "srcproj")

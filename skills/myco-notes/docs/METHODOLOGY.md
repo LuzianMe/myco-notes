@@ -589,7 +589,8 @@ The owner sees a short numbered list (title and one line on the fix) and the pat
 ### 21.4 Bringing an older notes repository up to newer rules (upgrade)
 When the method gains a rule (2.8 added summaries and the sync-log format), repositories made earlier do not follow it yet. They are not rewritten silently:
 1. Refresh the repository's tools and docs from the new kit (`tools/relocate`, 3.1), run the lint, commit.
-2. Write an upgrade review: the findings that come from new rules (notes without a summary, a newest sync-log line in an older form, a missing line in the entry point) become proposals of kind `upgrade`, in batches of about 20 notes, each with its summary written out. Records keep their form (history folders, older sync-log lines, changelog entries): they say what was written at the time.
+2. Write an upgrade review: the findings that come from new rules (notes without a summary, a newest sync-log line in an older form, a missing line in the entry point, a note the starter set gained since, such as the owner's page of 11.5a) become proposals of kind `upgrade`, in batches of about 20 notes, each with its summary written out. Records keep their form (history folders, older sync-log lines, changelog entries): they say what was written at the time.
+   A starter note the repository lacks is offered in one line (what it is for), never created unasked; a no is recorded like any declined proposal, so it is not offered again. On a yes it is written from the kit's template with this repository's names and dates.
 3. Apply them as in 21.3 and say in the sync-log line which kit version the repository now follows: `- **YYYY-MM-DD upgrade:** summaries for 20 of 46 notes (kit 0.17.0)`. A later session continues with the notes still without a summary (`tools/index --missing`).
 
 ### 21.5 Scope: what changed, or everything

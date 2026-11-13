@@ -196,6 +196,29 @@ def _rel(p):
     return (p or "").strip().replace("\\", "/").strip("/")
 
 
+# Notes the starter set gained after its first release: (path under the notes folder, kit version, what it is for). An upgrade
+# review offers a missing one to the owner in one line; it is created from the kit's template/notes/ only on a yes (method 21.4).
+TEMPLATE_NOTES_ADDED = (
+    ("inbox/README.md", "0.15.0", "the inbox format, for quick notes"),
+    ("sources/README.md", "0.19.0", "how outside documents are kept as sources"),
+    ("getting-started.md", "0.21.0", "the owner's page: what they have, what needs their yes, their part, their options"),
+)
+
+
+def vkey(v):
+    """A version string as a tuple for comparing; '' and unknown parts count as 0."""
+    return tuple(int(x) if x.isdigit() else 0 for x in (v or "0").split("."))
+
+
+def missing_template_notes(root, lay, since=""):
+    """Starter notes added after kit version `since` ('' = any) that this repository does not have: [(path, version, purpose)]."""
+    out = []
+    for rel, ver, why in TEMPLATE_NOTES_ADDED:
+        if vkey(ver) > vkey(since) and not os.path.exists(os.path.join(root, *lay["notes"].split("/"), *rel.split("/"))):
+            out.append((rel, ver, why))
+    return out
+
+
 def layout(root, conf=None):
     """Folder layout from .myco-notes.conf, as repository-relative paths with forward slashes.
 

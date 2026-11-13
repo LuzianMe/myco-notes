@@ -349,6 +349,10 @@ def refresh_only(root, old, conf, a, self_run):
         tips.append("AGENTS.md has no 'Questions and reviews' section (note index, keeping answers, reviews with proposed fixes, summaries, the sync-log form). Propose it from the kit's template/AGENTS.md to the owner.")
     if agents and "review-scope" not in agents:
         tips.append("AGENTS.md does not tell agents to start a review with `index --review-scope` (method 21.5). Propose the review line from the kit's template/AGENTS.md to the owner.")
+    new_notes = _myco.missing_template_notes(root, _myco.layout(root), conf.get("KIT_VERSION", "").strip().strip("\"'"))
+    if new_notes:
+        tips.append("The kit's starter notes gained notes this repository does not have: " + "; ".join(f"{r} ({w}, since {v})" for r, v, w in new_notes)
+                    + ". Offer each to the owner in one line in the upgrade review; create it from the kit's template/notes/ only on a yes.")
     tips.append(f"Offer the owner an upgrade review (method 21.4): {old['tools']}/index --missing lists the notes without a summary; propose summaries in batches of about 20 and apply only what the owner confirms. Records (logs, archive, inbox, older sync-log lines) keep their form.")
     print("\nrelocate: " + ("done, nothing committed. Next:" if a.apply else "this was a dry run. With --apply it copies the files above, then:"))
     print(f"  1. git status and git diff --stat; run {old['tools']}/notes-lint.py and python3 {old['tools']}/build-notes-map.py (it writes the graph view too).")
