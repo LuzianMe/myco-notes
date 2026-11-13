@@ -25,7 +25,9 @@ Existing notes (method section 20):
                                                             the folder becomes the repository, its notes stay where they are. First a zip
                                                             of the whole folder is written next to it (or into DIR), and a folder that
                                                             is already a git repository (with a clean working tree) gets the tag
-                                                            before-myco-notes. Existing AGENTS.md, CLAUDE.md and other files the
+                                                            before-myco-notes. The rules of an existing AGENTS.md keep working: its
+                                                            text follows the new entry point under "Your project rules" (a CLAUDE.md
+                                                            with rules of its own keeps them after @AGENTS.md). Other files the
                                                             template would overwrite are kept as <name>.pre-myco<ext>; .gitignore and
                                                             .gitattributes are extended.
 Both scan the collection for secrets first: a file with a secret-looking string is not committed (listed, value hidden).
@@ -53,6 +55,40 @@ TEXT_EXT = (".md", ".yml", ".yaml")
 TEXT_NAMES = {".myco-notes.conf", ".gitignore", "CODEOWNERS"}
 NOT_NOTES = {".git", ".obsidian", ".trash", ".logseq", ".foam", ".vscode", ".idea", "node_modules", "__pycache__", ".DS_Store", "Thumbs.db", "desktop.ini"}
 APPENDED = {".gitignore", ".gitattributes"}   # adopt: extended, never replaced
+ENTRY = ("AGENTS.md", "CLAUDE.md")             # adopt: the owner's rules stay in effect next to the new entry point (method 20.2)
+OWNER_RULES = ("## Your project rules (kept from before Myco Notes)\n\n"
+               "These rules were in this folder's `AGENTS.md` before Myco Notes was added, and they still apply alongside the ones above. "
+               "Where the two disagree, ask the owner; do not pick one silently. Tidying them up (moving facts into the notes, "
+               "shortening what repeats) is part of the first pass (method 20.4) and needs the owner's yes.\n\n")
+CLAUDE_RULES = ("## Rules for agents that read CLAUDE.md (kept from before Myco Notes)\n\n"
+                "These rules were in this folder's `CLAUDE.md` before Myco Notes was added, and they still apply "
+                "alongside `AGENTS.md` (method 20.2).\n\n")
+
+
+def pointer_only(text, name):
+    """Whether an entry file holds nothing but a pointer to the other one (@AGENTS.md, or a symlink's target text)."""
+    return text.strip() in ("@" + name, name)
+
+
+def merge_entry(target, old):
+    """Put the owner's earlier AGENTS.md text after the new entry point, and a CLAUDE.md's own rules after @AGENTS.md. Returns what was kept where."""
+    agents, claude = old.get("AGENTS.md"), old.get("CLAUDE.md")
+    if agents is not None and (pointer_only(agents, "CLAUDE.md") or not agents.strip()):
+        agents = None
+    if claude is not None and (pointer_only(claude, "AGENTS.md") or not claude.strip() or (agents is not None and claude.strip() == agents.strip())):
+        claude = None
+    done = []
+    for name, text, head, lead in (("AGENTS.md", agents, OWNER_RULES, None), ("CLAUDE.md", claude, CLAUDE_RULES, "@AGENTS.md\n")):
+        if text is None:
+            continue
+        p = os.path.join(target, name)
+        with open(p, encoding="utf-8", newline="") as fh:
+            new = fh.read() if lead is None else lead
+        body = text if text.endswith("\n") else text + "\n"
+        with open(p, "w", encoding="utf-8", newline="") as fh:
+            fh.write(new.rstrip("\n") + "\n\n" + head + body)
+        done.append(name)
+    return done
 
 
 def check_adopt(target, lay, a):
@@ -138,7 +174,7 @@ def scan(root, rels):
     return hits
 
 
-def write_import_log(target, lay, project, mode, files, hits, backup, kept, had_git, source=None, name=None):
+def write_import_log(target, lay, project, mode, files, hits, backup, kept, had_git, source=None, name=None, merged=()):
     """The import log (method 20.3): the choice, the backup, an inventory and one row per note. Returns its path in the repository."""
     name = name or re.sub(r"[^A-Za-z0-9._-]+", "-", os.path.basename(target)).strip("-.") or "notes"
     rel_log = f"{lay['notes']}/logs/import-{name}.md"
@@ -187,6 +223,9 @@ def write_import_log(target, lay, project, mode, files, hits, backup, kept, had_
         "- Header keys: " + (", ".join(f"{k} ({v})" for k, v in sorted(keys.items(), key=lambda kv: -kv[1])[:12]) or "none") + ".",
         f"- Secrets: {len(hits)} secret-looking string(s) in {len(held)} file(s); those files are not committed (marked `held`)." if hits else "- Secrets: none found.",
     ]
+    if merged:
+        lines.append("- Entry files: the rules of your earlier " + " and ".join(f"`{m}`" for m in merged) + " still apply; they follow the new "
+                     "entry point in the same file. Propose how to tidy them up in the first pass (method 20.2, 20.4).")
     if kept:
         lines.append("- Kept under a new name (merge into the working agreement): " + ", ".join(f"`{o}` (was {n})" for o, n in kept) + ".")
     if other:
@@ -295,11 +334,22 @@ def main():
     if a.adopt and not had_git:   # the owner's notes exactly as found, before anything is added (secrets held back)
         commit("Before Myco Notes: the notes as found", collection)
 
+    entry_old = {}   # adopt: the owner's AGENTS.md / CLAUDE.md text (read before either is replaced: one may link to the other)
+    for name in ENTRY if a.adopt else ():
+        p = os.path.join(target, name)
+        if os.path.lexists(p) and name not in held:
+            try:
+                with open(p, encoding="utf-8", newline="") as fh:
+                    entry_old[name] = fh.read()
+            except (OSError, UnicodeDecodeError):
+                pass   # unreadable or a dangling link: kept under a new name below, like any other file
     written = []   # files this run writes from the template (placeholders are filled only in these, never in the owner's notes)
 
     def put(src, dest):
-        if os.path.exists(dest):
-            name = os.path.basename(dest)
+        name = os.path.basename(dest)
+        if name in entry_old and os.path.dirname(dest) == target and os.path.lexists(dest):
+            os.remove(dest)   # its text is in entry_old and comes back after the new entry point; a symlink becomes a plain file
+        if os.path.lexists(dest):
             if name in APPENDED:
                 with open(src, encoding="utf-8", newline="") as fh:
                     extra = fh.read()
@@ -315,6 +365,9 @@ def main():
             while os.path.exists(keep):
                 keep, n = f"{stem}.pre-myco{n}{ext}", n + 1
             os.replace(dest, keep)
+            rel_dest, rel_keep = (os.path.relpath(x, target).replace(os.sep, "/") for x in (dest, keep))
+            if rel_dest in held:   # a held file keeps being held under its new name; the template's file takes the old name
+                held[held.index(rel_dest)] = rel_keep
             kept.append((os.path.relpath(keep, target).replace(os.sep, "/"), os.path.relpath(dest, target).replace(os.sep, "/")))
         os.makedirs(os.path.dirname(dest), exist_ok=True)
         shutil.copy2(src, dest)
@@ -368,6 +421,8 @@ def main():
         with open(os.path.join(target, "AGENTS.md"), "a", encoding="utf-8", newline="") as fh:
             fh.write("- Project data folders (inputs and outputs, not notes; ignored by git): " + ", ".join(f"`{d}/`" for d in data) + ".\n")
 
+    merged = merge_entry(target, entry_old) if entry_old else []
+
     if a.adopt:
         present = [d for d in (".obsidian", ".trash", ".logseq") if os.path.isdir(at(d))]
         if present:
@@ -384,11 +439,13 @@ def main():
 
     _myco.git("-C", target, "config", "core.hooksPath", lay["tools"] + "/hooks")
     print(f"bootstrap: {'took over' if a.adopt else 'created'} {target}")
+    for name in merged:
+        print(f"bootstrap: the rules of your {name} still apply: they follow the new entry point in {name} (tidy them up in the first pass, method 20.4)")
     for old_name, new_name in kept:
         print(f"bootstrap: kept your {new_name} as {old_name} (merge what it says into the working agreement)")
 
     if a.adopt:
-        log = write_import_log(target, lay, a.name, "in place", collection, hits, backup, kept, had_git)
+        log = write_import_log(target, lay, a.name, "in place", collection, hits, backup, kept, had_git, merged=merged)
         commit("Baseline: Myco Notes added around the existing notes (method section 20)")
     elif a.source:
         commit("Baseline: notes repository created from the Myco Notes template")
