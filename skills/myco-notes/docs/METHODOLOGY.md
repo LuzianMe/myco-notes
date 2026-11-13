@@ -1,6 +1,6 @@
 # Myco Notes: the method
 
-Version 3.1 (general edition), 2026-11-13. It is project-independent and is written for engineers and teams (and for AI coding agents working with them) who run long, large or fast-changing projects: infrastructure, software platforms, data and ML systems, research, hardware, operations. It is meant as the specification from which a skill, a template repository or a team convention can be built. What a notes repository looks like on disk, precisely enough for another tool to read, write and check one, is in `FORMAT.md` next to this document.
+Version 3.1 (general edition), 2026-11-13. It is project-independent and is written for engineers and teams (and for AI coding agents working with them) who run long, large or fast-changing projects: infrastructure, software platforms, data and ML systems, research, hardware, operations. Together with `FORMAT.md` next to it (what the notes look like on disk, precisely enough for another tool to read, write and check them), it is the Myco Notes framework. The tools, skill and template in this kit are its reference implementation; a skill, a template repository or a team convention can be built from the two documents alone.
 
 The method grew out of a long-running, AI-operated engineering project in which the notes had to act as the memory of an operator that forgets everything between sessions. That constraint is useful for any project: if the notes are good enough for an operator with no memory, they are good enough for a new teammate, an auditor, or you in a year.
 

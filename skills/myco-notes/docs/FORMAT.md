@@ -1,6 +1,6 @@
 # The Myco Notes format
 
-Format 1.0, 2026-11-13. This document says what a Myco Notes repository looks like on disk, precisely enough that a program or an agent that has never seen this kit can read one, write to one without breaking it, and check one. It is the contract; `METHODOLOGY.md` says why the rules exist and how to work with them, and the tools in this kit are one implementation of it.
+Format 1.0, 2026-11-13. This document says what a Myco Notes repository looks like on disk, precisely enough that a program or an agent that has never seen this kit can read one, write to one without breaking it, and check one. It is the contract. Together with `METHODOLOGY.md`, which says why the rules exist and how to work with them, it makes up the Myco Notes framework. The kit this document ships with (the tools, the agent skill and the starter notes) is the reference implementation; other implementations are welcome, and notes that follow this document need none of the kit's code.
 
 What belongs here and what belongs in the method: **if a tool reads it, it is format; if only people read it, it is method.** The sync-log line, the inbox heading and the review statuses are read by tools, so they are specified here; the changelog, how-to, incident and decision templates are written for people and adapted by each project, so they stay in the method (section 4).
 

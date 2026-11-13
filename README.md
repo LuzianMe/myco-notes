@@ -17,9 +17,11 @@
   <img alt="How Myco Notes works. What you give: changes you make, quick thoughts, questions, links and manuals, and your decisions. The method, six rules your agent follows: check the real system before writing; one home per fact; evidence and dates; supersede, never delete; no secrets, ever; nothing changes without your yes. What you get: notes that are true and say when they were checked, answers with their source, a briefing every session, what the notes said on any past date, a map of what connects, and nothing leaked or lost. Session after session: you work or ask, the agent checks the system live, writes it to the right note, it is checked and committed, and the next session starts from what is true; now and then a review proposes fixes and you say yes, no or a change." src=".github/assets/overview-light.svg">
 </picture>
 
-You keep working and talking to your agent. The agent follows six rules; on every commit the tools check what a tool can (secrets, links, dates, summaries), and git keeps every version. The full method: [METHODOLOGY.md](skills/myco-notes/docs/METHODOLOGY.md).
+You keep working and talking to your agent. The agent follows six rules; on every commit the tools check what a tool can (secrets, links, dates, summaries), and git keeps every version.
 
-Plain files only: Markdown, git and Python 3.8+ (standard library). Linux, macOS and Windows. What a notes repository looks like on disk is written down as its own short spec, [FORMAT.md](skills/myco-notes/docs/FORMAT.md), so other tools can read, write and check one without this kit. Works with Claude Code, Codex and other agents that read [Agent Skills](https://agentskills.io/specification), or with no agent at all.
+**The framework and this implementation.** The framework is two documents: the method, [METHODOLOGY.md](skills/myco-notes/docs/METHODOLOGY.md), says how to work and why; the Myco Notes format, [FORMAT.md](skills/myco-notes/docs/FORMAT.md), says what the notes look like on disk, as an open, versioned spec. Everything else in this repository (the tools, the agent skill, the plugins and the starter notes) is the **reference implementation**: one way to follow the framework, not the only one. Your notes depend on the format, not on this code.
+
+Plain files only: Markdown, git and Python 3.8+ (standard library). Linux, macOS and Windows. Works with Claude Code, Codex and other agents that read [Agent Skills](https://agentskills.io/specification), or with no agent at all.
 
 ## Install
 

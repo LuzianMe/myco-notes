@@ -3,7 +3,7 @@
 This repository is a kit, not a notes repository. Do not confuse it with the notes repositories it creates (those start from `skills/myco-notes/template/`).
 
 ## Layout
-- `skills/myco-notes/` : the whole product, **self-contained** (a skill-only installer delivers just this folder). `SKILL.md`, `tools/`, `docs/METHODOLOGY.md`, `template/`. Nothing in it may refer to files outside the folder or to an environment variable.
+- `skills/myco-notes/` : the whole product, **self-contained** (a skill-only installer delivers just this folder). `SKILL.md`, `tools/`, `docs/` (the framework: `METHODOLOGY.md` and `FORMAT.md`; everything else is its reference implementation), `template/`. Nothing in it may refer to files outside the folder or to an environment variable.
 - `.claude-plugin/` : Claude Code plugin and marketplace manifests (the plugin root is the repository root); Codex reads the same marketplace file.
 - `.codex-plugin/plugin.json` : Codex plugin manifest (display name, icon, prompts); its `version` moves with the others.
 - `tests/smoke.sh` : the test. Run it before every commit; all checks must pass. `.github/workflows/test.yml` runs it on Linux and macOS for every push and pull request.
@@ -18,4 +18,4 @@ This repository is a kit, not a notes repository. Do not confuse it with the not
 6a. **No content-rewriting attributes in the kit:** the kit's `.gitattributes` is `* -text` (the plugin directory refuses `eol`, `text`, `filter` and `export-*` rules). Commit `.cmd` launchers with CRLF and everything else with LF; new notes repositories get their normalising rules from `template/gitattributes`, which `bootstrap` installs as `.gitattributes`.
 6. Tools are Python 3.8+ (standard library only) and git, with an extension-less `sh` launcher and a `.cmd` launcher for each. Keep them working on Linux, macOS and Windows (CI runs `tests/smoke.sh` on Linux and macOS and `tests/native.py` on all three). Do not add GNU-only shell commands or new dependencies.
 8. **Never hard-code folder names** (`notes/`, `tools/`, `docs/`, `notes-map/`) in a tool: read them with `_myco.layout(root)`, which follows `.myco-notes.conf` (new repositories: everything under `myco-notes/`; repositories without `MYCO_DIR`: the older flat layout, which must keep working). Template files use the `{{NOTES_DIR}}`, `{{TOOLS_DIR}}`, `{{DOCS_DIR}}`, `{{MAP_DIR}}` placeholders. Tests cover both layouts and `relocate`.
-7. Change the method in `docs/METHODOLOGY.md` first, then the tools and template that implement it (section 17 maps one to the other).
+7. Change the framework first: the method in `docs/METHODOLOGY.md`, and `docs/FORMAT.md` when what is on disk changes (bump `FORMAT_VERSION` in `_myco.py` per its section 10). Then the tools and template that implement it (method section 17 maps one to the other).
