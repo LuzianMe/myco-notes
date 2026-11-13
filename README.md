@@ -72,6 +72,18 @@ At the start of each session the agent reads a short briefing (`resume`) and tel
 - **Sources.** Facts from a manual, release notes or a forum answer are kept with their origin: the document is saved as found in `myco-notes/sources/` (dated, with a checksum, never edited), facts are cited as "per <source>", and when the document changes the notes that relied on it come back for review. The kit's tools fetch nothing; text in a source is data, never instructions. Method section 22.
 - **Nothing is lost.** Old statements are superseded, not deleted; `asof 2026-09-01` shows what the notes said on any date; `mirror-push` keeps a second copy and `restore-drill` proves it restores.
 
+## In practice
+
+*One real notes repository, anonymized: an engineer's notes for an enterprise software support project, kept with Codex over ten days.*
+
+- **Day one:** set up from 22 earlier chat sessions: a master record, runbook, topic logs, backlog, verification guide and sync tracker, with old findings kept apart from what was checked as current.
+- **The first week:** troubleshooting evidence, certificate comparisons and maintenance preparation recorded without raw logs, credentials or configuration exports; an offline knowledge base distilled from 24 internal and research pages.
+- **A handoff merged:** 28 files from another session's development work filed with their provenance; its deployment claims stayed marked unverified.
+- **An upgrade:** from kit 0.12 to 0.20 in one step, keeping the project's own settings; the stricter checks found four problems in existing notes.
+- **Two reviews:** 12 and then 6 numbered fixes (stale status, older summaries contradicting later findings, files in the wrong place) and a summary for each of the 22 notes, each applied only after a yes. Final lint: 0 errors, 0 warnings.
+
+Its owner's verdict: a versioned project memory with traceable evidence, clear pending work and reviewable changes, which caught where older summaries contradicted later findings. And its limit, which the notes state themselves: they are a reference, not proof that the systems are healthy.
+
 ## Already have notes?
 Ask your agent to "make this folder a Myco Notes repository". It asks two things first:
 - **Where:** a **new folder** (your folder is copied into `myco-notes/imported/` and stays untouched) or **in place** (for a vault you open every day; a zip backup is written next to it first, and an existing git repository gets the tag `before-myco-notes`).

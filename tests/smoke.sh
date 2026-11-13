@@ -195,7 +195,11 @@ git switch -q main; git branch -q -D feat-crash
 
 echo "0.12: restore verdicts, mirror scope and results, narrower commits, kit version, doctor"
 chk "new repositories record the kit and format versions"  "grep -q '^KIT_VERSION=[0-9]' .myco-notes.conf && grep -q '^FORMAT_VERSION=1.0' .myco-notes.conf && grep -q '^MIRROR_SCOPE=tracked' .myco-notes.conf"
-chk "doctor reports a healthy repository"     "myco-notes/tools/doctor | grep -q 'doctor: healthy'"
+mkdir -p "$tmp/home"
+chk "doctor reports a healthy repository"     "myco-notes/tools/doctor --home $tmp/home | grep -q 'doctor: healthy'"
+for d in "$tmp/home2/.agentx/skills/myco-notes" "$tmp/home2/.agentx/plugins/cache/m/p/1.0/skills/myco-notes" "$tmp/home2/.othera/skills/myco-notes"; do
+  mkdir -p "$d"; printf -- '---\nname: myco-notes\n---\n' > "$d/SKILL.md"; done
+chk "doctor finds the skill installed twice for one agent folder, not across agent folders" "out=\$(myco-notes/tools/doctor --home $tmp/home2); [ \$? = 1 ] && echo \"\$out\" | grep -q 'more than once for the agent folder .agentx: ~/.agentx/skills/myco-notes and a plugin' && ! echo \"\$out\" | grep -q 'folder .othera'"
 git clone -q "$tmp/proj" "$tmp/drill"; rm -f "$tmp/drill/AGENTS.md"; echo changed > "$tmp/drill/myco-notes/state.md"
 chk "restore drill fails an incomplete working copy" "out=\$(myco-notes/tools/restore-drill $tmp/drill); [ \$? -ne 0 ] && echo \"\$out\" | grep -q 'verdict history:      OK' && echo \"\$out\" | grep -q 'working copy: INCOMPLETE'"
 echo "local only" > ignored-local.env; printf 'ignored-local.env\n' >> .git/info/exclude

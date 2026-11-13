@@ -173,6 +173,9 @@ def entry_checks(root, lay, conf, scope, base):
         if now and was != now:
             out.append(f"the kit was updated since the last review ({was or 'unknown'} to {now}): compare `AGENTS.md` with the kit's "
                        "`template/AGENTS.md` and propose the missing lines as `upgrade` fixes (method 21.4)")
+            for rel, ver, why in _myco.missing_template_notes(root, lay, was):
+                out.append(f"the kit added `{lay['notes']}/{rel}` in {ver} ({why}) and this repository does not have it: offer it to the owner "
+                           "in one line as an `upgrade` proposal; create it from the kit's `template/notes/` only on a yes (method 21.4)")
         ch = _myco.git("-C", root, "diff", "--name-only", base, "HEAD", "--", "AGENTS.md", "CLAUDE.md").stdout.split()
         ch += [l[3:] for l in _myco.git("-C", root, "status", "--porcelain", "--", "AGENTS.md", "CLAUDE.md").stdout.split("\n") if len(l) > 3]
         if ch:
@@ -202,6 +205,11 @@ def entry_checks(root, lay, conf, scope, base):
             pass
     if scope == "full" and not any("template/AGENTS.md" in o for o in out):
         out.append("a full review also compares `AGENTS.md` with the kit's `template/AGENTS.md` (missing lines become `upgrade` fixes, method 21.4)")
+    if scope == "full":
+        for rel, ver, why in _myco.missing_template_notes(root, lay):
+            if not any(f"`{lay['notes']}/{rel}`" in o for o in out):
+                out.append(f"the kit's starter notes include `{lay['notes']}/{rel}` (since {ver}: {why}) and this repository does not have it: "
+                           "offer it to the owner in one line as an `upgrade` proposal, unless an earlier review recorded a no (method 21.4)")
     return out
 
 

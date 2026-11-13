@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """doctor: read-only health check of a Myco Notes repository. It changes nothing.
 
-  tools/doctor [--root DIR]
+  tools/doctor [--root DIR] [--home DIR]
 
 Run it from the repository's own tools to check the repository, or from a newer kit (python3 <KIT>/tools/doctor.py --root PROJECT) to
 also see whether the repository's tools are older than that kit.
@@ -12,6 +12,8 @@ Checks
   hook      git uses the versioned hook (core.hooksPath) and the hook file is there
   tools     every tool has its sh and .cmd launcher
   settings  settings newer kits expect (NEW_FOLDERS, MIRROR_SCOPE, KIT_VERSION) and the generated map being gitignored
+  skills    this skill installed more than once for the same agent (a standalone copy next to a plugin, or two standalone copies,
+            in a hidden folder of your home folder or of the repository): the agent may load it twice, or an old copy
 Exit: 0 healthy, 1 something to fix (each line says what), 2 not a Myco Notes repository.
 """
 import argparse
@@ -37,6 +39,39 @@ def tools_version(tools_dir):
         return None
 
 
+def is_this_skill(path):
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            head = fh.read(2000)
+    except OSError:
+        return False
+    return re.search(r"^name:\s*[\"']?myco-notes[\"']?\s*$", head, re.M) is not None
+
+
+def skill_copies(base):
+    """Installed copies of this skill in base's hidden folders: {folder: [(kind, path)]}, kind 'standalone' (<folder>/skills/<x>/)
+    or 'plugin' (anywhere under <folder>/plugins/, where plugin managers keep their copies)."""
+    found = {}
+    try:
+        tops = sorted(d for d in os.listdir(base) if d.startswith(".") and d != ".git" and os.path.isdir(os.path.join(base, d)))
+    except OSError:
+        return found
+    for d in tops:
+        skills = os.path.join(base, d, "skills")
+        for x in (sorted(os.listdir(skills)) if os.path.isdir(skills) else []):
+            if is_this_skill(os.path.join(skills, x, "SKILL.md")):
+                found.setdefault(d, []).append(("standalone", os.path.join(skills, x)))
+        plugins = os.path.join(base, d, "plugins")
+        depth0 = plugins.rstrip(os.sep).count(os.sep)
+        for dp, dn, fn in os.walk(plugins):
+            if dp.count(os.sep) - depth0 >= 7:
+                dn[:] = []
+            dn[:] = [n for n in dn if n not in (".git", "node_modules")]
+            if "SKILL.md" in fn and os.path.basename(os.path.dirname(dp)) == "skills" and is_this_skill(os.path.join(dp, "SKILL.md")):
+                found.setdefault(d, []).append(("plugin", dp))
+    return found
+
+
 def vkey(v):
     return tuple(int(x) for x in re.findall(r"\d+", v or "")[:3])
 
@@ -45,6 +80,7 @@ def main():
     _myco.utf8_console()
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--root", default=".")
+    ap.add_argument("--home", default=None, help="the home folder to look for installed copies of the skill in (default: yours)")
     a = ap.parse_args()
     root = _myco.toplevel(os.path.abspath(a.root))
     if not root or not os.path.isfile(os.path.join(root, ".myco-notes.conf")):
@@ -117,6 +153,22 @@ def main():
         fix(f"the generated map {lay['map']}/ is not in .gitignore")
     if not os.path.isfile(os.path.join(root, ".gitattributes")):
         fix(".gitattributes is missing (line endings may differ between Windows and other systems)")
+
+    home = os.path.abspath(a.home or os.path.expanduser("~"))
+    copies = {}
+    for base in ([home] + ([root] if _myco.overlap(root, home) != "same" else [])):
+        for d, items in skill_copies(base).items():
+            copies.setdefault(d, []).extend(items)
+    shown = lambda p: "~" + p[len(home):] if p.startswith(home + os.sep) else p
+    for d, items in sorted(copies.items()):
+        standalone = [p for k, p in items if k == "standalone"]
+        plugin = [p for k, p in items if k == "plugin"]
+        if len(standalone) + (1 if plugin else 0) > 1:
+            fix(f"this skill is installed more than once for the agent folder {d}: " + ", ".join(shown(p) for p in standalone)
+                + (f" and a plugin ({len(plugin)} cached cop{'y' if len(plugin) == 1 else 'ies'})" if plugin else "")
+                + ". The agent may load it twice, or an old copy. Keep one (the plugin, if you installed it) and move the others aside, outside the skills folder.")
+    if copies and all(len([1 for k, _ in v if k == "standalone"]) + (1 if any(k == "plugin" for k, _ in v) else 0) <= 1 for v in copies.values()):
+        ok("the skill is installed once per agent folder")
 
     print(f"doctor: {'healthy' if not problems else str(problems) + ' thing(s) to fix'} (nothing was changed)")
     return 1 if problems else 0
