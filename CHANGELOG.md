@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.17.3
+- **Proposed summaries are measured before you are asked** (method 2.8.3, section 21.2): a review proposes a summary as its own `summary: ...` line, and the lint checks those lines in a review file too (also inside code blocks), warning about one over 200 characters. The skill runs the lint on the review file before showing it, so an applied fix no longer brings a new warning with it (in a real run, a 202-character summary needed a second review to fix).
+- Method edition date corrected (2.8.2 was dated a day ahead).
+
 ## 0.17.2
 - **A review file's header is checked** (method 2.8.2, section 21.2): it carries an `open:` line with the proposals still waiting (`open: none` when all are answered), and the lint warns when the line is missing or does not match the `Status:` lines, saying what it should be. In the second real review the summary and opening of both review files fell behind after the fixes were applied; now that cannot pass the lint.
 - **Proposed text goes in code blocks**: replacement text and new notes in a proposal sit in fenced code blocks, so the name of a note the proposal would create is not reported as a missing reference while the proposal waits.
