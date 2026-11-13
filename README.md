@@ -23,6 +23,15 @@ Then ask: *"start a Myco Notes tree for my project"*.
 - **See how it connects:** a static map with backlinks, and the mycelium view above, which replays the git history and shows wilting (overdue) notes and missing references.
 - **Plain files:** Markdown, git and Python 3.8+ standard library. Linux, macOS and Windows. Works with any agent, or none.
 
+## How it works
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/assets/overview-dark.svg">
+  <img alt="How Myco Notes works. You work on your system, jot quick notes, ask questions, share links or bring an old notes folder. Your agent with the Myco Notes skill checks the live system, updates the right notes and commits them; saves quick notes to an inbox; answers from the note index; keeps outside documents as sources; imports old notes after a backup. Your notes are plain Markdown in git: a master record, a runbook, one note per device, an inbox, sources, logs and review files, each with a one-line summary. Every commit is checked: a hook refuses secrets, a lint checks links, dates and summaries, and git keeps every version. Reviews turn findings into numbered proposals that you answer with yes, no or a change; briefings, the note index and maps let you or the next session start from what is true now." src=".github/assets/overview-light.svg">
+</picture>
+
+You keep working and talking to your agent; the skill does the bookkeeping, every commit is checked, and nothing changes in your notes on a review without your yes. Details per tool are in [What you get](#what-you-get-all-paths-inside-skillsmyco-notes).
+
 ## Where it comes from
 
 A method, a starter tree and a small set of tools for keeping a project's knowledge **accurate, secure, versioned and connected**, for engineers who run large or long projects (infrastructure, platforms, data and ML systems, research, hardware) alone, in teams, or together with AI coding agents.
