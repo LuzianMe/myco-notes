@@ -471,9 +471,14 @@ def main():
         check("adopt: the notes are committed as found first, then the repository is added", len(subjects) == 2 and subjects[1].startswith("Before Myco Notes")
               and "AGENTS.md" in first and "recipes/sourdough.md" in first and not any(f.startswith(MY) for f in first), "\n".join(subjects + first))
         check("adopt: notes stay at their paths; the old AGENTS.md is kept; .obsidian ignored; the owner's .gitignore still applies",
-              os.path.isfile(os.path.join(ad, "recipes", "sourdough.md")) and read(os.path.join(ad, "AGENTS.pre-myco.md")).startswith("# Old agent file")
+              os.path.isfile(os.path.join(ad, "recipes", "sourdough.md")) and not os.path.exists(os.path.join(ad, "AGENTS.pre-myco.md"))
               and "{{" not in read(os.path.join(ad, "AGENTS.md")) and ".obsidian/" in read(os.path.join(ad, ".gitignore")) and "*.tmp" in read(os.path.join(ad, ".gitignore"))
               and "scratch.tmp" not in git(ad, "ls-files")[1] and not git(ad, "status", "--porcelain")[1].strip(), git(ad, "status", "--porcelain")[1])
+        entry = read(os.path.join(ad, "AGENTS.md"))
+        check("adopt: the old AGENTS.md rules still apply, after the new entry point, as found",
+              entry.startswith("# Vault: start here") and entry.rstrip().endswith("# Old agent file\nBe brief.")
+              and "## Your project rules (kept from before Myco Notes)" in entry and "{{" not in entry
+              and "Entry files: the rules of your earlier `AGENTS.md` still apply" in read(os.path.join(ad, MY, "logs", "import-vault.md")), entry[-600:])
         rc, out = run([sys.executable, "-B", os.path.join(ad, *T.split("/"), "notes-lint.py")], ad)
         check("lint: wiki links and relative links count as mentions; a link to nothing is reported",
               "link to missing note or file [[Nowhere]]" in out and "Bread basics.md:1 no other note" not in out and "sourdough.md:1 no other note" not in out
@@ -500,6 +505,25 @@ def main():
         write(os.path.join(gv, "sub", "n.md"), "# N\n")
         rc, out = run(L(kit, "bootstrap") + [os.path.join(gv, "sub"), "--name", "Vault", "--adopt", "--no-backup"], tmp)
         check("adopt refuses a folder inside another repository", rc == 1 and "inside another git repository" in out, out)
+        cl = os.path.join(tmp, "claude-only")   # rules only in CLAUDE.md (and AGENTS.md linked to it where links work)
+        write(os.path.join(cl, "CLAUDE.md"), "# My Claude rules\nRun the tests first. {{KEEP}}\n")
+        write(os.path.join(cl, "n.md"), "# N\n")
+        if not WIN:
+            os.symlink("CLAUDE.md", os.path.join(cl, "AGENTS.md"))
+        rc, out = run(L(kit, "bootstrap") + [cl, "--name", "Cl", "--adopt", "--no-backup"], tmp)
+        agents, claude = read(os.path.join(cl, "AGENTS.md")), read(os.path.join(cl, "CLAUDE.md"))
+        check("adopt: CLAUDE.md rules stay in effect once (after @AGENTS.md, or in AGENTS.md when it linked to them), placeholders untouched",
+              rc == 0 and not os.path.islink(os.path.join(cl, "AGENTS.md")) and claude.startswith("@AGENTS.md\n")
+              and (agents + claude).count("Run the tests first. {{KEEP}}") == 1 and agents.startswith("# Cl: start here")
+              and not git(cl, "status", "--porcelain")[1].strip(), agents[-400:] + "\n---\n" + claude)
+        sk = os.path.join(tmp, "secret-entry")   # an entry file with a secret is not merged: kept aside and held back
+        write(os.path.join(sk, "AGENTS.md"), "# Rules\n" + "api_key = " + "AbCdEfGhIjKlMnOpQrStUvWx12\n")
+        write(os.path.join(sk, "n.md"), "# N\n")
+        rc, out = run(L(kit, "bootstrap") + [sk, "--name", "Sk", "--adopt", "--no-backup"], tmp)
+        tracked = git(sk, "ls-files")[1].split("\n")
+        check("adopt: an entry file with a secret is kept as AGENTS.pre-myco.md and not committed; the new AGENTS.md is",
+              rc == 4 and "AGENTS.md" in tracked and "AGENTS.pre-myco.md" not in tracked and "AbCdEf" not in read(os.path.join(sk, "AGENTS.md"))
+              and "AbCdEf" in read(os.path.join(sk, "AGENTS.pre-myco.md")), out + "\n".join(tracked))
         rc, out = run(L(kit, "bootstrap") + [os.path.join(tmp, "x"), "--name", "X", "--import", old, "--adopt"], tmp)
         check("--import and --adopt together are a usage error", rc == 2, out)
 

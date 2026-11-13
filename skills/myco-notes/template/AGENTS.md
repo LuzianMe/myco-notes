@@ -2,7 +2,7 @@
 
 This repository holds the **notes** of {{PROJECT_NAME}}: the single source of truth for its current state, procedures, decisions and lessons. Read this file first, in any session, from any starting folder.
 
-> Claude Code reads `CLAUDE.md`; Codex and many other agents read `AGENTS.md`. Keep this file as the real content and make `CLAUDE.md` contain only the line `@AGENTS.md` (or a symlink). If your agent looks for another filename, make that file a one-line pointer to this one (the exact syntax depends on the agent). Keep this file small: some agents cap the instructions they load (Codex: 32 KiB in total).
+> Claude Code reads `CLAUDE.md`; Codex and many other agents read `AGENTS.md`. Keep this file as the real content and make `CLAUDE.md` start with the line `@AGENTS.md` (or be a symlink). If your agent looks for another filename, make that file a one-line pointer to this one (the exact syntax depends on the agent). Keep this file small: some agents cap the instructions they load (Codex: 32 KiB in total).
 
 ## Read order (about five files)
 1. `{{NOTES_DIR}}/working-agreement.md` : how to work here (approvals, safety rules, things never to do).

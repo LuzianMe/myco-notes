@@ -76,7 +76,7 @@ One folder holds everything the method adds, so the repository root stays free f
 
 ```
 repo/
-  AGENTS.md  CLAUDE.md             entry point (read order + key rules); CLAUDE.md contains only @AGENTS.md
+  AGENTS.md  CLAUDE.md             entry point (read order + key rules); CLAUDE.md starts with @AGENTS.md
   .github/  .gitignore  .gitattributes  .myco-notes.conf     (must stay at the root)
   myco-notes/
     working-agreement.md
@@ -519,7 +519,7 @@ Also ask how far to go: **keep the structure** (add the master record, working a
 ### 20.2 Before the first commit
 - **Secrets first (8.1).** The whole collection is scanned. Files with a secret-looking string are not committed: they are listed (file and line, never the value) and stay outside version control until the owner has removed the value or moved it where secrets live. Older collections, and especially notes written with AI help, often hold a pasted key or password.
 - **Not everything is a note.** App settings and caches (for example `.obsidian/`, `.trash/`) are not copied (new folder) or are ignored (in place). Attachments are kept next to the notes that use them; large binary collections become data folders (`DATA_DIRS`).
-- **Existing entry files** (`AGENTS.md`, `CLAUDE.md` written by an earlier tool) are not overwritten: they are kept under a new name and their content is merged into the working agreement in the first pass.
+- **Existing entry files keep working.** An `AGENTS.md` the folder already has (the owner's own workflow rules, or another kit's) is not replaced: the new entry point is written and the old text follows it, as found, under its own section ("Your project rules"), which says that both apply and that the agent asks the owner where they disagree. A `CLAUDE.md` with rules of its own becomes the line `@AGENTS.md` followed by those rules, so they still reach only the agents that read it. From the first session on, an agent therefore sees the owner's rules and the method's together; tidying them up (moving facts into the notes, shortening what repeats) is part of the first pass and needs the owner's yes. A file with a secret-looking string is not merged: it is kept under a new name (`AGENTS.pre-myco.md`) and held back like any other (8.1).
 
 ### 20.3 The import log
 Creating the repository writes `<notes>/logs/import-<source>.md`, an effort log (section 3) with: the choice made (new folder or in place, keep or reorganise), where the backup is, an inventory (number of notes, folders, link styles, header keys, attachments) and one row per original file with its status (`pending`, `kept`, `merged into <note>.md`, `became <note>.md`, `left out: <reason>`). It is the plan and the record at once, so a different session or agent can continue where the last one stopped. The import is finished when no row is `pending`.

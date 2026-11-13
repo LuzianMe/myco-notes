@@ -40,7 +40,7 @@ A level 2 tool working on a level 3 repository MUST NOT change files it cannot w
 
 ### 3.1 Files at the repository root
 - `AGENTS.md`: the entry point (6.1). MUST exist.
-- `CLAUDE.md`: SHOULD contain only the line `@AGENTS.md`, so agents that look for it find the same entry point.
+- `CLAUDE.md`: SHOULD start with the line `@AGENTS.md`, so agents that look for it find the same entry point; anything after that line applies only to the agents that read `CLAUDE.md`.
 - `.myco-notes.conf`: the configuration (3.2). SHOULD exist; without it the defaults of the flat layout apply.
 - `.gitattributes`, `.gitignore`: MAY exist. A notes repository SHOULD store text with LF line endings, except `*.cmd` files, which use CRLF.
 
@@ -127,7 +127,7 @@ Text inside fenced code blocks is not scanned for references.
 ## 6. Files with a fixed role
 
 ### 6.1 Entry point (`AGENTS.md`)
-Plain Markdown, written for an agent or person with no prior context. It MUST give the read order (which files to open first) and SHOULD stay below 24 KiB, because several agents load only the first 32 KiB. It is not a note: it has no header requirement and is not counted in note checks except as a source of references.
+Plain Markdown, written for an agent or person with no prior context. It MUST give the read order (which files to open first) and SHOULD stay below 24 KiB, because several agents load only the first 32 KiB. It is not a note: it has no header requirement and is not counted in note checks except as a source of references. It MAY end with a section of rules the owner had before the notes repository existed (method 20.2); those rules apply alongside the rest of the file.
 
 ### 6.2 Master record (`STATE_FILE`, default `state.md`)
 The single place for the current state. It MUST exist in a level 2 repository. Its structure is left to the method (current state, open items, quirks, changelog), with one checkable rule: if it has a `Last updated YYYY-MM-DD` line near the top (within the first 12 lines after the header), that date MUST NOT be older than the newest changelog entry (a line starting `- **YYYY-MM-DD` below a heading that contains `changelog`).
