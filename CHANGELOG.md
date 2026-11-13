@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.18.3
+- **A review that finds nothing is recorded** (method 2.9.3, section 21.5): when a review read something and has nothing to propose, it writes and commits a short review file (`scope`, `open: none`, what it read, no proposals). Before, it wrote nothing, so the next review's scope still started at the previous review file and read the same lines again, and a tree could never reach "no review needed" after a kit update. With nothing in scope at all, a review still writes nothing. `index --review-scope` repeats the rule under its list.
+
 ## 0.18.2
 - **A review no longer re-reads its own fixes** (method 2.9.2, section 21.5): the changed scope now starts at the last commit of the newest review file (the one that applied its fixes), not at the commit that first added it. Before, every review listed the notes and the `AGENTS.md` line the previous review had just fixed, so it could never come back with "nothing changed". The lint comparison after applying still covers side effects of the fixes; an unrelated edit committed together with them falls outside the next review, one more reason for one logical change per commit.
 

@@ -203,9 +203,11 @@ def main():
             return 0
         if not ch:
             print("No note changed since the last review: check only the items above. Header line for the review file: "
-                  f"`scope: changed since {base[:7]}`.")
+                  f"`scope: changed since {base[:7]}`. Finding nothing still means a short review file with 'open: none', committed,"
+                  " so the next review starts after it (method 21.5).")
             return 0
-        print(f"Read {len(ch)} changed and {len(linked)} linked note(s) of {len(notes)}. Header line for the review file: `scope: changed since {base[:7]}`.")
+        print(f"Read {len(ch)} changed and {len(linked)} linked note(s) of {len(notes)}. Header line for the review file: `scope: changed since {base[:7]}`."
+              " Finding nothing still means a short review file with 'open: none', committed, so the next review starts after it (method 21.5).")
         print("\n## Changed")
         for n in ch:
             print(f"- `{n}`")
