@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.20.1
 - **Taking over a folder keeps its agent rules working** (method 20.2): `bootstrap --adopt` on a folder that already has an `AGENTS.md` (the owner's workflow rules, or another kit's, such as a second-brain setup) no longer moves it aside as `AGENTS.pre-myco.md`. The new entry point is written and the old text follows it as found, under "Your project rules", which says both apply and that the agent asks the owner where they disagree. A `CLAUDE.md` with rules of its own becomes `@AGENTS.md` followed by those rules; a symlink between the two is read once and replaced by a plain file. Before, the owner's rules were ignored until someone merged them by hand. A file with a secret-looking string is still kept aside and held back. The format now says `CLAUDE.md` SHOULD *start* with `@AGENTS.md`, and the entry point MAY end with the owner's earlier rules.
 
 ## 0.20.0
