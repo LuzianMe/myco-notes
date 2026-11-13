@@ -9,9 +9,9 @@ It reads; it never writes. It is generated, so it is never out of date and never
 Usage:  tools/index [--root DIR] [--all] [--missing] [--review-scope [--full]]
         --all           list every record in the history folders too
         --missing       only the notes outside the history folders that have no summary (for an upgrade, method 21.4)
-        --review-scope  what the next review should read (method 21.5): the notes changed since the last review file was committed
-                        (and uncommitted ones), plus the notes named in the changed lines and the notes that point to a changed note (unless more than
-                        5 do: a hub such as the master record); or every note when a full review is due (no
+        --review-scope  what the next review should read (method 21.5): the notes changed since the last commit of the newest review
+                        file, the one that applied its fixes (uncommitted edits included), plus the notes named in the changed lines
+                        and the notes that point to a changed note (unless more than 5 do: a hub such as the master record); or every note when a full review is due (no
                         earlier review, or the last full one older than REVIEW_FULL_DAYS, default 30). --full asks for a full one.
                         'Also check' names the entry point (AGENTS.md) when the kit was updated or it changed since the last
                         review, and in every full review.
@@ -54,7 +54,8 @@ def collect(root, lay):
 
 
 def review_files(root, lay):
-    """[(ct, sha, rel, is_full)] for committed review files (method 21.2), oldest first; is_full: header scope is 'full' or absent."""
+    """[(ct, sha, rel, is_full)] for committed review files (method 21.2), oldest first by the commit that added them; sha is the LAST
+    commit that touched the file (the one that applied its fixes), so the next review starts after them; is_full: scope 'full' or absent."""
     d = os.path.join(root, *lay["notes"].split("/"), "plans")
     out = []
     if not os.path.isdir(d):
@@ -66,7 +67,9 @@ def review_files(root, lay):
         r = _myco.git("-C", root, "log", "--diff-filter=A", "--format=%ct %H", "-1", "--", rel)
         if r.returncode != 0 or not r.stdout.strip():
             continue                                  # not committed yet: a review being written
-        ct, sha = r.stdout.split()[:2]
+        ct = r.stdout.split()[0]
+        last = _myco.git("-C", root, "log", "--format=%H", "-1", "--", rel)
+        sha = last.stdout.strip() or r.stdout.split()[1]
         fm, _ = _myco.frontmatter(open(os.path.join(d, f), encoding="utf-8", errors="replace").read())
         scope = fm.get("scope", ("",))[0].strip().lower()
         out.append((int(ct), sha, rel, scope in ("", "full") or scope.startswith("full")))
