@@ -78,6 +78,11 @@ def main():
         print("bootstrap (from the copied skill folder only; default single-folder layout)")
         rc, out = run(L(kit, "bootstrap") + [proj, "--name", "Demo", "--owner", "Tester", "--tz", "UTC", "--data-dir", "files-input", "--data-dir", "files-output"], tmp)
         check("bootstrap runs", rc == 0, out)
+        gs = read(os.path.join(proj, MY, "getting-started.md"))
+        check("first run: the owner's page is written, linked from AGENTS.md and printed (their part, their options), apart from the agent's steps",
+              "## Your part" in gs and "{{" not in gs and "getting-started.md" in read(os.path.join(proj, "AGENTS.md"))
+              and "For the owner" in out and "## Your part" in out and "## Your options" in out
+              and out.index("## What you can say") < out.index("Next, for the agent"), out[-1500:])
         check("baseline commit exists", "Baseline" in git(proj, "log", "--oneline")[1])
         check("placeholders filled", all("{{" not in read(os.path.join(proj, f)) for f in ("AGENTS.md", ".myco-notes.conf", ".gitignore", ".github/CODEOWNERS", ".github/pull_request_template.md"))
               and "{{TOOLS_DIR}}" not in read(os.path.join(proj, ".github", "workflows", "notes-check.yml")))

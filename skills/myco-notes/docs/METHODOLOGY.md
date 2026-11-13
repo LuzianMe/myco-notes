@@ -79,6 +79,7 @@ repo/
   AGENTS.md  CLAUDE.md             entry point (read order + key rules); CLAUDE.md starts with @AGENTS.md
   .github/  .gitignore  .gitattributes  .myco-notes.conf     (must stay at the root)
   myco-notes/
+    getting-started.md             for the owner: what you have, your part, your options (11.5a)
     working-agreement.md
     state.md                       master record
     runbook.md                     how-to + lessons
@@ -358,11 +359,19 @@ When several sessions or people edit the same repository: each writes a handoff 
 ### 11.5 New project bootstrap (30 minutes)
 1. `git init`; create the entry point, working agreement, master record skeleton, runbook skeleton, tracker with the matrix, backlog.
 2. Install the commit helper and the secret hook; write `.gitignore`.
-3. Create the mirror job and the independent snapshot job; run one restore test.
+3. Create the mirror job and the independent snapshot job; run one restore test (with the owner's yes: these are the owner's choices, 11.5a).
 4. Add the map builder and the publish step (or a plain index file to start).
 5. Make the first commit: "Baseline".
 6. Write the first changelog entry and the first sync-log line.
 7. Record which version of the kit made the repository (`KIT_VERSION` in `.myco-notes.conf`), so an old copy of the tools can be found later; `tools/doctor` reports it.
+
+### 11.5a The first run: what the owner is asked and told
+Setting up is the moment the owner learns what they are getting into, so it is a short conversation, not a silent default:
+1. **Say what was found,** in one line: an empty folder, a code project (with or without its own `AGENTS.md`), or a folder of notes (then section 20 applies).
+2. **Ask everything at once,** in one message of numbered questions, each with the recommended answer first, so that "defaults" settles them all: where the notes live (their own repository next to the project, recommended; or inside this folder, taking it over, 20.1), the project's name, the owner, the time zone (detected, to confirm), which folders hold data that is not notes, and what to do when a new folder appears in the root. Nothing is created before the answer.
+3. **Tell the owner where they stand,** in plain words, from `getting-started.md` (written into every new repository): what they now have, what the agent does without asking, what needs their yes, their own part, the optional protection beyond this computer with what each step protects against, and what they can say. The owner's part is named as such; optional steps are offered as choices, never done unasked and never presented as done.
+
+`getting-started.md` is written for the owner, not for agents: it is not in the read order, and the entry point points to it. Like any note, it is changed when the facts in it change (a mirror was set up, a team joined).
 
 ### 11.6 Restore drill
 Restore the latest snapshot into a scratch directory; run `git fsck` and `git log -5`; check that the entry point, master record and tracker are there and that the working files equal the last commit; record date and both verdicts (history, working copy) in the tracker.
@@ -457,6 +466,7 @@ Paths are relative to the kit, which is the skill folder `skills/myco-notes/` (i
 | The relations as a network, freshness (recently changed notes glow and float in front, untouched ones sink back), stale follow-ups, missing references, replay of the history (9, 10) | `tools/build-notes-map.py` writes `graph.html` (`tools/notes_graph.py`, `tools/graph-template.html`) |
 | Mirror (8.4); refuses a target that overlaps the repository or holds other files; `--dry-run`; `MIRROR_SCOPE`, `--strict` | `tools/mirror-push` |
 | Restore drill with history and working-copy verdicts (8.4, 11.6) | `tools/restore-drill` |
+| The first run: questions, then where the owner stands (11.5a) | the skill's setup mode, `template/notes/getting-started.md`, the summary `tools/bootstrap` prints at the end |
 | Health of a notes repository: kit version, tools, hook, layout, settings (11.5) | `tools/doctor` (read-only) |
 | Entry point for agents (12) | `template/AGENTS.md` (+ `CLAUDE.md` containing `@AGENTS.md`) |
 | The repository on disk, precisely enough for other tools to read, write and check it: layout, headers, references, sync log, inbox, reviews, sources | `docs/FORMAT.md` (`FORMAT_VERSION` in `.myco-notes.conf`) |

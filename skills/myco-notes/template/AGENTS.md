@@ -1,6 +1,6 @@
 # {{PROJECT_NAME}}: start here (entry point for humans and AI agents)
 
-This repository holds the **notes** of {{PROJECT_NAME}}: the single source of truth for its current state, procedures, decisions and lessons. Read this file first, in any session, from any starting folder.
+This repository holds the **notes** of {{PROJECT_NAME}}: the single source of truth for its current state, procedures, decisions and lessons. Read this file first, in any session, from any starting folder. For the owner (people, not agents): `{{NOTES_DIR}}/getting-started.md` says what they have, what needs their yes, and their options.
 
 > Claude Code reads `CLAUDE.md`; Codex and many other agents read `AGENTS.md`. Keep this file as the real content and make `CLAUDE.md` start with the line `@AGENTS.md` (or be a symlink). If your agent looks for another filename, make that file a one-line pointer to this one (the exact syntax depends on the agent). Keep this file small: some agents cap the instructions they load (Codex: 32 KiB in total).
 
