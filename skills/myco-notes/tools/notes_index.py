@@ -169,6 +169,26 @@ def entry_checks(root, lay, conf, scope, base):
         ch += [l[3:] for l in _myco.git("-C", root, "status", "--porcelain", "--", "AGENTS.md", "CLAUDE.md").stdout.split("\n") if len(l) > 3]
         if ch:
             out.append(f"the entry point changed since the last review ({', '.join(sorted(set(ch)))}): read the changed lines")
+    if base:                                       # a source fetched again with changed content (method 22.4)
+        try:
+            import notes_ingest
+            srcs = dict(notes_ingest.read_sources(root, lay))
+            added = _myco.git("-C", root, "-c", "core.quotepath=off", "diff", "--name-only", "--diff-filter=A", base, "HEAD", "--",
+                              lay["notes"] + "/sources/").stdout.split("\n")
+            added += [l[3:] for l in _myco.git("-C", root, "-c", "core.quotepath=off", "status", "--porcelain", "--untracked-files=all",
+                                                 "--", lay["notes"] + "/sources/").stdout.split("\n") if l.startswith("??")]
+            for p in sorted({x.strip() for x in added if x.strip()}):
+                f = os.path.basename(p)
+                old = srcs.get(f, {}).get("supersedes", "").strip()
+                if old:
+                    who = notes_ingest.citing(root, lay, [old])[old]
+                    out.append(f"source `{f}` replaces `{old}` (the content changed): compare "
+                               + (", ".join(f"`{w}`" for w in who) if who else "the notes that relied on it (none cite it by name)")
+                               + " with the new copy (method 22.4)")
+                elif f in srcs:
+                    out.append(f"new source `{f}` since the last review: if it has not been taken in yet, read it and propose (method 22.3)")
+        except Exception:
+            pass
     if scope == "full" and not any("template/AGENTS.md" in o for o in out):
         out.append("a full review also compares `AGENTS.md` with the kit's `template/AGENTS.md` (missing lines become `upgrade` fixes, method 21.4)")
     return out

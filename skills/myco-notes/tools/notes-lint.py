@@ -11,7 +11,7 @@ Checks
   secrets   secret-looking strings (the rules of tools/secret_scan.py, the same as the pre-commit hook and CI; values are not shown)
   orphans   notes that no other note mentions by file name or links to (info only; names the records, such as logs, that still mention one)
   size      notes larger than MAX_NOTE_KB (default 100) and an AGENTS.md near or over the 32 KiB some agents load (warns from ENTRY_WARN_KB, default 24)
-  header    the optional freshness header (method 10.1: last_confirmed, review_after, valid_from, valid_until, supersedes, superseded_by): malformed or
+  header    the optional freshness header (method 10.1: last_confirmed, review_after, valid_from, valid_until, supersedes, superseded_by, sources): malformed or
             reversed dates, a passed review_after or valid_until, last_confirmed older than STALE_DAYS (default 365) without a review_after, missing targets
   summary   notes outside the history folders without a one-line `summary` in the header (one info line for all of them; tools/index --missing
             lists them) and summaries longer than 200 characters (method 10.1)
@@ -209,7 +209,7 @@ def main():
                 add("WARN", rel, fm["valid_until"][1], f"valid_until {vu} has passed: supersede the note or move it to the archive")
             if vf and vu and vf > vu:
                 add("WARN", rel, fm["valid_from"][1], f"valid_from {vf} is after valid_until {vu}")
-            for k in ("supersedes", "superseded_by"):
+            for k in ("supersedes", "superseded_by", "sources"):
                 if k not in fm:
                     continue
                 for tok in [t.strip().strip("`") for t in fm[k][0].split(",") if t.strip()]:
@@ -218,7 +218,7 @@ def main():
                             if other != rel and (other == tok or os.path.basename(other) == os.path.basename(tok)):
                                 mentions[other] += 1
                     else:
-                        add("WARN", rel, fm[k][1], f"header {k} points to a missing note `{tok}`")
+                        add("WARN", rel, fm[k][1], f"header {k} points to a missing {'source' if k == 'sources' else 'note'} `{tok}`")
                 if k == "superseded_by" and fm[k][0] and not is_hist:
                     add("INFO", rel, fm[k][1], f"superseded by {fm[k][0]}: move it to the archive when it is no longer needed")
         # fresh
