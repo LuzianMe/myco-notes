@@ -4,7 +4,7 @@ import re
 import subprocess
 import sys
 
-VERSION = "0.22.0"   # the kit version these tools come from; moves with plugin.json and SKILL.md (tests check it)
+VERSION = "0.22.1"   # the kit version these tools come from; moves with plugin.json and SKILL.md (tests check it)
 FORMAT_VERSION = "1.0"   # the version of docs/FORMAT.md that new repositories follow; bootstrap writes it, relocate adds it when missing
 AGENT_SKILL_DIRS = (".claude/skills", ".agents/skills")   # a copy of the skill kept in a notes repository for agents (a cloud session loads it from there): not notes, so the lint and the map leave it out
 
