@@ -684,6 +684,12 @@ def main():
         run([sys.executable, "-B", os.path.join(rp, *T.split("/"), "notes_commit.py"), "Review"], rp)
         rc, out = run(L(rp, "index", T) + ["--review-scope"], rp)
         check("review scope: nothing changed since the last review", "Nothing changed in the notes since the last review" in out, out)
+        write(os.path.join(rp, MY, "gamma.md"), "\nFixed by the review.\n", "a")
+        rvf = os.path.join(rp, MY, "plans", "review-2026-01-01.md")
+        write(rvf, read(rvf).replace("summary: First review", "summary: First review, fix applied"))
+        run([sys.executable, "-B", os.path.join(rp, *T.split("/"), "notes_commit.py"), "Apply the review"], rp)
+        rc, out = run(L(rp, "index", T) + ["--review-scope"], rp)
+        check("review scope: the fixes a review applied are not read again by the next one", "Nothing changed in the notes since the last review" in out and "gamma.md" not in out, out)
         write(os.path.join(rp, MY, "alpha.md"), "\nNow also see `beta.md`.\n", "a")
         rc, out = run(L(rp, "index", T) + ["--review-scope"], rp)
         check("review scope: a changed note, the note its new line names and a note pointing to it; not the others",

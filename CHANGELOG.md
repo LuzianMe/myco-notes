@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.18.2
+- **A review no longer re-reads its own fixes** (method 2.9.2, section 21.5): the changed scope now starts at the last commit of the newest review file (the one that applied its fixes), not at the commit that first added it. Before, every review listed the notes and the `AGENTS.md` line the previous review had just fixed, so it could never come back with "nothing changed". The lint comparison after applying still covers side effects of the fixes; an unrelated edit committed together with them falls outside the next review, one more reason for one logical change per commit.
+
 ## 0.18.1
 - **Reviews no longer miss the entry point** (method 2.9.1, section 21.5): `AGENTS.md` is not a note, so a changed-scope review never looked at it, and a tree's `AGENTS.md` could stay behind the kit until the next full review. `tools/index --review-scope` now has an *Also check* section: when the kit was updated since the last review (`KIT_VERSION` moved) it asks for `AGENTS.md` to be compared with the kit's `template/AGENTS.md`, with missing lines proposed as `upgrade` fixes; it also lists an entry point that changed, and every full review includes the comparison.
 - `relocate` points out an `AGENTS.md` that does not tell agents to start a review with `index --review-scope`.
