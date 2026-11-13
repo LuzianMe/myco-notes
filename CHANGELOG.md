@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.19.0
+Sources (method 3.0, section 22), after the "raw sources" layer of Andrej Karpathy's LLM Wiki note, adapted so the owner approves every change.
+- **Outside documents kept as found**: `tools/ingest` saves a manual, release notes, a forum answer or an article to `<notes>/sources/YYYY-MM-DD-<name>.md` with a header (summary, `source_url` or `original`, `retrieved`, `kind`, `sha256`), refuses secret-looking strings (exit 4, values not shown), writes nothing when the same URL comes back unchanged, and writes a superseding copy when it changed. It fetches nothing: the agent gets the document. `--list` shows every source and the notes that cite it; `--commit` commits the new file alone.
+- **Taking a source in is a review**: the agent reads the document and writes proposals (`scope: source <file>`), each citing it; only what the owner accepts goes into the notes. The skill has a matching ingest mode; from a phone, "save this source: <link>" goes to the inbox for later.
+- **Citations are checked**: notes name their sources in a new `sources` header key (the lint warns about one that points to no file) and in the text ("per `<file>`"); the map draws the relation and shows sources as their own group.
+- **Changed sources come back**: when a source was fetched again with different content, `index --review-scope` lists the notes citing the old copy under *Also check*; a new source not yet taken in is listed too.
+- `sources/` is a record folder (like `logs/`, `inbox/`, `imported/`); the sync log has a new kind, `ingest`. The starter tree has `sources/README.md`, and the demo tree a cited source (a relay board manual).
+
 ## 0.18.3
 - **A review that finds nothing is recorded** (method 2.9.3, section 21.5): when a review read something and has nothing to propose, it writes and commits a short review file (`scope`, `open: none`, what it read, no proposals). Before, it wrote nothing, so the next review's scope still started at the previous review file and read the same lines again, and a tree could never reach "no review needed" after a kit update. With nothing in scope at all, a review still writes nothing. `index --review-scope` repeats the rule under its list.
 

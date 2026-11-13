@@ -4,7 +4,7 @@ import re
 import subprocess
 import sys
 
-VERSION = "0.18.3"   # the kit version these tools come from; moves with plugin.json and SKILL.md (tests check it)
+VERSION = "0.19.0"   # the kit version these tools come from; moves with plugin.json and SKILL.md (tests check it)
 AGENT_SKILL_DIRS = (".claude/skills", ".agents/skills")   # a copy of the skill kept in a notes repository for agents (a cloud session loads it from there): not notes, so the lint and the map leave it out
 
 IS_WINDOWS = os.name == "nt"
@@ -119,7 +119,7 @@ def frontmatter(text):
 
 
 SUMMARY_MAX = 200   # characters (method 10.1)
-LOG_KINDS = ("change", "note", "answer", "review", "audit", "import", "merge", "upgrade", "setup", "drill")   # sync-log line kinds (method 4)
+LOG_KINDS = ("change", "note", "ingest", "answer", "review", "audit", "import", "merge", "upgrade", "setup", "drill")   # sync-log line kinds (method 4)
 LOG_LINE = re.compile(r"^- \*\*\d{4}-\d{2}-\d{2} (" + "|".join(LOG_KINDS) + r")( \([^)]*\))?:\*\*\s+\S")
 
 
@@ -204,7 +204,7 @@ def layout(root, conf=None):
         "map": pick("MAP_DIR", "notes-map", my + "/map"),
         "state": _rel(conf.get("STATE_FILE")) or "state.md",
         "data": [d for d in (_rel(x) for x in conf.get("DATA_DIRS", "").split()) if d],
-        "history": list(dict.fromkeys([d for d in (_rel(x) for x in conf.get("HISTORY_DIRS", "archive logs").split()) if d] + ["inbox", "imported"])),   # the inbox (19.1) and imported originals (20) are always records
+        "history": list(dict.fromkeys([d for d in (_rel(x) for x in conf.get("HISTORY_DIRS", "archive logs").split()) if d] + ["inbox", "imported", "sources"])),   # the inbox (19.1), imported originals (20) and sources (22) are always records
     }
 
 

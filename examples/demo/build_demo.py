@@ -148,6 +148,9 @@ Effect: some seedling trays damaged. Cause (proven): the heater's timer reset af
 Fix: the valve and heater schedule moved to the relay board (`irrigation-valve.md`), which keeps time.
 The forecast had shown -3 C (`weather-feed.md`); a forecast-based warning is now on the backlog.
 """}),
+    ("2026-02-28", "Source: RB-8 relay board manual; the valve note cites it", {
+        "sources/2026-02-28-rb-8-relay-board-manual.md": '---\nsummary: Manual of the RB-8 relay board (excerpt): relays, clock backup, stored schedules\nsource_url: https://example.invalid/rb8-manual\nretrieved: 2026-02-28\nkind: manual\nsha256: 0fbb4725aecbbed419718f3da61d87f9921b02d643cadcf18abbbad6023f70dd\n---\n# RB-8 relay board manual\n\nRetrieved 2026-02-28 from https://example.invalid/rb8-manual. Kept as found (method section 22): not edited after saving.\n\nRelay board RB-8 (excerpt kept: timing and power)\n\n- Eight relays, 24 V coils, MQTT client built in.\n- Real-time clock with a supercapacitor: keeps time for 72 hours without power.\n- Schedules are stored on the board and run without the network.\n',
+        "entities/irrigation-valve.md": "+\n## Why the schedule lives on the board (since 2026-02-28)\n- The board keeps time for 72 hours without power, per `2026-02-28-rb-8-relay-board-manual.md` (not tested here yet). That is why the frost-night fix moved the schedule here.\n"}),
     ("2026-03-02", "Soil probes arrived (not wired up yet)", {
         "entities/soil-probe.md": """# Soil probe
 

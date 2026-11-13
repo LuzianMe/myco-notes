@@ -47,6 +47,7 @@ def default_groups(lay):
         ("artifacts", "Deployed artifacts", "Repository copies of what runs elsewhere (READMEs of bundles).", [n + "scripts/"]),
         ("archive", "Archive", "Old detail kept for history.", [n + "archive/"]),
         ("imported", "Imported, as found", "Notes taken over from an older collection, unchanged (method section 20); the import log says what became of each.", [n + "imported/"]),
+        ("sources", "Sources", "Outside documents as they were retrieved: manuals, release notes, articles (method section 22); notes cite them.", [n + "sources/"]),
         ("docs", "Method", "How the notes are kept.", [lay["docs"] + "/"]),
         ("other", "Other notes", "Everything else (entity notes and new files appear here automatically).", []),
     ]

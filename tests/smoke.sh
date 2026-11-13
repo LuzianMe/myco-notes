@@ -270,7 +270,7 @@ mkdir -p $tmp/flat/.claude/skills/myco-notes/docs; echo old > $tmp/flat/.claude/
 chk "relocate refreshes a skill copy under .claude/skills" "\"$kit/tools/relocate\" --root $tmp/flat --apply >/dev/null && cmp -s $kit/SKILL.md $tmp/flat/.claude/skills/myco-notes/SKILL.md && [ -f $tmp/flat/.claude/skills/myco-notes/docs/METHODOLOGY.md ] && [ -f $tmp/flat/.claude/skills/myco-notes/tools/bootstrap.py ]"
 
 echo "demo tree (README screenshots and the live demo)"
-chk "build_demo makes the tree, its map and the mycelium view" "python3 $repo/examples/demo/build_demo.py $tmp/demo | grep -q 'graph: 32 nodes' && [ -f $tmp/demo/myco-notes/map/graph.html ] && [ \"\$(git -C $tmp/demo rev-list --count HEAD)\" -ge 20 ]"
+chk "build_demo makes the tree, its map and the mycelium view" "python3 $repo/examples/demo/build_demo.py $tmp/demo | grep -q 'graph: 34 nodes' && [ -f $tmp/demo/myco-notes/map/graph.html ] && [ \"\$(git -C $tmp/demo rev-list --count HEAD)\" -ge 20 ]"
 chk "the demo tree is lint-clean apart from its two staged warnings" "(cd $tmp/demo && myco-notes/tools/notes-lint.py --quiet | grep -q ' 0 errors, 2 warnings')"
 
 chk "no .gitattributes in the kit rewrites file contents (the plugin directory refuses it)" "! git -C $repo ls-files -z '*.gitattributes' '.gitattributes' | xargs -0 -I{} grep -h -v '^#' $repo/{} | grep -q -E 'eol=|filter|export-|(^| )text( |=|$)'"
