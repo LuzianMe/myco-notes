@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.22.1
 - **Starter notes are fitted to the repository** (method 21.4): when an upgrade review offers a starter note, its proposal shows the text fitted to the repository's real facts (for example, the owner's page lists the mirror that already runs instead of saying the notes exist only on this computer), not the template's generic lines. Seen first in a real full review.
 
 ## 0.22.0
