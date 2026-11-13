@@ -1,7 +1,7 @@
 {
   "name": "myco-notes",
   "displayName": "Myco Notes",
-  "version": "0.21.0",
+  "version": "0.22.0",
   "description": "Myco Notes: a framework for project notes that your AI agent keeps true: a method, an open format (versioned, secret-free, linked Markdown in git), tools that check it, and an agent skill.",
   "author": {
     "name": "Luzian",
