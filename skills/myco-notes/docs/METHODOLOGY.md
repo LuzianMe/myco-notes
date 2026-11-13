@@ -1,6 +1,6 @@
 # Myco Notes: the method
 
-Version 2.8.3 (general edition), 2026-11-12. It is project-independent and is written for engineers and teams (and for AI coding agents working with them) who run long, large or fast-changing projects: infrastructure, software platforms, data and ML systems, research, hardware, operations. It is meant as the specification from which a skill, a template repository or a team convention can be built.
+Version 2.9 (general edition), 2026-11-12. It is project-independent and is written for engineers and teams (and for AI coding agents working with them) who run long, large or fast-changing projects: infrastructure, software platforms, data and ML systems, research, hardware, operations. It is meant as the specification from which a skill, a template repository or a team convention can be built.
 
 The method grew out of a long-running, AI-operated engineering project in which the notes had to act as the memory of an operator that forgets everything between sessions. That constraint is useful for any project: if the notes are good enough for an operator with no memory, they are good enough for a new teammate, an auditor, or you in a year.
 
@@ -444,6 +444,7 @@ Paths are relative to the kit, which is the skill folder `skills/myco-notes/` (i
 | Per-clone setup, branches and pull requests (18) | `tools/setup-clone` (and `tools/notes-commit`, which switches the hook on in a clone where it is not set), `tools/notes-commit --branch/--push/--pr`, `docs/TEAM.md` |
 | Lint: references, numbering, freshness, due dates, ledger, secrets, size (3.3, 9, 10), the optional freshness header and summaries (10.1), the newest sync-log line (4) | `tools/notes-lint.py` (`HISTORY_DIRS`, `DATA_DIRS`, `MAX_NOTE_KB`, `ENTRY_WARN_KB`, `STALE_DAYS`) |
 | Note index: every note with its one-line summary (3.2, 10.1, 12) | `tools/index` (`--missing` lists notes without a summary); the map shows summaries too |
+| Review scope: changed notes and their links, or a full review when due (21.5) | `tools/index --review-scope` (`--full`, `REVIEW_FULL_DAYS`) |
 | Reviews with proposed fixes, applied only when confirmed; upgrades of older trees (21) | `<notes>/plans/review-YYYY-MM-DD.md` (written by the agent); `tools/resume` lists proposals waiting for an answer |
 | Bounded start-of-session briefing (11.2, 12) | `tools/resume` (`--budget`, `RESUME_BUDGET`) |
 | What the notes said on a date, what changed since, history of one note (7.1) | `tools/asof` |
@@ -544,7 +545,7 @@ Read earlier review files first: a fix the owner declined is not proposed again 
 **Side effects belong in the proposal.** Before proposing a fix that moves, shortens or deletes text (condensing a note, moving an old changelog into `logs/` or the archive, merging two notes), check what that text was the only place to mention: a note named nowhere else becomes an orphan, because mentions from records do not count (the lint says which records still name it). The proposal then includes the link that keeps the note connected (a line in the note that stays, the read order or an index note), so the owner approves the whole change, not half of it.
 
 ### 21.2 The review file
-The proposals go into `<notes>/plans/review-YYYY-MM-DD.md`, which is committed (it is a plan, not a change to the notes). Its header carries a `summary` and an `open` line listing the numbers still waiting for an answer (`open: 1, 2, 3` when it is written, `open: none` when everything is answered); the lint warns when `open` does not match the `Status:` lines below, so the header cannot fall behind. Each proposal is numbered and complete enough to be applied without further thought:
+The proposals go into `<notes>/plans/review-YYYY-MM-DD.md`, which is committed (it is a plan, not a change to the notes). Its header carries a `summary`, a `scope` line (`full`, or `changed since <commit>`, 21.5) and an `open` line listing the numbers still waiting for an answer (`open: 1, 2, 3` when it is written, `open: none` when everything is answered); the lint warns when `open` does not match the `Status:` lines below, so the header cannot fall behind. Each proposal is numbered and complete enough to be applied without further thought:
 
 ```
 ## 3. <short title>
@@ -574,3 +575,10 @@ When the method gains a rule (2.8 added summaries and the sync-log format), tree
 1. Refresh the tree's tools and docs from the new kit (`tools/relocate`, 3.1), run the lint, commit.
 2. Write an upgrade review: the findings that come from new rules (notes without a summary, a newest sync-log line in an older form, a missing line in the entry point) become proposals of kind `upgrade`, in batches of about 20 notes, each with its summary written out. Records keep their form (history folders, older sync-log lines, changelog entries): they say what was written at the time.
 3. Apply them as in 21.3 and say in the sync-log line which kit version the tree now follows: `- **YYYY-MM-DD upgrade:** summaries for 20 of 46 notes (kit 0.17.0)`. A later session continues with the notes still without a summary (`tools/index --missing`).
+
+### 21.5 Scope: what changed, or everything
+A full review reads every note. Done again and again it finds less each time (in one real tree: 13, 9, 5, 4, 3, then 1 finding), while most of what goes wrong between reviews sits in the notes that were edited. So a review has two scopes:
+- **Changed** (the default): the notes changed since the last review file was written (committed or not), plus the notes named in the lines that changed and the notes that point to a changed note, because a contradiction or a lost mention usually sits across such a link. A note that many notes point to (more than five: a hub such as the master record or the tracker) does not pull all of them in; its changed lines decide. Records (history folders) and review files are not in the scope.
+- **Full**: every note. When the owner asks for it ("full review"), when there is no earlier review, or when the last full review is older than `REVIEW_FULL_DAYS` (default 30) in `.myco-notes.conf`.
+
+`tools/index --review-scope` prints which scope is due and why, and the list of notes. The review file records it (`scope: changed since abc1234` or `scope: full`; an older review file without the line counts as full). A changed review with nothing changed says so in one line and writes no review file. Other good times for a review: after a large change, and before handing the notes to someone; answering "all" (or "all except 4") in one go is the quickest way through it.

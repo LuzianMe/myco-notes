@@ -24,7 +24,7 @@ Working through pull requests (a cloud session, a branch per change; experimenta
 
 ## Questions and reviews
 - **A question about the project:** run `{{TOOLS_DIR}}/index` (every note with its one-line summary) and open the notes it points to. If the answer took several notes, a live check or research, offer in one line to keep it as a note (and where); save it only on a yes.
-- **"Review the notes":** write the findings with ready-to-apply fixes to `{{NOTES_DIR}}/plans/review-<date>.md` and change no note yet; the owner answers per number (yes, no, or a change). Apply only the accepted fixes exactly as shown; a changed fix is shown again before it is applied; declined ones are recorded and not proposed again (method section 21).
+- **"Review the notes":** run `{{TOOLS_DIR}}/index --review-scope` first: it lists the notes changed since the last review and the notes linked to them, or says a full review is due ("full review" asks for one). Write the findings with ready-to-apply fixes to `{{NOTES_DIR}}/plans/review-<date>.md` and change no note yet; the owner answers per number (yes, no, or a change). Apply only the accepted fixes exactly as shown; a changed fix is shown again before it is applied; declined ones are recorded and not proposed again (method section 21).
 - Every note starts with a header line `summary:` (one line, what it holds and when to read it). Sync-log lines read `- **YYYY-MM-DD kind:** what` (kind: change, note, answer, review, audit, import, merge, upgrade, setup, drill).
 
 ## Tools

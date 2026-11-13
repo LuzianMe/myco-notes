@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.18.0
+Faster reviews (method 2.9, section 21.5). In one real tree six full reviews in a row found 13, 9, 5, 4, 3 and 1 issues: most of what goes wrong between reviews sits in the notes that were edited.
+- **A review reads what changed**: `tools/index --review-scope` lists the notes changed since the last review file was committed (uncommitted edits included), the notes named in the changed lines, and the notes that point to a changed note (unless more than five do: a hub such as the master record). With nothing changed it says no review is needed. The skill reads only those notes and records `scope: changed since <commit>` in the review file.
+- **Every note now and then**: a full review is due when there is no earlier review, when the last full one is older than `REVIEW_FULL_DAYS` (new setting, default 30), or when the owner asks ("full review", `--review-scope --full`). Older review files without a `scope` line count as full.
+
 ## 0.17.3
 - **Proposed summaries are measured before you are asked** (method 2.8.3, section 21.2): a review proposes a summary as its own `summary: ...` line, and the lint checks those lines in a review file too (also inside code blocks), warning about one over 200 characters. The skill runs the lint on the review file before showing it, so an applied fix no longer brings a new warning with it (in a real run, a 202-character summary needed a second review to fix).
 - Method edition date corrected (2.8.2 was dated a day ahead).
