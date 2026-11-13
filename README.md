@@ -1,6 +1,6 @@
 # Myco Notes
 
-*Linked, versioned, secret-free project notes for you and your AI agents.*
+*Myco Notes is a framework for project notes that your AI agent keeps true: a method, an open format, and tools that check it.*
 
 [![test](https://github.com/LuzianMe/myco-notes/actions/workflows/test.yml/badge.svg)](https://github.com/LuzianMe/myco-notes/actions/workflows/test.yml) [![live demo](https://img.shields.io/badge/live%20demo-mycelium%20view-3fbfa8)](https://luzianme.github.io/myco-notes/graph.html) [![license](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 

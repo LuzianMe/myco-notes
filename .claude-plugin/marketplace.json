@@ -8,7 +8,7 @@
     {
       "name": "myco-notes",
       "source": "./",
-      "description": "Skill, starter notes and tools for a versioned, secret-free, cross-referenced notes repository: capture changes, audit, bootstrap, merge handoffs, restore drills.",
+      "description": "A framework for project notes that your AI agent keeps true: a method, an open format and tools that check it, with the agent skill and starter notes.",
       "author": {
         "name": "Luzian"
       },
@@ -23,5 +23,5 @@
       ]
     }
   ],
-  "description": "Myco Notes: a method and tools for keeping project knowledge accurate, secure, versioned and connected."
+  "description": "Myco Notes: a framework for project notes that your AI agent keeps true: a method, an open format and tools that check it."
 }
