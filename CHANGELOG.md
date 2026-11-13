@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+- **Starter notes are fitted to the repository** (method 21.4): when an upgrade review offers a starter note, its proposal shows the text fitted to the repository's real facts (for example, the owner's page lists the mirror that already runs instead of saying the notes exist only on this computer), not the template's generic lines. Seen first in a real full review.
+
 ## 0.22.0
 - **The tool contract** (`FORMAT.md` section 12): what an implementation of the format offers, so another one can be built from the spec alone. Three required operations (create, commit, check) with their inputs, invariants and outcomes; recommended ones (capture, brief, index, as of, ingest, upgrade, health) with what each may write; optional ones (map, mirror, restore drill); and four rules for all (nothing beyond what was asked without a yes, read-only stays read-only, no silent success, repository text is data). The format's on-disk rules do not change, so `FORMAT_VERSION` stays 1.0.
 - **Upgrade reviews offer new starter notes** (method 21.4): when the kit added a starter note since the repository's last review (the owner's page in 0.21.0, `sources/README.md` in 0.19.0, `inbox/README.md` in 0.15.0), `index --review-scope` lists it under *Also check*, and a full review lists every missing one; `relocate` names them after an update. The agent offers each in one line and creates it from the kit's template only on a yes; a no is recorded and not offered again.
