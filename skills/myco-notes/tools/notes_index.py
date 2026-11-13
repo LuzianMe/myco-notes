@@ -6,12 +6,16 @@ the note's path and the `summary` from its header; a note without one shows its 
 history folders (logs, archive, inbox, imported, HISTORY_DIRS) are listed after the notes, as a count per folder unless --all is given.
 It reads; it never writes. It is generated, so it is never out of date and never committed.
 
-Usage:  tools/index [--root DIR] [--all] [--missing]
-        --all      list every record in the history folders too
-        --missing  only the notes outside the history folders that have no summary (for an upgrade, method 21.4)
+Usage:  tools/index [--root DIR] [--all] [--missing] [--review-scope [--full]]
+        --all           list every record in the history folders too
+        --missing       only the notes outside the history folders that have no summary (for an upgrade, method 21.4)
+        --review-scope  what the next review should read (method 21.5): the notes changed since the last review file was committed
+                        (and uncommitted ones), plus the notes named in the changed lines and the notes that point to a changed note (unless more than
+                        5 do: a hub such as the master record); or every note when a full review is due (no
+                        earlier review, or the last full one older than REVIEW_FULL_DAYS, default 30). --full asks for a full one.
 Exit:   0 (also when summaries are missing; the lint reports those)
 """
-import argparse, os, sys
+import argparse, datetime, os, re, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.dont_write_bytecode = True
@@ -47,15 +51,134 @@ def collect(root, lay):
     return rows
 
 
+def review_files(root, lay):
+    """[(ct, sha, rel, is_full)] for committed review files (method 21.2), oldest first; is_full: header scope is 'full' or absent."""
+    d = os.path.join(root, *lay["notes"].split("/"), "plans")
+    out = []
+    if not os.path.isdir(d):
+        return out
+    for f in os.listdir(d):
+        if not _myco.REVIEW_FILE.match(f):
+            continue
+        rel = lay["notes"] + "/plans/" + f
+        r = _myco.git("-C", root, "log", "--diff-filter=A", "--format=%ct %H", "-1", "--", rel)
+        if r.returncode != 0 or not r.stdout.strip():
+            continue                                  # not committed yet: a review being written
+        ct, sha = r.stdout.split()[:2]
+        fm, _ = _myco.frontmatter(open(os.path.join(d, f), encoding="utf-8", errors="replace").read())
+        scope = fm.get("scope", ("",))[0].strip().lower()
+        out.append((int(ct), sha, rel, scope in ("", "full") or scope.startswith("full")))
+    return sorted(out)
+
+
+HUB_LINKERS = 5   # a changed note that more notes than this point to is a hub: its linkers are not added to the scope
+
+
+class Linker:
+    """Finds the notes a piece of text names: backticked file names and wiki/relative links (method 9)."""
+    def __init__(self, notes):
+        self.by_base, self.paths = {}, set(notes)
+        for n in notes:
+            self.by_base.setdefault(os.path.basename(n), []).append(n)
+        self.index = _myco.LinkIndex(notes, self.paths)
+
+    def targets(self, text, rel):
+        tgt = set()
+        for tok in re.findall(r"`([^`\n]+\.md)`", text):
+            tgt.update(self.by_base.get(os.path.basename(tok.strip()), []))
+        for kind, target, _ in _myco.links(text):
+            found = self.index.resolve(kind, target, rel)
+            if found in self.paths:
+                tgt.add(found)
+        tgt.discard(rel)
+        return tgt
+
+
+def changed_lines(root, base, rel, untracked):
+    """The added and removed lines of one note since `base`, uncommitted edits included; the whole file when it is new."""
+    if rel in untracked:
+        return open(os.path.join(root, *rel.split("/")), encoding="utf-8", errors="replace").read()
+    r = _myco.git("-C", root, "-c", "core.quotepath=off", "diff", "-U0", base, "--", rel)
+    return "\n".join(l[1:] for l in r.stdout.split("\n") if l[:1] in "+-" and not l.startswith(("+++", "---")))
+
+
+def review_scope(root, lay, conf, want_full=False, today=None):
+    """(scope, reason, base sha or None, changed notes, linked notes, all notes) for the next review (method 21.5)."""
+    rows = collect(root, lay)
+    notes = sorted(r[0] for r in rows if not r[3] and not (r[0].startswith(lay["notes"] + "/plans/") and _myco.REVIEW_FILE.match(os.path.basename(r[0]))))
+    try:
+        full_days = int(conf.get("REVIEW_FULL_DAYS") or 30)
+    except ValueError:
+        full_days = 30
+    revs = review_files(root, lay)
+    today = today or datetime.date.today()
+    fulls = [r for r in revs if r[3]]
+    if want_full:
+        return "full", "asked for a full review", None, [], [], notes
+    if not revs:
+        return "full", "no earlier review file", None, [], [], notes
+    if not fulls:
+        return "full", "no earlier full review", None, [], [], notes
+    age = (today - datetime.date.fromtimestamp(fulls[-1][0])).days
+    if age > full_days:
+        return "full", f"the last full review ({fulls[-1][2]}) is {age} days old (REVIEW_FULL_DAYS={full_days})", None, [], [], notes
+    base = revs[-1][1]
+    changed = set()
+    r = _myco.git("-C", root, "-c", "core.quotepath=off", "diff", "--name-only", "-z", base, "HEAD")
+    changed.update(p for p in r.stdout.split("\0") if p)
+    r = _myco.git("-C", root, "-c", "core.quotepath=off", "status", "--porcelain", "-z", "--untracked-files=all")
+    for entry in r.stdout.split("\0"):
+        if len(entry) > 3:
+            changed.add(entry[3:])
+    ch = sorted(n for n in notes if n in changed)
+    untracked = set(p for p in _myco.git("-C", root, "-c", "core.quotepath=off", "ls-files", "--others", "--exclude-standard", "-z").stdout.split("\0") if p)
+    lk = Linker(notes)
+    linked = set()
+    for n in ch:                                   # notes named in the lines that changed
+        linked.update(lk.targets(changed_lines(root, base, n, untracked), n))
+    linkers = {n: set() for n in ch}               # notes that point to a changed note, unless it is a hub
+    for n in notes:
+        text = open(os.path.join(root, *n.split("/")), encoding="utf-8", errors="replace").read()
+        for tgt in lk.targets(text, n) & set(ch):
+            linkers[tgt].add(n)
+    for n, who in linkers.items():
+        if len(who) <= HUB_LINKERS:
+            linked.update(who)
+    linked = sorted(linked - set(ch))
+    return "changed", f"since {revs[-1][2]} (commit {base[:7]}); last full review {age} day(s) ago, full every {full_days}", base, ch, linked, notes
+
+
 def main():
     _myco.utf8_console()
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--root", default=".")
     ap.add_argument("--all", action="store_true", help="list every record in the history folders too")
     ap.add_argument("--missing", action="store_true", help="only notes without a summary")
+    ap.add_argument("--review-scope", action="store_true", help="what the next review should read (method 21.5)")
+    ap.add_argument("--full", action="store_true", help="with --review-scope: a full review")
     a = ap.parse_args()
     root = _myco.toplevel(a.root) or os.path.abspath(a.root)
-    lay = _myco.layout(root)
+    conf = _myco.load_conf(root)
+    lay = _myco.layout(root, conf)
+    if a.review_scope:
+        scope, reason, base, ch, linked, notes = review_scope(root, lay, conf, a.full)
+        if scope == "full":
+            print(f"# Review scope: full ({reason})")
+            print(f"Read all {len(notes)} notes (`index` lists them with their summaries). Header line for the review file: `scope: full`.")
+            return 0
+        print(f"# Review scope: changed ({reason})")
+        if not ch:
+            print("Nothing changed in the notes since the last review: no review needed (say so in one line; write no review file).")
+            return 0
+        print(f"Read {len(ch)} changed and {len(linked)} linked note(s) of {len(notes)}. Header line for the review file: `scope: changed since {base[:7]}`.")
+        print("\n## Changed")
+        for n in ch:
+            print(f"- `{n}`")
+        if linked:
+            print("\n## Linked to or from them")
+            for n in linked:
+                print(f"- `{n}`")
+        return 0
     rows = collect(root, lay)
     notes = [r for r in rows if not r[3]]
     missing = [r for r in notes if not r[2]]
