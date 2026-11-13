@@ -174,6 +174,20 @@ def scan(root, rels):
     return hits
 
 
+def print_welcome(path, rel):
+    """Print the owner's page (getting-started.md) without its header and title: what they have, their part, their options."""
+    try:
+        with open(path, encoding="utf-8") as fh:
+            text = fh.read()
+    except OSError:
+        return
+    body = text.split("\n## ", 1)   # from the first section on: the header and the title are for the file, not the reader
+    if len(body) < 2:
+        return
+    print(f"\nFor the owner (tell them this in plain words; it is kept in {rel}):\n")
+    print("## " + body[1].rstrip())
+
+
 def write_import_log(target, lay, project, mode, files, hits, backup, kept, had_git, source=None, name=None, merged=()):
     """The import log (method 20.3): the choice, the backup, an inventory and one row per note. Returns its path in the repository."""
     name = name or re.sub(r"[^A-Za-z0-9._-]+", "-", os.path.basename(target)).strip("-.") or "notes"
@@ -471,9 +485,10 @@ def main():
             print(f"  {f}:{ln} ({kind})", file=sys.stderr)
         print("  Remove each value (or move it where secrets live), then commit them with notes-commit.", file=sys.stderr)
     n, t, d_ = lay["notes"], lay["tools"], lay["docs"]
+    print_welcome(at(n + "/getting-started.md"), n + "/getting-started.md")
     if a.adopt or a.source:
         print(f"""
-Next: the first pass (method section 20.4), guided by the import log {log}.
+Next, for the agent: the first pass (method section 20.4), guided by the import log {log}.
   1. Read the collection; write {n}/{lay['state']} (what it is about, main subjects, open questions) and {n}/working-agreement.md.
   2. Connect notes that belong together; reorganise only if the owner chose to, in batches of about 20 files, one commit each,
      updating each row of the import log ({t}/notes-commit "Import: ...").
@@ -481,14 +496,15 @@ Next: the first pass (method section 20.4), guided by the import log {log}.
   Never delete originals during the import.""")
         return rc
     print(f"""
-Next steps:
-  1. Edit {n}/working-agreement.md and {n}/state.md (headline facts, components).
-  2. Set MIRROR_TARGET in .myco-notes.conf and run {t}/mirror-push (then a timer every few hours).
-  3. Set up an independent encrypted snapshot of the mirror and run {t}/restore-drill once.
-  4. python3 {t}/build-notes-map.py   (navigable map with backlinks and history)
-  5. Commit after every meaningful update:  {t}/notes-commit "what changed and why"
+Next, for the agent:
+  1. Fill {n}/working-agreement.md and {n}/state.md with the owner (headline facts, components).
+  2. Offer the owner the optional protection in {n}/getting-started.md as choices; set up only what they choose:
+     a mirror (MIRROR_TARGET in .myco-notes.conf, then {t}/mirror-push on a timer), an encrypted snapshot of it,
+     and {t}/restore-drill once.
+  3. python3 {t}/build-notes-map.py   (navigable map with backlinks and history)
+  4. Commit after every meaningful update:  {t}/notes-commit "what changed and why"
      (New folders and files in the root: NEW_FOLDERS={a.new_folders} in .myco-notes.conf; with 'ask' notes-commit stops and lists them.)
-  6. Sharing with a team (GitHub or GitHub Enterprise): see {d_}/TEAM.md; teammates run {t}/setup-clone after cloning.
+  5. Sharing with a team (GitHub or GitHub Enterprise): see {d_}/TEAM.md; teammates run {t}/setup-clone after cloning.
   (On Windows in cmd or PowerShell write {t.replace('/', chr(92))}\\notes-commit; in Git Bash, WSL, macOS and Linux write {t}/notes-commit.)""")
     return rc
 
