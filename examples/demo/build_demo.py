@@ -8,6 +8,7 @@ commits them with fixed dates from January to March 2026 (so the timeline replay
 (OUT_DIR/myco-notes/map/index.html and graph.html). Everything in it is fictional; nothing is read from the machine it runs on.
 Standard library and git only, like the tools.
 """
+import datetime
 import json
 import os
 import subprocess
@@ -19,7 +20,8 @@ KIT = os.path.normpath(os.path.join(HERE, "..", "..", "skills", "myco-notes"))
 DEMO_GIT = {"GIT_AUTHOR_NAME": "Demo Owner", "GIT_AUTHOR_EMAIL": "demo@example.invalid",
             "GIT_COMMITTER_NAME": "Demo Owner", "GIT_COMMITTER_EMAIL": "demo@example.invalid"}
 
-# (date, commit message, {path under myco-notes/: text}); text starting with "+" is appended to the note instead of replacing it.
+# (date, commit message, {path under myco-notes/: text}); text starting with "+" is appended to the note, "^" is a sync-log line put
+# at the top of the log, "=old|new" replaces one line; any other text replaces the note (with its summary from SUMMARIES).
 STEPS = [
     ("2026-01-06", "Sensor node: hardware, power budget and where the nodes hang", {
         "entities/sensor-node.md": """# Sensor node
@@ -160,8 +162,46 @@ Capacitive soil moisture probes, six bought for a test in one bed. Not connected
     ("2026-03-10", "Master record: inventory and headline facts", {
         "state.md": "+\n## Demo inventory (2026-03-10)\n| Name | Role | Note |\n|---|---|---|\n| Sensor nodes (12) | readings every 5 minutes | `sensor-node.md` |\n| LoRa gateway | radio to network | `gateway.md` |\n| MQTT broker | message bus | `mqtt-broker.md` |\n| Time-series database | storage, two years | `timeseries-db.md` |\n| Dashboard | for the growers | `dashboard.md` |\n"}),
     ("2026-03-12", "Runbook: batteries, alerts, restore", {
+        "sync-tracker.md": "^- **2026-03-12 change:** runbook entries for batteries, frost alerts and restores; inventory in `state.md` (2026-03-10). Map rebuilt.\n",
         "runbook.md": "+\n## How do I swap a node's batteries? (since 2026-03-12)\nOpen the box, swap both cells, wait for the next reading on the dashboard. See `sensor-node.md`.\n\n## What do I do when a frost alert fires? (since 2026-03-12)\nCheck the heater first, then the valves. See `alerting.md` and the frost night incident.\n\n## How do I restore last night's backup? (since 2026-03-12)\nSee `backup-job.md`. Last restore drill: 2026-03-11, 4 minutes. Gateway restarts: `gateway.md`.\n"}),
+    ("2026-03-15", "Review 2026-03-15 (scope: full): 3 proposals, nothing applied", {
+        "plans/review-2026-03-15.md": '---\nsummary: Full review of 2026-03-15: node count, a missing link to the forecast, the firmware review date; nothing applied yet\nscope: full\nopen: 1, 2, 3\n---\n# Review 2026-03-15\n\nMade at the owner\'s request. Nothing in the notes has been changed: this file is the only thing committed. Answer per number: yes, no, or a change.\n\n## 1. Twelve nodes, but the houses list nine\nKind: contradiction\nWhere: `state.md` (Demo inventory); `greenhouse-a.md`; `greenhouse-b.md`\nFound: the inventory and `sensor-node.md` say twelve nodes; greenhouse A has four and greenhouse B five. Three are not placed anywhere in the notes.\nProposed fix: add to `backlog.md`:\n```\n- Where are the other three sensor nodes? `state.md` says 12, the houses list 9 (owner; found in the review of 2026-03-15).\n```\nStatus: proposed\n\n## 2. The dashboard shows the forecast but does not name its source\nKind: missing relation\nWhere: `dashboard.md` (first line)\nFound: the dashboard shows "the forecast", which comes from `weather-feed.md`; the dashboard note does not name it.\nProposed fix: in `dashboard.md` replace\n```\n- Reads from `timeseries-db.md`.\n```\nwith\n```\n- Reads from `timeseries-db.md` (the forecast comes from `weather-feed.md`).\n```\nStatus: proposed\n\n## 3. Firmware: the review date has passed\nKind: superseded\nWhere: `firmware.md` (header `review_after: 2026-03-01`)\nFound: the humidity calibration was due on 2026-03-01; nothing says it was done.\nProposed fix: calibrate one node against the reference sensor, then move `last_confirmed` and `review_after` (2026-09-01).\nStatus: proposed\n'}),
+    ("2026-03-16", "Apply the review of 2026-03-15: forecast link (2); 3 declined, 1 waiting", {
+        "plans/review-2026-03-15.md": '---\nsummary: Full review of 2026-03-15: forecast link applied, firmware calibration declined until April, the node count still waiting\nscope: full\nopen: 1\n---\n# Review 2026-03-15\n\nMade at the owner\'s request. When it was written nothing in the notes had been changed. On 2026-03-16 the owner answered: 2 yes (applied), 3 no, 1 not yet (waiting).\n\n## 1. Twelve nodes, but the houses list nine\nKind: contradiction\nWhere: `state.md` (Demo inventory); `greenhouse-a.md`; `greenhouse-b.md`\nFound: the inventory and `sensor-node.md` say twelve nodes; greenhouse A has four and greenhouse B five. Three are not placed anywhere in the notes.\nProposed fix: add to `backlog.md`:\n```\n- Where are the other three sensor nodes? `state.md` says 12, the houses list 9 (owner; found in the review of 2026-03-15).\n```\nStatus: proposed\n\n## 2. The dashboard shows the forecast but does not name its source\nKind: missing relation\nWhere: `dashboard.md` (first line)\nFound: the dashboard shows "the forecast", which comes from `weather-feed.md`; the dashboard note does not name it.\nProposed fix: in `dashboard.md` replace\n```\n- Reads from `timeseries-db.md`.\n```\nwith\n```\n- Reads from `timeseries-db.md` (the forecast comes from `weather-feed.md`).\n```\nStatus: applied 2026-03-16\n\n## 3. Firmware: the review date has passed\nKind: superseded\nWhere: `firmware.md` (header `review_after: 2026-03-01`)\nFound: the humidity calibration was due on 2026-03-01; nothing says it was done.\nProposed fix: calibrate one node against the reference sensor, then move `last_confirmed` and `review_after` (2026-09-01).\nStatus: declined 2026-03-16: the calibration is planned for April with the new reference sensor\n',
+        "entities/dashboard.md": "=- Reads from `timeseries-db.md`.|- Reads from `timeseries-db.md` (the forecast comes from `weather-feed.md`).",
+        "sync-tracker.md": "^- **2026-03-16 review:** applied 2 of `plans/review-2026-03-15.md` (dashboard names the forecast feed); declined 3 (calibration in April); 1 waiting.\n"}),
 ]
+
+# One-line summaries (method 10.1), added as a header to every note the demo writes in full.
+SUMMARIES = {
+    "entities/sensor-node.md": "The battery LoRa nodes: hardware, power budget, where they send; read before changing a node or its batteries",
+    "entities/gateway.md": "The LoRa gateway in the potting shed: where it hangs, what it publishes to, how it is checked",
+    "entities/mqtt-broker.md": "The MQTT broker every reading passes through: clients, topics, where its passwords live",
+    "entities/timeseries-db.md": "The time-series database: what it keeps for how long, its schema, backups and readers",
+    "entities/dashboard.md": "The growers' dashboard: one page per greenhouse and where each panel's data comes from",
+    "entities/alerting.md": "Frost, heat and silent-node alerts: the rules, where they show and what to do when one fires",
+    "plans/decision-lora-vs-wifi.md": "Why the nodes use LoRa and not Wi-Fi (2026-01-26), what was not chosen and when to decide again",
+    "entities/irrigation-valve.md": "The 24 V bed valves on the relay board: how they are switched, the 20-minute alert, manual override",
+    "entities/weather-feed.md": "The hourly forecast feed written to the database and shown on the dashboard",
+    "plans/backlog.md": "Parked ideas and open questions, each with what it waits on",
+    "entities/backup-job.md": "Nightly database dump to the NAS and weekly offline copy; where restores are described",
+    "verification/checks.md": "The 5-minute health check: what it tests and what pass, warn and fail mean",
+    "entities/greenhouse-a.md": "Greenhouse A (tomatoes): its nodes, beds, valves and shade cloth",
+    "entities/greenhouse-b.md": "Greenhouse B (seedlings): its nodes, heated bench and valves",
+    "entities/firmware.md": "Node firmware version and what changed; the humidity calibration and its review date",
+    "logs/2026-02-frost-night.md": "Frost night in greenhouse B (2026-02-26): timeline, cause, fix",
+    "entities/soil-probe.md": "Six capacitive soil probes bought for a test; not connected yet",
+}
+
+
+def with_summary(rel, text):
+    """The note's text with its summary in the header (an existing header gets the line added)."""
+    s = SUMMARIES.get(rel)
+    if not s:
+        return text
+    if text.startswith("---\n"):
+        return "---\nsummary: " + s + "\n" + text[4:]
+    return "---\nsummary: " + s + "\n---\n" + text
 
 
 def run(args, cwd, date=None):
@@ -183,6 +223,18 @@ def main():
     run([sys.executable, os.path.join(KIT, "tools", "bootstrap.py"), out, "--name", "Greenhouse Sensors", "--owner", "Demo Owner",
          "--tz", "UTC", "--new-folders", "add"], HERE, "2026-01-05")
     notes = os.path.join(out, "myco-notes")
+    today = datetime.date.today().isoformat()
+    for dp, dn, fn in os.walk(out):
+        dn[:] = [d for d in dn if d != ".git"]
+        for f in fn:
+            if f.endswith((".md", ".conf")):
+                fp = os.path.join(dp, f)
+                with open(fp, encoding="utf-8") as fh:
+                    cur = fh.read()
+                if today in cur:
+                    with open(fp, "w", encoding="utf-8", newline="\n") as fh:
+                        fh.write(cur.replace(today, "2026-01-05"))
+    run(["git", "commit", "-q", "-a", "--amend", "--no-edit"], out, "2026-01-05")
     with open(os.path.join(out, ".myco-notes-map.json"), "w", encoding="utf-8") as fh:
         json.dump({"title": "Greenhouse Sensors (demo)", "groups": [
             {"id": "start", "name": "Start here", "blurb": "Entry point, working agreement, tracker, master record, runbook.",
@@ -205,12 +257,25 @@ def main():
         for rel, text in files.items():
             p = os.path.join(notes, *rel.split("/"))
             os.makedirs(os.path.dirname(p), exist_ok=True)
-            if text.startswith("+"):
+            if text.startswith("+"):                      # append
                 with open(p, "a", encoding="utf-8", newline="\n") as fh:
                     fh.write(text[1:])
+            elif text.startswith(("^", "=")):              # ^: newest-first sync-log line; =old|new: replace one line
+                with open(p, encoding="utf-8") as fh:
+                    cur = fh.read()
+                if text[0] == "^":
+                    head = "## Sync log (newest first)\n"
+                    assert head in cur, rel
+                    cur = cur.replace(head, head + text[1:], 1)
+                else:
+                    old, new = text[1:].split("|", 1)
+                    assert cur.count(old) == 1, (rel, old)
+                    cur = cur.replace(old, new)
+                with open(p, "w", encoding="utf-8", newline="\n") as fh:
+                    fh.write(cur)
             else:
                 with open(p, "w", encoding="utf-8", newline="\n") as fh:
-                    fh.write(text)
+                    fh.write(with_summary(rel, text))
         run(["git", "add", "-A"], out)
         run(["git", "commit", "-q", "-m", msg], out, date)
     print(run([sys.executable, os.path.join(notes, "tools", "build-notes-map.py")], out).strip())
