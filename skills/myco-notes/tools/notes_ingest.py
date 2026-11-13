@@ -12,6 +12,7 @@ text as given. Sources are records: never edited after saving. The same URL save
 content writes a new file that supersedes the old one, and `index --review-scope` then lists the notes citing the old copy.
 Notes cite a source in their header (`sources: <file>`) and next to the fact ("per `<file>`").
 Options: --kind manual|release-notes|forum|article|benchmark|datasheet|other (default other); --date YYYY-MM-DD (default today).
+A text over 200 KB is saved with a warning (keep what the notes rely on). The date is today in TIMEZONE (.myco-notes.conf).
 Exit: 0 saved or unchanged, 1 error, 2 usage, 4 refused: the text has a secret-looking string (lines named, values not shown);
 with --commit, notes-commit's own exit code.
 """
@@ -23,6 +24,7 @@ sys.path.insert(0, HERE)
 import _myco  # noqa: E402
 import secret_scan  # noqa: E402
 
+LARGE_KB = 200   # a source larger than this gets a warning (it is still saved)
 KINDS = ("manual", "release-notes", "forum", "article", "benchmark", "datasheet", "other")
 
 
@@ -48,11 +50,12 @@ def read_sources(root, lay):
 
 
 def citing(root, lay, names):
-    """{source file name: [notes that cite it]} for notes outside the history folders (header `sources` or the name in the text)."""
+    """{source file name: [notes that cite it]} for notes outside the history folders (header `sources` or the name in the text);
+    review files are not notes and are left out."""
     import notes_index
     found = {n: [] for n in names}
     for rel, _, _, is_hist in notes_index.collect(root, lay):
-        if is_hist:
+        if is_hist or (rel.startswith(lay["notes"] + "/plans/") and _myco.REVIEW_FILE.match(os.path.basename(rel))):
             continue
         text = open(os.path.join(root, *rel.split("/")), encoding="utf-8", errors="replace").read()
         fm, _ = _myco.frontmatter(text)
@@ -106,8 +109,12 @@ def main():
     if len(a.summary) > _myco.SUMMARY_MAX:
         print(f"ingest: --summary is {len(a.summary)} characters; keep it to {_myco.SUMMARY_MAX}", file=sys.stderr)
         return 2
-    try:
-        text = open(a.file, encoding="utf-8", errors="replace").read() if a.file else sys.stdin.read()
+    if not a.file and sys.stdin.isatty():
+        print("ingest: give the text with --file PATH or on standard input (for example: ... < page.md)", file=sys.stderr)
+        return 2
+    try:   # read bytes and decode as UTF-8 ourselves: on Windows a pipe would otherwise be read in the local code page
+        raw = open(a.file, "rb").read() if a.file else sys.stdin.buffer.read()
+        text = raw.decode("utf-8", errors="replace").lstrip("\ufeff")
     except OSError as e:
         print(f"ingest: cannot read {a.file}: {e}", file=sys.stderr)
         return 1
@@ -119,11 +126,18 @@ def main():
     if hits:
         print(f"ingest: REFUSED: the text has secret-looking strings on line(s) {', '.join(map(str, hits[:10]))} (values not shown); remove them and run again", file=sys.stderr)
         return 4
-    day = a.date or datetime.date.today().isoformat()
+    if a.date:
+        day = a.date
+    else:                                          # the notes' time zone (TIMEZONE), like capture
+        import capture
+        day = capture.now_in(conf.get("TIMEZONE", "").strip())[0].strftime("%Y-%m-%d")
     if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", day):
         print("ingest: --date takes YYYY-MM-DD", file=sys.stderr)
         return 2
     digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+    kb = len(text.encode("utf-8")) / 1024
+    if kb > LARGE_KB:
+        print(f"ingest: warning: the text is {kb:.0f} KB; keep the parts the notes rely on (method 22.1). Saved anyway.", file=sys.stderr)
     key, val = ("source_url", a.url.strip()) if a.url else ("original", os.path.basename(a.original.strip()))
     same = [(f, h) for f, h in srcs if h.get(key) == val]
     supersedes = ""

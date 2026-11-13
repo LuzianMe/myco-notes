@@ -53,13 +53,16 @@ def collect(root, lay):
     return rows
 
 
-def review_files(root, lay):
-    """[(ct, sha, rel, is_full)] for committed review files (method 21.2), oldest first by the commit that added them; sha is the LAST
-    commit that touched the file (the one that applied its fixes), so the next review starts after them; is_full: scope 'full' or absent."""
+def review_files(root, lay, normal_only=True):
+    """[(ct, sha, rel, is_full, source)] for committed review files (method 21.2), oldest first by the commit that added them (ties in
+    commit order); sha is the LAST commit that touched the file (the one that applied its fixes), so the next review starts after them;
+    is_full: scope 'full' or absent; source: the source file a review of one source looked at (scope 'source <file>', method 22.3), else
+    ''. Such reviews read one document, not the changed notes, so with normal_only (the default) they are left out."""
     d = os.path.join(root, *lay["notes"].split("/"), "plans")
     out = []
     if not os.path.isdir(d):
         return out
+    order = {h: i for i, h in enumerate(_myco.git("-C", root, "rev-list", "HEAD").stdout.split())}   # 0 = newest
     for f in os.listdir(d):
         if not _myco.REVIEW_FILE.match(f):
             continue
@@ -71,9 +74,14 @@ def review_files(root, lay):
         last = _myco.git("-C", root, "log", "--format=%H", "-1", "--", rel)
         sha = last.stdout.strip() or r.stdout.split()[1]
         fm, _ = _myco.frontmatter(open(os.path.join(d, f), encoding="utf-8", errors="replace").read())
-        scope = fm.get("scope", ("",))[0].strip().lower()
-        out.append((int(ct), sha, rel, scope in ("", "full") or scope.startswith("full")))
-    return sorted(out)
+        scope = fm.get("scope", ("",))[0].strip()
+        low = scope.lower()
+        source = os.path.basename(scope.split(None, 1)[1].strip().strip("`")) if low.startswith("source") and len(scope.split(None, 1)) > 1 else ""
+        if normal_only and low.startswith("source"):
+            continue
+        added_sha = r.stdout.split()[1]
+        out.append((int(ct), -order.get(added_sha, 0), sha, rel, low in ("", "full") or low.startswith("full"), source))
+    return [(c, s, r, f, src) for c, _, s, r, f, src in sorted(out)]
 
 
 HUB_LINKERS = 5   # a changed note that more notes than this point to is a hub: its linkers are not added to the scope
@@ -177,8 +185,11 @@ def entry_checks(root, lay, conf, scope, base):
                               lay["notes"] + "/sources/").stdout.split("\n")
             added += [l[3:] for l in _myco.git("-C", root, "-c", "core.quotepath=off", "status", "--porcelain", "--untracked-files=all",
                                                  "--", lay["notes"] + "/sources/").stdout.split("\n") if l.startswith("??")]
+            taken = {r[4] for r in review_files(root, lay, normal_only=False) if r[4]}   # sources a review of their own has read
             for p in sorted({x.strip() for x in added if x.strip()}):
                 f = os.path.basename(p)
+                if f in taken:
+                    continue
                 old = srcs.get(f, {}).get("supersedes", "").strip()
                 if old:
                     who = notes_ingest.citing(root, lay, [old])[old]
