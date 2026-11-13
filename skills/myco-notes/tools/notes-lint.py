@@ -17,7 +17,8 @@ Checks
             lists them) and summaries longer than 200 characters (method 10.1)
   synclog   the newest line of the sync log in sync-tracker.md must read '- **YYYY-MM-DD kind:** text' (method 4); older lines are history
   reviews   a review file (<notes>/plans/review-*.md, method 21.2) needs an 'open:' header line that lists exactly the proposals whose
-            Status is still 'proposed' ('open: none' when all are answered)
+            Status is still 'proposed' ('open: none' when all are answered); a 'summary: ...' line in a proposal still waiting (also inside code blocks)
+            longer than 200 characters
 
 Usage:  tools/notes-lint.py [--root DIR] [--quiet] [--strict]
 Exit:   0 clean, 1 warnings, 2 errors (secrets), 3 the lint could not run (for example an invalid ignore expression). --strict turns
@@ -293,6 +294,17 @@ def main():
         allp, waiting = _myco.review_proposals(texts[rel])
         if not allp:
             continue
+        _, end0 = _myco.frontmatter(texts[rel])
+        cur = None
+        for i, line in enumerate(texts[rel].split("\n"), 1):
+            hm = re.match(r"^#{2,3}\s+(\d+)[.)]?\s", line)
+            if hm:
+                cur = hm.group(1)
+            elif re.match(r"^#{1,3}\s", line):
+                cur = None
+            sm = re.match(r"^\s*summary:\s*(.+?)\s*$", line)
+            if i > end0 and cur in waiting and sm and len(sm.group(1).strip("\"'")) > _myco.SUMMARY_MAX:
+                add("WARN", rel, i, f"proposed summary is {len(sm.group(1).strip(chr(34) + chr(39)))} characters (limit {_myco.SUMMARY_MAX}): shorten it before the owner is asked (method 21.2)")
         fm, _ = _myco.frontmatter(texts[rel])
         want = ", ".join(waiting) if waiting else "none"
         if "open" not in fm:

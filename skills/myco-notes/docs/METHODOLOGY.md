@@ -1,6 +1,6 @@
 # Myco Notes: the method
 
-Version 2.8.2 (general edition), 2026-11-12. It is project-independent and is written for engineers and teams (and for AI coding agents working with them) who run long, large or fast-changing projects: infrastructure, software platforms, data and ML systems, research, hardware, operations. It is meant as the specification from which a skill, a template repository or a team convention can be built.
+Version 2.8.3 (general edition), 2026-11-12. It is project-independent and is written for engineers and teams (and for AI coding agents working with them) who run long, large or fast-changing projects: infrastructure, software platforms, data and ML systems, research, hardware, operations. It is meant as the specification from which a skill, a template repository or a team convention can be built.
 
 The method grew out of a long-running, AI-operated engineering project in which the notes had to act as the memory of an operator that forgets everything between sessions. That constraint is useful for any project: if the notes are good enough for an operator with no memory, they are good enough for a new teammate, an auditor, or you in a year.
 
@@ -555,7 +555,7 @@ Proposed fix: the exact edit for each file (the text to replace and the new text
 Status: proposed
 ```
 
-Put the replacement text and any new note in fenced code blocks (three backticks). Inside them a name such as `frigate.md` for a note the proposal would create is not read as a reference, so the lint does not warn about a note that does not exist yet.
+Put the replacement text and any new note in fenced code blocks (three backticks). Inside them a name such as `frigate.md` for a note the proposal would create is not read as a reference, so the lint does not warn about a note that does not exist yet. A proposed summary (for a new note, or a changed one) is written as its own `summary: ...` line, as it will appear in the header; the lint measures these lines in a review file too and warns about one over 200 characters before the owner is asked, so an applied fix cannot bring a new warning with it.
 
 The owner sees a short numbered list (title and one line on the fix) and the path of the file for the details. They answer per number: *yes*, *no* (a reason is welcome) or a change ("3: keep the NAS value instead"); *all* is a yes to every proposal that is still `proposed`.
 
