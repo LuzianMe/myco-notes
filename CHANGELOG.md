@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.21.0
 - **A guided first run** (method 11.5a): setting up is now a short conversation instead of defaults. The agent says in one line what it found (an empty folder, a code project, a folder of notes), then asks every setup question in one numbered message with its recommendation first ("defaults" accepts them all): where the notes live, name, owner, time zone, data folders, what to do with new root folders. Nothing is created before the answer.
 - **The owner's page, `getting-started.md`**: every new repository gets a page written for the owner, not for agents: what they now have, what the agent does without asking, what needs their yes, their own part, the optional protection beyond this computer (mirror, encrypted snapshot, restore drill, team) with what each protects against, and what they can say. `AGENTS.md` points to it; `bootstrap` prints it at the end, apart from the agent's next steps, and the skill relays it in plain words. Backup steps are now offered as choices, never done unasked.
 
