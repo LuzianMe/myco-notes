@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""resume: a bounded start-of-session briefing for a Myco Notes tree (Python standard library only).
+"""resume: a bounded start-of-session briefing for a Myco Notes repository (Python standard library only).
 
 Prints, as Markdown and within a character budget, what a session needs before it touches anything (method 11.2):
 the repository state, review proposals waiting for the owner's answer (method 21), the pending list of the sync tracker, the headline

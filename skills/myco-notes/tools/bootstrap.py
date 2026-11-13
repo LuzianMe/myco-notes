@@ -13,16 +13,16 @@ the conf as DATA_DIRS and left out of the lint and the map.
 
 --new-folders sets what notes-commit does with a new folder or loose file in the root (NEW_FOLDERS in the conf): ask (default; it stops and the
 agent asks the owner), add (track it and lint it as notes), ignorelint (track it, skip the lint and the map), ignoreall (do not track, do not lint).
-An agent setting up a tree for a person asks them which one they want first.
+An agent setting up a notes repository for a person asks them which one they want first.
 
 Copies template/ into <target-dir>, fills the {{PLACEHOLDERS}}, copies tools/ and docs/*.md, makes git use the versioned hooks
 (core.hooksPath = <tools folder>/hooks), and makes the baseline commit. The target must be empty or not exist.
 
 Existing notes (method section 20):
-  bootstrap <new-dir> --name "Notes" --import <folder>     a new tree; the folder is copied as found into <notes>/imported/<folder name>/
+  bootstrap <new-dir> --name "Notes" --import <folder>     a new notes repository; the folder is copied as found into <notes>/imported/<folder name>/
                                                             (the folder itself is not touched; app settings such as .obsidian/ are left out)
   bootstrap <folder> --name "Notes" --adopt [--backup-to DIR | --no-backup]
-                                                            the folder becomes the tree, its notes stay where they are. First a zip
+                                                            the folder becomes the repository, its notes stay where they are. First a zip
                                                             of the whole folder is written next to it (or into DIR), and a folder that
                                                             is already a git repository (with a clean working tree) gets the tag
                                                             before-myco-notes. Existing AGENTS.md, CLAUDE.md and other files the
@@ -58,10 +58,10 @@ APPENDED = {".gitignore", ".gitattributes"}   # adopt: extended, never replaced
 def check_adopt(target, lay, a):
     """--adopt: refuse anything that could lose or mix up the owner's files. Returns whether the folder is already a git repository, or an exit code."""
     if not os.path.isdir(target) or not os.listdir(target):
-        print(f"bootstrap: --adopt needs an existing folder with notes in it; {target} is missing or empty (leave out --adopt for a new tree)", file=sys.stderr)
+        print(f"bootstrap: --adopt needs an existing folder with notes in it; {target} is missing or empty (leave out --adopt for a new notes repository)", file=sys.stderr)
         return 1
     if os.path.exists(os.path.join(target, ".myco-notes.conf")):
-        print("bootstrap: this folder is a Myco Notes tree already; to update its tools run relocate.py --root from the kit", file=sys.stderr)
+        print("bootstrap: this folder is a Myco Notes repository already; to update its tools run relocate.py --root from the kit", file=sys.stderr)
         return 1
     for d in ([lay["myco"]] if lay["myco"] else [lay["notes"], lay["tools"], lay["docs"]]):
         if os.path.exists(os.path.join(target, *d.split("/"))):
@@ -139,7 +139,7 @@ def scan(root, rels):
 
 
 def write_import_log(target, lay, project, mode, files, hits, backup, kept, had_git, source=None, name=None):
-    """The import log (method 20.3): the choice, the backup, an inventory and one row per note. Returns its path in the tree."""
+    """The import log (method 20.3): the choice, the backup, an inventory and one row per note. Returns its path in the repository."""
     name = name or re.sub(r"[^A-Za-z0-9._-]+", "-", os.path.basename(target)).strip("-.") or "notes"
     rel_log = f"{lay['notes']}/logs/import-{name}.md"
     md = [f for f in files if f.lower().endswith(".md")]
@@ -164,7 +164,7 @@ def write_import_log(target, lay, project, mode, files, hits, backup, kept, had_
                 broken += 1
         rows.append(f"| `{f}` | {title} | {max(1, round(size(f) / 1024))} | {n_links} | {'held: secret' if f in held else 'pending'} |")
     today = datetime.date.today().isoformat()
-    where = (f"A new tree; the notes were copied as found from the folder `{os.path.basename(source)}` into `{lay['notes']}/imported/{name}/`. The original folder was not changed."
+    where = (f"A new notes repository; the notes were copied as found from the folder `{os.path.basename(source)}` into `{lay['notes']}/imported/{name}/`. The original folder was not changed."
              if source else "In place: the notes stay at their paths in this folder; the Myco Notes files were added around them.")
     if backup:
         where += f" Backup of the folder as it was: `{os.path.basename(backup)}` ({'next to this folder' if os.path.dirname(backup) == os.path.dirname(target) else 'in the backup folder chosen'})."
@@ -223,7 +223,7 @@ def main():
     ap.add_argument("--no-backup", action="store_true")
     a = ap.parse_args()
     if a.source and a.adopt:
-        print("bootstrap: use either --import FOLDER (a new tree with a copy) or --adopt (the folder itself), not both", file=sys.stderr)
+        print("bootstrap: use either --import FOLDER (a new notes repository with a copy) or --adopt (the folder itself), not both", file=sys.stderr)
         return 2
     if (a.backup_to or a.no_backup) and not a.adopt:
         print("bootstrap: --backup-to and --no-backup go with --adopt", file=sys.stderr)
@@ -257,7 +257,7 @@ def main():
                 print(f"bootstrap: --import {a.source}: not a folder, or empty", file=sys.stderr)
                 return 1
             if _myco.overlap(src, target):
-                print("bootstrap: the new tree and the imported folder must not contain each other", file=sys.stderr)
+                print("bootstrap: the new notes repository and the imported folder must not contain each other", file=sys.stderr)
                 return 1
     if a.adopt and not a.no_backup:
         backup = make_backup(target, a.backup_to)
@@ -335,7 +335,7 @@ def main():
             put_tree(src, at(lay["notes"]))
         elif os.path.isdir(src):
             put_tree(src, os.path.join(target, item))
-        else:   # template/gitattributes becomes the tree's .gitattributes (in the kit it must not apply to the kit's own files)
+        else:   # template/gitattributes becomes the repository's .gitattributes (in the kit it must not apply to the kit's own files)
             put(src, os.path.join(target, "." + item if item == "gitattributes" else item))
     put_tree(HERE, at(lay["tools"]), skip=NOT_COPIED)
     docs = os.path.join(KIT, "docs")
@@ -347,7 +347,7 @@ def main():
 
     subs = (("{{PROJECT_NAME}}", a.name), ("{{OWNER}}", owner), ("{{TIMEZONE}}", a.tz), ("{{DATE}}", datetime.date.today().isoformat()),
             ("{{MYCO_DIR}}", lay["myco"]), ("{{NOTES_DIR}}", lay["notes"]), ("{{TOOLS_DIR}}", lay["tools"]), ("{{DOCS_DIR}}", lay["docs"]),
-            ("{{MAP_DIR}}", lay["map"]), ("{{DATA_DIRS}}", " ".join(data)), ("{{NEW_FOLDERS}}", a.new_folders), ("{{KIT_VERSION}}", _myco.VERSION))
+            ("{{MAP_DIR}}", lay["map"]), ("{{DATA_DIRS}}", " ".join(data)), ("{{NEW_FOLDERS}}", a.new_folders), ("{{KIT_VERSION}}", _myco.VERSION), ("{{FORMAT_VERSION}}", _myco.FORMAT_VERSION))
     tools_abs = os.path.normcase(at(lay["tools"]))
     for p in written:
         f = os.path.basename(p)
@@ -391,7 +391,7 @@ def main():
         log = write_import_log(target, lay, a.name, "in place", collection, hits, backup, kept, had_git)
         commit("Baseline: Myco Notes added around the existing notes (method section 20)")
     elif a.source:
-        commit("Baseline: notes tree created from the Myco Notes template")
+        commit("Baseline: notes repository created from the Myco Notes template")
         name = re.sub(r"[^A-Za-z0-9._-]+", "-", os.path.basename(os.path.abspath(a.source))).strip("-.") or "notes"
         base = lay["notes"] + "/imported/" + name
         copied = []
@@ -405,7 +405,7 @@ def main():
         log = write_import_log(target, lay, a.name, "new folder", copied, hits, None, kept, False, source=os.path.abspath(a.source), name=name)
         commit(f"Import: the notes from {os.path.basename(os.path.abspath(a.source))} as found (method section 20)")
     else:
-        commit("Baseline: notes tree created from the Myco Notes template")
+        commit("Baseline: notes repository created from the Myco Notes template")
     sys.stdout.flush()
     if held:
         rc = 4

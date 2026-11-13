@@ -1,7 +1,7 @@
 {
   "name": "myco-notes",
-  "version": "0.19.0",
-  "description": "Myco Notes: keep a project's knowledge in a versioned, secret-free, cross-referenced Markdown notes tree that stays accurate: method, starter tree, commit/lint/map/mirror tools and an agent skill.",
+  "version": "0.20.0",
+  "description": "Myco Notes: keep a project's knowledge in a versioned, secret-free, cross-referenced Markdown notes repository that stays accurate: method, starter notes, commit/lint/map/mirror tools and an agent skill.",
   "author": {
     "name": "Luzian",
     "url": "https://github.com/LuzianMe"
@@ -14,14 +14,14 @@
   "interface": {
     "displayName": "Myco Notes",
     "shortDescription": "Versioned, linked, secret-free Markdown notes your agent keeps accurate",
-    "longDescription": "Keeps a project's knowledge in a git-versioned, cross-referenced Markdown notes tree. After each change the agent updates the right notes and commits them; a lint finds broken references and passed review dates, a pre-commit hook refuses anything that looks like a secret, resume briefs the next session, asof shows what the notes said on any date, and a static map draws the notes as a mycelium that replays the git history. Runs local Python (standard library) and git only; no network unless you configure a mirror or push.",
+    "longDescription": "Keeps a project's knowledge in a git-versioned, cross-referenced Markdown notes repository. After each change the agent updates the right notes and commits them; a lint finds broken references and passed review dates, a pre-commit hook refuses anything that looks like a secret, resume briefs the next session, asof shows what the notes said on any date, and a static map draws the notes as a mycelium that replays the git history. Runs local Python (standard library) and git only; no network unless you configure a mirror or push.",
     "developerName": "Luzian",
     "category": "Productivity",
     "capabilities": ["Read", "Write"],
     "websiteURL": "https://github.com/LuzianMe/myco-notes",
     "privacyPolicyURL": "https://github.com/LuzianMe/myco-notes#what-it-runs-and-what-it-sends",
     "defaultPrompt": [
-      "Start a Myco Notes tree for this project.",
+      "Start a Myco Notes repository for this project.",
       "Update the notes with what we just changed and commit them.",
       "Audit the notes for stale facts and broken references."
     ],

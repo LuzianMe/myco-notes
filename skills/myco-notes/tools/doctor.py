@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
-"""doctor: read-only health check of a Myco Notes tree. It changes nothing.
+"""doctor: read-only health check of a Myco Notes repository. It changes nothing.
 
   tools/doctor [--root DIR]
 
-Run it from the tree's own tools to check the tree, or from a newer kit (python3 <KIT>/tools/doctor.py --root PROJECT) to
-also see whether the tree's tools are older than that kit.
+Run it from the repository's own tools to check the repository, or from a newer kit (python3 <KIT>/tools/doctor.py --root PROJECT) to
+also see whether the repository's tools are older than that kit.
 
 Checks
-  version   KIT_VERSION in .myco-notes.conf, the version of the tree's tools, and (from a kit) the kit's version
+  version   KIT_VERSION in .myco-notes.conf, the version of the repository's tools, and (from a kit) the kit's version
   layout    the notes, tools and docs folders named in .myco-notes.conf exist; the master record, tracker and entry point exist
   hook      git uses the versioned hook (core.hooksPath) and the hook file is there
   tools     every tool has its sh and .cmd launcher
   settings  settings newer kits expect (NEW_FOLDERS, MIRROR_SCOPE, KIT_VERSION) and the generated map being gitignored
-Exit: 0 healthy, 1 something to fix (each line says what), 2 not a Myco Notes tree.
+Exit: 0 healthy, 1 something to fix (each line says what), 2 not a Myco Notes repository.
 """
 import argparse
 import os
@@ -48,7 +48,7 @@ def main():
     a = ap.parse_args()
     root = _myco.toplevel(os.path.abspath(a.root))
     if not root or not os.path.isfile(os.path.join(root, ".myco-notes.conf")):
-        print(f"doctor: {os.path.abspath(a.root)} is not a Myco Notes tree (no .myco-notes.conf at a git repository root)")
+        print(f"doctor: {os.path.abspath(a.root)} is not a Myco Notes repository (no .myco-notes.conf at a git repository root)")
         return 2
     conf = _myco.load_conf(root)
     lay = _myco.layout(root, conf)
@@ -67,14 +67,14 @@ def main():
     recorded = conf.get("KIT_VERSION", "").strip()
     have = tools_version(tools_dir)
     from_kit = _myco.overlap(tools_dir, HERE) != "same"
-    print(f"  tree tools: {have or 'older than 0.12.0 (no version inside)'}; recorded KIT_VERSION: {recorded or 'not set'}"
+    print(f"  repository tools: {have or 'older than 0.12.0 (no version inside)'}; recorded KIT_VERSION: {recorded or 'not set'}"
           + (f"; this kit: {_myco.VERSION}" if from_kit else ""))
     if not recorded:
         fix("KIT_VERSION is not set in .myco-notes.conf: refresh the tools with relocate from the current kit (it records it)")
     elif have and recorded != have:
         fix(f"KIT_VERSION says {recorded} but the tools are {have}: the tools were copied by hand; refresh them with relocate")
     if from_kit and vkey(have) < vkey(_myco.VERSION):
-        fix(f"the tree's tools ({have or 'before 0.12.0'}) are older than this kit ({_myco.VERSION}): "
+        fix(f"the repository's tools ({have or 'before 0.12.0'}) are older than this kit ({_myco.VERSION}): "
             f"python3 {os.path.join(HERE, 'relocate.py')} --root {root}  (dry run first, then --apply)")
     elif not from_kit or have:
         ok("tools version")

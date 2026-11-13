@@ -8,7 +8,7 @@
     {
       "name": "myco-notes",
       "source": "./",
-      "description": "Skill, starter tree and tools for a versioned, secret-free, cross-referenced notes tree: capture changes, audit, bootstrap, merge handoffs, restore drills.",
+      "description": "Skill, starter notes and tools for a versioned, secret-free, cross-referenced notes repository: capture changes, audit, bootstrap, merge handoffs, restore drills.",
       "author": {
         "name": "Luzian"
       },

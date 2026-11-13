@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""index: every note of a Myco Notes tree with its one-line summary (Python standard library only).
+"""index: every note of a Myco Notes repository with its one-line summary (Python standard library only).
 
 The note index of method 3.2 and 10.1: read it first to find the note for a question instead of opening files one by one. Each line is
 the note's path and the `summary` from its header; a note without one shows its first sentence, marked "(first line)". Records in the

@@ -140,7 +140,7 @@ def build(root, lay, info, groups, out, title, sh, today, built):
 
 
 def hub_set(info, hist_prefixes):
-    """The notes that most other notes mention: a few per project, chosen by the mentions. Every tree has the same entry and method notes
+    """The notes that most other notes mention: a few per project, chosen by the mentions. Every repository has the same entry and method notes
     (the "start" and "docs" groups), so highlighting those would say nothing about this project: they are never hubs, nor are history
     notes. A note needs at least two mentions to count."""
     live = [r for r in info if not r.startswith(hist_prefixes) and info[r]["group"] not in ("start", "docs") and len(info[r]["inn"]) >= 2]

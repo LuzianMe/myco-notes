@@ -1,5 +1,5 @@
 name: demo
-# Builds the made-up "Greenhouse Sensors" notes tree with this kit and publishes its map and mycelium view on GitHub Pages.
+# Builds the made-up "Greenhouse Sensors" notes repository with this kit and publishes its map and mycelium view on GitHub Pages.
 on:
   push:
     branches: [main]
@@ -20,7 +20,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Build the demo tree and its map
+      - name: Build the demo notes and its map
         run: python examples/demo/build_demo.py "$RUNNER_TEMP/demo"
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

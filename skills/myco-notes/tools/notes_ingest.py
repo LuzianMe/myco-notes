@@ -118,7 +118,7 @@ def main():
     except OSError as e:
         print(f"ingest: cannot read {a.file}: {e}", file=sys.stderr)
         return 1
-    text = "\n".join(l.rstrip() for l in text.replace("\r\n", "\n").split("\n")).strip("\n")
+    text = _myco.normalize_text(text)
     if not text.strip():
         print("ingest: no text given (use --file or standard input)", file=sys.stderr)
         return 2

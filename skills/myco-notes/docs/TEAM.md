@@ -1,16 +1,16 @@
 # Myco Notes for a team (GitHub, GitHub Enterprise and similar)
 
-The notes tree is a git repository, so a team shares it like code. This page is the set-up and the working routine. The reasons are in `METHODOLOGY.md` section 18.
+The notes live in a git repository, so a team shares it like code. This page is the set-up and the working routine. The reasons are in `METHODOLOGY.md` section 18.
 
-Paths below assume the default single-folder layout (`myco-notes/tools/...`). In a tree made before 0.6.0 the tools are at `tools/...`; use the tools folder named in `.myco-notes.conf` (`TOOLS_DIR`). `myco-notes/tools/relocate` moves an older tree into the single folder.
+Paths below assume the default single-folder layout (`myco-notes/tools/...`). In a notes repository made before 0.6.0 the tools are at `tools/...`; use the tools folder named in `.myco-notes.conf` (`TOOLS_DIR`). `myco-notes/tools/relocate` moves an older notes repository into the single folder.
 
 ## 1. One-time set-up (about 15 minutes)
-1. **Create a private repository** on your hosting service (notes hold operational detail; keep them private) and push the notes tree to it:
+1. **Create a private repository** on your hosting service (notes hold operational detail; keep them private) and push the notes repository to it:
    ```bash
    git remote add origin <url-of-the-new-repository>
    git push -u origin main
    ```
-2. **Check that the workflow runs.** The tree already contains `.github/workflows/notes-check.yml`. Open a throw-away pull request and see the `notes-check` job pass. On GitHub Enterprise Server, change `runs-on:` to a runner label your instance has, and make sure `actions/checkout` is available there (mirror it or allow it).
+2. **Check that the workflow runs.** The repository already contains `.github/workflows/notes-check.yml`. Open a throw-away pull request and see the `notes-check` job pass. On GitHub Enterprise Server, change `runs-on:` to a runner label your instance has, and make sure `actions/checkout` is available there (mirror it or allow it).
 3. **Protect `main`** (Settings, Branches, add a rule for `main`). Note: on GitHub, branch protection for a *private* repository needs a paid plan (Pro for a personal account, Team or Enterprise for an organization); on a free personal account the API answers "Upgrade to GitHub Pro or make this repository public". Without it the check still runs and shows red or green on every pull request, but nothing stops a merge or a direct push, so agree the rule with the team:
    - require a pull request before merging, with at least 1 approval;
    - require status checks to pass, and select `notes-check` (it is the name of the job in the workflow; it appears in the list after the workflow has run once);

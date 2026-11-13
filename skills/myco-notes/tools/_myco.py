@@ -4,7 +4,8 @@ import re
 import subprocess
 import sys
 
-VERSION = "0.19.0"   # the kit version these tools come from; moves with plugin.json and SKILL.md (tests check it)
+VERSION = "0.20.0"   # the kit version these tools come from; moves with plugin.json and SKILL.md (tests check it)
+FORMAT_VERSION = "1.0"   # the version of docs/FORMAT.md that new repositories follow; bootstrap writes it, relocate adds it when missing
 AGENT_SKILL_DIRS = (".claude/skills", ".agents/skills")   # a copy of the skill kept in a notes repository for agents (a cloud session loads it from there): not notes, so the lint and the map leave it out
 
 IS_WINDOWS = os.name == "nt"
@@ -151,6 +152,20 @@ def parse_open(value):
     return parts if all(p.isdigit() for p in parts) else None
 
 
+def normalize_text(text):
+    """Text as a source's checksum covers it (FORMAT.md 8.2): LF line endings, no trailing whitespace, no leading or trailing blank lines."""
+    return "\n".join(l.rstrip() for l in text.replace("\r\n", "\n").split("\n")).strip("\n")
+
+
+def source_text(text, fm_end):
+    """The document text of a source file (FORMAT.md 8.1: '# title', blank, one retrieval line, blank, text), normalised; None when
+    the file does not have that layout."""
+    lines = text.replace("\r\n", "\n").split("\n")[fm_end:]
+    if len(lines) < 5 or not lines[0].startswith("# ") or lines[1].strip() or not lines[2].strip() or lines[3].strip():
+        return None
+    return normalize_text("\n".join(lines[4:]))
+
+
 def first_sentence(text, fm_end=0):
     """The first sentence of the first plain paragraph after the title (no heading, table, list, quote or code), for a note
     without a summary. Markdown emphasis and link syntax are dropped; at most SUMMARY_MAX characters."""
@@ -184,7 +199,7 @@ def _rel(p):
 def layout(root, conf=None):
     """Folder layout from .myco-notes.conf, as repository-relative paths with forward slashes.
 
-    No MYCO_DIR (trees made before 0.6.0): notes/, tools/, docs/ and notes-map/ at the repository root.
+    No MYCO_DIR (repositories made before 0.6.0): notes/, tools/, docs/ and notes-map/ at the repository root.
     MYCO_DIR=myco-notes: that one folder holds the notes themselves plus tools/, docs/ and map/.
     NOTES_DIR, TOOLS_DIR, DOCS_DIR and MAP_DIR each override one folder; DATA_DIRS lists project folders that are not notes;
     HISTORY_DIRS (inside the notes folder) holds records that are not re-checked for dates and references.
@@ -209,14 +224,18 @@ def layout(root, conf=None):
 
 
 def record_kit_version(root):
-    """Write KIT_VERSION=<these tools' version> into the tree's .myco-notes.conf (bootstrap and relocate call it)."""
+    """Write KIT_VERSION=<these tools' version> into the repository's .myco-notes.conf (bootstrap and relocate call it), and FORMAT_VERSION
+    when the file has none: a notes repository that states a format version keeps it (it moves only through an upgrade review, FORMAT.md 10)."""
     cp = os.path.join(root, ".myco-notes.conf")
     if not os.path.isfile(cp):
         return
     with open(cp, encoding="utf-8", newline="") as fh:
         text = fh.read()
     with open(cp, "w", encoding="utf-8", newline="") as fh:
-        fh.write(set_conf_key(text, "KIT_VERSION", VERSION))
+        text = set_conf_key(text, "KIT_VERSION", VERSION)
+        if not re.search(r"^[ \t]*FORMAT_VERSION=", text, re.M):
+            text = set_conf_key(text, "FORMAT_VERSION", FORMAT_VERSION)
+        fh.write(text)
 
 
 def set_conf_key(text, key, value):

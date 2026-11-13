@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.20.0
+The notes format as its own spec, and new words for the whole (method 3.1).
+- **`docs/FORMAT.md`, format 1.0**: what a Myco Notes repository looks like on disk, written as MUST and SHOULD rules so that another tool or agent can read, write and check one without this kit: the layout and configuration, headers, references, the master record, the sync log, the inbox, review files, sources and secrets, with three conformance levels (readable, checkable, reviewed) and what readers, writers and checkers must do. The rule for what goes in it: if a tool reads it, it is format; if only people read it, it stays in the method.
+- **`FORMAT_VERSION`** in `.myco-notes.conf`: new repositories get `1.0`; `relocate` adds it where it is missing and never changes one that is set (a repository moves to a new major version only through an upgrade review). Without it a repository counts as 1.0, so every existing one conforms as it is.
+- **The lint checks sources**: it recomputes each source's `sha256` from its text and warns when they differ, so an edit to a source (which is never edited after saving) no longer goes unnoticed.
+- **The lint reports ambiguous references**: a bare file name that several files share (`README.md` when there is one per bundle) points to none of them for sure; it now warns and asks for the folder part. Several files with the same name are still fine.
+- **No more "tree"**: the kit's documents, tool messages and manifests now say *notes repository* (or simply *the notes*) where they said *notes tree*. Linked together, a project's notes are its **mycelium**, in plain terms a *notebase* (what a codebase is to code); the spec is *the Myco Notes format*. No option, setting or folder name changes. New repositories' first commit now reads "Baseline: notes repository created from the Myco Notes template".
+
 ## 0.19.0
 Sources (method 3.0, section 22), after the "raw sources" layer of Andrej Karpathy's LLM Wiki note, adapted so the owner approves every change.
 - **Outside documents kept as found**: `tools/ingest` saves a manual, release notes, a forum answer or an article to `<notes>/sources/YYYY-MM-DD-<name>.md` with a header (summary, `source_url` or `original`, `retrieved`, `kind`, `sha256`), refuses secret-looking strings (exit 4, values not shown), writes nothing when the same URL comes back unchanged, and writes a superseding copy when it changed. It fetches nothing: the agent gets the document. `--list` shows every source and the notes that cite it; `--commit` commits the new file alone.
