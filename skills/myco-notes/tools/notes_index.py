@@ -13,6 +13,8 @@ Usage:  tools/index [--root DIR] [--all] [--missing] [--review-scope [--full]]
                         (and uncommitted ones), plus the notes named in the changed lines and the notes that point to a changed note (unless more than
                         5 do: a hub such as the master record); or every note when a full review is due (no
                         earlier review, or the last full one older than REVIEW_FULL_DAYS, default 30). --full asks for a full one.
+                        'Also check' names the entry point (AGENTS.md) when the kit was updated or it changed since the last
+                        review, and in every full review.
 Exit:   0 (also when summaries are missing; the lint reports those)
 """
 import argparse, datetime, os, re, sys
@@ -148,6 +150,27 @@ def review_scope(root, lay, conf, want_full=False, today=None):
     return "changed", f"since {revs[-1][2]} (commit {base[:7]}); last full review {age} day(s) ago, full every {full_days}", base, ch, linked, notes
 
 
+def entry_checks(root, lay, conf, scope, base):
+    """Things outside the notes a review must also look at (method 21.4, 21.5): the entry point when the kit was updated since the
+    last review, when the entry point itself changed, and in every full review."""
+    out = []
+    now = conf.get("KIT_VERSION", "").strip().strip("\"'")
+    if base:
+        r = _myco.git("-C", root, "show", base + ":.myco-notes.conf")
+        m = re.search(r"^KIT_VERSION=[\"']?([^\"'\s]*)", r.stdout, re.M) if r.returncode == 0 else None
+        was = m.group(1) if m else ""
+        if now and was != now:
+            out.append(f"the kit was updated since the last review ({was or 'unknown'} to {now}): compare `AGENTS.md` with the kit's "
+                       "`template/AGENTS.md` and propose the missing lines as `upgrade` fixes (method 21.4)")
+        ch = _myco.git("-C", root, "diff", "--name-only", base, "HEAD", "--", "AGENTS.md", "CLAUDE.md").stdout.split()
+        ch += [l[3:] for l in _myco.git("-C", root, "status", "--porcelain", "--", "AGENTS.md", "CLAUDE.md").stdout.split("\n") if len(l) > 3]
+        if ch:
+            out.append(f"the entry point changed since the last review ({', '.join(sorted(set(ch)))}): read the changed lines")
+    if scope == "full" and not any("template/AGENTS.md" in o for o in out):
+        out.append("a full review also compares `AGENTS.md` with the kit's `template/AGENTS.md` (missing lines become `upgrade` fixes, method 21.4)")
+    return out
+
+
 def main():
     _myco.utf8_console()
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -162,13 +185,22 @@ def main():
     lay = _myco.layout(root, conf)
     if a.review_scope:
         scope, reason, base, ch, linked, notes = review_scope(root, lay, conf, a.full)
+        revs = review_files(root, lay)
+        extra = entry_checks(root, lay, conf, scope, revs[-1][1] if revs else None)
         if scope == "full":
             print(f"# Review scope: full ({reason})")
             print(f"Read all {len(notes)} notes (`index` lists them with their summaries). Header line for the review file: `scope: full`.")
+            print("\n## Also check\n" + "".join(f"- {e}\n" for e in extra), end="")
             return 0
         print(f"# Review scope: changed ({reason})")
-        if not ch:
+        if extra:
+            print("\n## Also check\n" + "".join(f"- {e}\n" for e in extra))
+        if not ch and not extra:
             print("Nothing changed in the notes since the last review: no review needed (say so in one line; write no review file).")
+            return 0
+        if not ch:
+            print("No note changed since the last review: check only the items above. Header line for the review file: "
+                  f"`scope: changed since {base[:7]}`.")
             return 0
         print(f"Read {len(ch)} changed and {len(linked)} linked note(s) of {len(notes)}. Header line for the review file: `scope: changed since {base[:7]}`.")
         print("\n## Changed")
