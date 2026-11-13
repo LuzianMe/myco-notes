@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.18.1
+- **Reviews no longer miss the entry point** (method 2.9.1, section 21.5): `AGENTS.md` is not a note, so a changed-scope review never looked at it, and a tree's `AGENTS.md` could stay behind the kit until the next full review. `tools/index --review-scope` now has an *Also check* section: when the kit was updated since the last review (`KIT_VERSION` moved) it asks for `AGENTS.md` to be compared with the kit's `template/AGENTS.md`, with missing lines proposed as `upgrade` fixes; it also lists an entry point that changed, and every full review includes the comparison.
+- `relocate` points out an `AGENTS.md` that does not tell agents to start a review with `index --review-scope`.
+
 ## 0.18.0
 Faster reviews (method 2.9, section 21.5). In one real tree six full reviews in a row found 13, 9, 5, 4, 3 and 1 issues: most of what goes wrong between reviews sits in the notes that were edited.
 - **A review reads what changed**: `tools/index --review-scope` lists the notes changed since the last review file was committed (uncommitted edits included), the notes named in the changed lines, and the notes that point to a changed note (unless more than five do: a hub such as the master record). With nothing changed it says no review is needed. The skill reads only those notes and records `scope: changed since <commit>` in the review file.

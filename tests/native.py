@@ -2,6 +2,7 @@
 """Cross-platform test (Linux, macOS, Windows) that needs no bash: copies ONLY the skill folder to a temporary place, then
 bootstraps a notes tree from that copy and exercises the real launchers (the .cmd files on Windows). Exit 0 = all passed."""
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -689,6 +690,13 @@ def main():
               "# Review scope: changed" in out and f"`{MY}/alpha.md`" in out and f"`{MY}/beta.md`" in out and f"`{MY}/delta.md`" in out and "gamma.md" not in out and "scope: changed since" in out, out)
         rc, out = run(L(rp, "index", T) + ["--review-scope", "--full"], rp)
         check("review scope: --full asks for every note", "# Review scope: full (asked for a full review)" in out, out)
+        check("review scope: a full review also checks AGENTS.md against the template", "## Also check" in out and "template/AGENTS.md" in out, out)
+        rc, out = run(L(rp, "index", T) + ["--review-scope"], rp)
+        check("review scope: no entry-point item while the kit and AGENTS.md are unchanged", "Also check" not in out, out)
+        cp0 = os.path.join(rp, ".myco-notes.conf")
+        write(cp0, re.sub(r"(?m)^KIT_VERSION=.*$", "KIT_VERSION=9.9.9", read(cp0)))
+        rc, out = run(L(rp, "index", T) + ["--review-scope"], rp)
+        check("review scope: a kit update since the last review adds the AGENTS.md comparison", "## Also check" in out and "the kit was updated since the last review" in out and "to 9.9.9" in out, out)
         cp = os.path.join(rp, ".myco-notes.conf")
         write(cp, "\nREVIEW_FULL_DAYS=-1\n", "a")
         rc, out = run(L(rp, "index", T) + ["--review-scope"], rp)
