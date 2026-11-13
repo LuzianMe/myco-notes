@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """build-notes-map: generate a navigable static view of the notes (index, one page per note, backlinks, git history).
 
-  tools/build-notes-map.py [--root DIR] [--out DIR]        default out: the map folder of .myco-notes.conf (myco-notes/map, or notes-map in older trees; gitignored, rebuilt on demand)
+  tools/build-notes-map.py [--root DIR] [--out DIR]        default out: the map folder of .myco-notes.conf (myco-notes/map, or notes-map in older repositories; gitignored, rebuilt on demand)
 
 What it produces
   index.html        notes grouped by purpose, live search, the 15 latest commits

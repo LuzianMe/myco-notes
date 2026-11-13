@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
-"""relocate: move an existing notes tree into the single-folder layout (or rename that folder) and fix the paths that name it.
+"""relocate: move an existing notes repository into the single-folder layout (or rename that folder) and fix the paths that name it.
 
   python3 <kit>/tools/relocate.py --root PROJECT [--myco-dir myco-notes] [--apply] [--no-refresh]
   tools/relocate [--myco-dir myco-notes] [--apply]            (from the project's own tools folder, on Linux and macOS)
 
-Updating a tree that already uses the single folder: run the same command from a newer kit. There is nothing to move, so it only refreshes the
+Updating a notes repository that already uses the single folder: run the same command from a newer kit. There is nothing to move, so it only refreshes the
 project's tools and docs from that kit (dry run lists the new and changed files; --apply copies them; never bootstrap, never your notes, conf or
 AGENTS.md) and tells you what else is worth checking (NEW_FOLDERS in the conf, the AGENTS.md rule about exit code 3).
 
-Before 0.6.0 a notes tree had notes/, tools/, docs/ and notes-map/ at the repository root. The single-folder layout puts the notes
+Before 0.6.0 a notes repository had notes/, tools/, docs/ and notes-map/ at the repository root. The single-folder layout puts the notes
 themselves, tools/, docs/ and map/ inside one folder (default myco-notes/), so the root stays free for the project's own folders.
-The same command renames the folder when the tree already uses it (--myco-dir new-name).
+The same command renames the folder when the repository already uses it (--myco-dir new-name).
 
 Dry run by default: it prints the moves and the text changes and touches nothing. With --apply it
-  1. moves the folders (git mv for tracked files), keeping the names your tree uses (a docs folder called myco-docs stays myco-docs)
+  1. moves the folders (git mv for tracked files), keeping the folder names you use (a docs folder called myco-docs stays myco-docs)
   2. rewrites path references in .md, .yml, .yaml and .json files, the conf, .gitignore and CODEOWNERS, but only where the text names a
      path that really existed (so prose such as "release notes/changes" is left alone)
   3. updates .myco-notes.conf (MYCO_DIR, NOTES_DIR, TOOLS_DIR, DOCS_DIR, MAP_DIR), .gitignore and core.hooksPath
@@ -284,11 +284,11 @@ def skill_copies(root):
 
 
 def refresh_only(root, old, conf, a, self_run):
-    """The tree already has the layout: refresh its tools and docs from this kit (dry run unless --apply)."""
+    """The repository already has the layout: refresh its tools and docs from this kit (dry run unless --apply)."""
     my = old["myco"]
     if a.no_refresh or self_run:
         why = "--no-refresh" if a.no_refresh else "this is the project's own tools folder, so there is no newer kit to copy from; run relocate.py from a newer kit folder"
-        print(f"relocate: the tree already uses {my}/ ; nothing to do ({why})")
+        print(f"relocate: the repository already uses {my}/ ; nothing to do ({why})")
         return 0
     plan = []                      # (kit file, project file, label)
     for src_dir, dst_rel, only_md in ((HERE, old["tools"], False), (os.path.join(KIT, "docs"), old["docs"], True)):
@@ -314,10 +314,10 @@ def refresh_only(root, old, conf, a, self_run):
     same = len(plan) - len(new_f) - len(changed)
     print(f"relocate: {'APPLYING' if a.apply else 'dry run (nothing is changed; add --apply to do it)'}")
     print(f"  project: {root}")
-    print(f"  the tree already uses {my}/ ; nothing to move. Refreshing tools and docs from this kit (version {kit_version()}).")
+    print(f"  the repository already uses {my}/ ; nothing to move. Refreshing tools and docs from this kit (version {kit_version()}).")
     print(f"  new files ({len(new_f)}):" + "".join(f"\n    + {p[2]}" for p in new_f[:40]))
     print(f"  changed files ({len(changed)}):" + "".join(f"\n    ~ {p[2]}" for p in changed[:60]))
-    print(f"  unchanged: {same}. Not touched: bootstrap, your notes, AGENTS.md, .gitignore; .myco-notes.conf only gets KIT_VERSION.")
+    print(f"  unchanged: {same}. Not touched: bootstrap, your notes, AGENTS.md, .gitignore; .myco-notes.conf only gets KIT_VERSION (and FORMAT_VERSION when missing).")
     print(f"  lint before: {lint_summary(root, old['tools'])}")
     if a.apply:
         for src, dst, _label in new_f + changed:

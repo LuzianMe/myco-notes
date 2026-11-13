@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""notes-lint: cheap consistency checks for a Myco Notes tree (Python standard library only).
+"""notes-lint: cheap consistency checks for a Myco Notes repository (Python standard library only).
 
 Checks
-  refs      backticked names of notes (*.md) and of repository paths that do not exist; wiki links ([[Note]]) and relative
+  refs      backticked names of notes (*.md) and of repository paths that do not exist; a bare name (`README.md`) that several files
+            share, so it points to none of them for sure (write it with its folder); wiki links ([[Note]]) and relative
             Markdown links ([text](../note.md)) that point nowhere
   headings  duplicate numbered headings in one file ("## 9." twice)
   fresh     "Last updated <date>" header older than the newest changelog entry in the same file
@@ -19,6 +20,8 @@ Checks
   reviews   a review file (<notes>/plans/review-*.md, method 21.2) needs an 'open:' header line that lists exactly the proposals whose
             Status is still 'proposed' ('open: none' when all are answered); a 'summary: ...' line in a proposal still waiting (also inside code blocks)
             longer than 200 characters
+  sources   a source (<notes>/sources/*.md, method 22) whose text no longer matches its sha256 header: sources are never edited
+            after saving (format: docs/FORMAT.md 8)
 
 Usage:  tools/notes-lint.py [--root DIR] [--quiet] [--strict]
 Exit:   0 clean, 1 warnings, 2 errors (secrets), 3 the lint could not run (for example an invalid ignore expression). --strict turns
@@ -28,7 +31,7 @@ Layout (.myco-notes.conf): the generated map folder and DATA_DIRS (project data 
         HISTORY_DIRS (default "archive logs", inside the notes folder; inbox and imported always) are records, so references, follow-up dates, size and orphans are not
         checked there (secrets always are).
 """
-import argparse, datetime, os, re, subprocess, sys
+import argparse, datetime, hashlib, os, re, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.dont_write_bytecode = True
@@ -108,6 +111,10 @@ def main():
     md_files = walk_md(root, {lay["map"], *lay["data"]})
     names, paths = all_files(root, {lay["map"]})
     top_dirs = {p.split("/")[0] for p in paths if "/" in p}
+    by_name = {}
+    for p in paths:
+        by_name.setdefault(p.rsplit("/", 1)[-1], []).append(p)
+    sources_prefix = lay["notes"] + "/sources/"
     findings = []   # (level, file, line, text)
 
     def add(level, f, line, text):
@@ -154,6 +161,9 @@ def main():
                     base = os.path.basename(tok)
                     ok = (tok in paths or join_rel(rel, tok) in paths
                           or (base == tok and base in names))
+                    if ok and base == tok and tok not in paths and join_rel(rel, tok) not in paths and len(by_name.get(base, [])) > 1:
+                        add("WARN", rel, i, f"`{tok}` is ambiguous: {len(by_name[base])} files have that name ({', '.join(sorted(by_name[base])[:3])}"
+                            + (", ..." if len(by_name[base]) > 3 else "") + "); write it with its folder")
                     if ok:
                         for other in md_files:
                             if os.path.basename(other) == base and other != rel:
@@ -187,6 +197,12 @@ def main():
         if not (fm.get("summary") or ("",))[0].strip() and not is_hist and os.path.basename(rel) not in ("AGENTS.md", "CLAUDE.md") \
                 and not rel.startswith((".github/", docs_prefix, "template/")):
             no_summary.append(rel)
+        if rel.startswith(sources_prefix) and "sha256" in fm and fm["sha256"][0]:
+            body = _myco.source_text(text, fm_end)
+            if body is None:
+                add("WARN", rel, fm_end + 1, "the text after the header is not laid out as tools/ingest writes it ('# title', retrieval line, text; FORMAT.md 8.1), so its sha256 cannot be checked")
+            elif hashlib.sha256(body.encode("utf-8")).hexdigest() != fm["sha256"][0].lower():
+                add("WARN", rel, fm["sha256"][1], "the text no longer matches its sha256: a source is not edited after saving; restore it from git, or save the new text as a new copy with tools/ingest")
         if fm:
             dates = {}
             for k in ("last_confirmed", "review_after", "valid_from", "valid_until"):

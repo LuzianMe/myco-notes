@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""build_demo: create the made-up "Greenhouse Sensors" notes tree and its map, for the README screenshots and the live demo.
+"""build_demo: create the made-up "Greenhouse Sensors" notes repository and its map, for the README screenshots and the live demo.
 
     python3 examples/demo/build_demo.py OUT_DIR
 
-OUT_DIR must not exist. The script bootstraps a tree with this kit, writes a few dozen invented notes in the method's formats,
+OUT_DIR must not exist. The script bootstraps a notes repository with this kit, writes a few dozen invented notes in the method's formats,
 commits them with fixed dates from January to March 2026 (so the timeline replay always tells the same story) and builds the map
 (OUT_DIR/myco-notes/map/index.html and graph.html). Everything in it is fictional; nothing is read from the machine it runs on.
 Standard library and git only, like the tools.

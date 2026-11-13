@@ -37,4 +37,4 @@ Created {{DATE}}. One place that says which copies of the project's documentatio
 | Anything else | at least a dated changelog line in `state.md` and one line in the sync log |
 
 ## Sync log (newest first)
-- **{{DATE}} setup:** notes tree created from the Myco Notes template. Nothing else synced; mirror, snapshots, map and offline copy are pending.
+- **{{DATE}} setup:** notes repository created from the Myco Notes template. Nothing else synced; mirror, snapshots, map and offline copy are pending.

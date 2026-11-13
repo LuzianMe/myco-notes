@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Cross-platform test (Linux, macOS, Windows) that needs no bash: copies ONLY the skill folder to a temporary place, then
-bootstraps a notes tree from that copy and exercises the real launchers (the .cmd files on Windows). Exit 0 = all passed."""
+bootstraps a notes repository from that copy and exercises the real launchers (the .cmd files on Windows). Exit 0 = all passed."""
 import os
 import re
 import shutil
@@ -96,7 +96,7 @@ def main():
         rc, out = run(L(proj, "notes-commit", T) + ["Record the native test change and why"], proj)
         check("commit with message", rc == 0 and "Record the native test change" in out, out)
         rc, out = run(L(proj, "notes-commit", T) + ["again"], proj)
-        check("clean tree says nothing to commit", "nothing to commit" in out, out)
+        check("clean repository says nothing to commit", "nothing to commit" in out, out)
         bad = os.path.join(proj, MY, "scripts", "broken.py")
         write(bad, "def (:\n")
         rc, out = run(L(proj, "notes-commit", T) + ["broken script"], proj)
@@ -117,7 +117,7 @@ def main():
         check("private key block is refused", rc != 0, out)
         os.remove(key)
         git(proj, "reset", "-q")
-        check("tree is clean again", git(proj, "status", "--porcelain")[1].strip() == "")
+        check("repository is clean again", git(proj, "status", "--porcelain")[1].strip() == "")
 
         print("lint and map")
         lint = [sys.executable, os.path.join(proj, MY, "tools", "notes-lint.py")]
@@ -186,7 +186,7 @@ def main():
         git(proj, "rm", "-q", MY + "/plans/graph-renamed.md", *[MY + f"/plans/graph-{x}.md" for x in ("hub", "a", "b", "c")])
         run(NC + ["Remove the graph test note"], proj)
         shutil.rmtree(os.path.join(proj, MY, "map"), ignore_errors=True)
-        check("the map folder is still gitignored and the tree clean", git(proj, "status", "--porcelain")[1].strip() == "", git(proj, "status", "--porcelain")[1])
+        check("the map folder is still gitignored and the repository clean", git(proj, "status", "--porcelain")[1].strip() == "", git(proj, "status", "--porcelain")[1])
 
         print("freshness header, resume, asof")
         import datetime as _dt
@@ -245,7 +245,7 @@ def main():
         git(proj, "reset", "-q", "--hard", "before-fresh")
         git(proj, "tag", "-d", "before-fresh")
         shutil.rmtree(os.path.join(proj, MY, "map"), ignore_errors=True)
-        check("the tree is clean again", git(proj, "status", "--porcelain")[1].strip() == "", git(proj, "status", "--porcelain")[1])
+        check("the repository is clean again", git(proj, "status", "--porcelain")[1].strip() == "", git(proj, "status", "--porcelain")[1])
 
         print("lint: data folders, history folders, size")
         write(os.path.join(proj, "files-input", "case.md"), "See `missing-case.md`. Follow-up after 2020-01-01.\napi_key = AbCdEfGhIjKlMnOpQrStUvWx12\n")
@@ -278,7 +278,7 @@ def main():
         git(proj, "checkout", "-q", "--", "AGENTS.md", MY + "/plans/backlog.md")
         shutil.rmtree(os.path.join(proj, "files-input"))
         os.makedirs(os.path.join(proj, "files-input"))
-        check("tree is clean after the lint scenarios", git(proj, "status", "--porcelain")[1].strip() == "")
+        check("repository is clean after the lint scenarios", git(proj, "status", "--porcelain")[1].strip() == "")
         check("no __pycache__ was left by the tools or the launchers", not pycache_dirs(proj), str(pycache_dirs(proj)))
 
         print("new folders and loose files in the root (NEW_FOLDERS)")
@@ -338,7 +338,7 @@ def main():
         shutil.rmtree(os.path.join(proj, "bad-mode"))
         git(proj, "add", "-A")
         git(proj, "commit", "-qm", "settle the new-folder test")
-        check("tree is clean after the new-folder scenarios", git(proj, "status", "--porcelain")[1].strip() == "", git(proj, "status", "--porcelain")[1])
+        check("repository is clean after the new-folder scenarios", git(proj, "status", "--porcelain")[1].strip() == "", git(proj, "status", "--porcelain")[1])
         for d in ("runbooks", "exports", "later-dir", "auto-add", "auto-ignorelint", "auto-ignoreall"):
             shutil.rmtree(os.path.join(proj, d), ignore_errors=True)
         for f in ("loose-export.xlsx", "loose-note.md"):
@@ -428,7 +428,7 @@ def main():
             check("solo: passing checks are squash-merged and the branch deleted", res["pass"][0] == 0 and "fake gh pr merge main --squash --delete-branch" in res["pass"][1] and "squash-merged main" in res["pass"][1], res["pass"][1])
             check("solo: every note was pushed", "main" in git(qremote, "branch", "--list")[1])
 
-        print("adopting existing notes (import into a new tree, adopt in place)")
+        print("adopting existing notes (import into a new notes repository, adopt in place)")
         old = os.path.join(tmp, "old-notes")
         write(os.path.join(old, "recipes", "sourdough.md"), "# Sourdough\nFeed 1:1:1. See [bread](../Bread%20basics.md) and [[Prompting]].\n![[crumb.png]]\n")
         write(os.path.join(old, "Bread basics.md"), "---\ntags: [baking]\n---\n# Bread basics\nFlour, water.\n")
@@ -438,7 +438,7 @@ def main():
         write(os.path.join(old, "AGENTS.md"), "# Old agent file\nBe brief.\n")
         write(os.path.join(old, "keys.md"), "token ghp_" + "abcdefghijklmnopqrstuvwxyz0123456789AB\n")
         before = sorted(os.path.relpath(os.path.join(dp, f), old) for dp, _dn, fn in os.walk(old) for f in fn)
-        imp = os.path.join(tmp, "imported-tree")
+        imp = os.path.join(tmp, "imported-repository")
         rc, out = run(L(kit, "bootstrap") + [imp, "--name", "Kitchen", "--owner", "Tester", "--import", old], tmp)
         base = MY + "/imported/old-notes/"
         tracked = git(imp, "ls-files")[1].split("\n")
@@ -468,7 +468,7 @@ def main():
         check("adopt: a verified zip backup of the whole folder is written outside it", rc == 0 and len(zips) == 1 and "vault/AGENTS.md" in names and "vault/.obsidian/app.json" in names, out)
         subjects = git(ad, "log", "--format=%s")[1].strip().split("\n")
         first = git(ad, "show", "--name-only", "--format=", "HEAD~1")[1].split("\n")
-        check("adopt: the notes are committed as found first, then the tree is added", len(subjects) == 2 and subjects[1].startswith("Before Myco Notes")
+        check("adopt: the notes are committed as found first, then the repository is added", len(subjects) == 2 and subjects[1].startswith("Before Myco Notes")
               and "AGENTS.md" in first and "recipes/sourdough.md" in first and not any(f.startswith(MY) for f in first), "\n".join(subjects + first))
         check("adopt: notes stay at their paths; the old AGENTS.md is kept; .obsidian ignored; the owner's .gitignore still applies",
               os.path.isfile(os.path.join(ad, "recipes", "sourdough.md")) and read(os.path.join(ad, "AGENTS.pre-myco.md")).startswith("# Old agent file")
@@ -482,7 +482,7 @@ def main():
         page = read(os.path.join(ad, MY, "map", "p", "prompting.html")) if rc == 0 else ""
         check("map: wiki links become relations", "recipes-sourdough.html" in page, out)
         rc, out = run(L(kit, "bootstrap") + [ad, "--name", "Vault", "--adopt", "--no-backup"], tmp)
-        check("adopt refuses a folder that is a tree already", rc == 1 and "already" in out, out)
+        check("adopt refuses a folder that is a notes repository already", rc == 1 and "already" in out, out)
         gv = os.path.join(tmp, "vault-git")   # a folder of notes that is already a git repository
         write(os.path.join(gv, "a.md"), "# A\n")
         git(tmp, "init", "-q", gv)
@@ -538,7 +538,7 @@ def main():
         rc, out = run([sys.executable, os.path.join(proj, MY, "tools", "notes_commit.py"), "--help"], proj)
         check("python <tools>/notes_commit.py --help", rc == 0 and "--branch" in out, out)
 
-        print("flat layout still works (older trees, --layout flat)")
+        print("flat layout still works (older repositories, --layout flat)")
         flat = os.path.join(tmp, "flat")
         rc, out = run(L(kit, "bootstrap") + [flat, "--name", "Old", "--tz", "UTC", "--layout", "flat", "--new-folders", "add"], tmp)
         check("flat bootstrap runs", rc == 0 and all(os.path.isdir(os.path.join(flat, d)) for d in ("notes", "tools", "docs")), out)
@@ -552,9 +552,9 @@ def main():
         rc, out = run([sys.executable, os.path.join(flat, "tools", "build-notes-map.py")], flat)
         check("flat map goes to notes-map", rc == 0 and os.path.exists(os.path.join(flat, "notes-map", "index.html")), out)
         shutil.rmtree(os.path.join(flat, "notes-map"))
-        check("flat tree: no __pycache__", not pycache_dirs(flat), str(pycache_dirs(flat)))
+        check("flat repository: no __pycache__", not pycache_dirs(flat), str(pycache_dirs(flat)))
 
-        print("relocate: flat tree -> single folder (run from the kit, as an agent or user would)")
+        print("relocate: flat repository -> single folder (run from the kit, as an agent or user would)")
         write(os.path.join(flat, "notes", "state.md"), "\nSee `notes/plans/backlog.md` and `tools/notes-lint.py`. Release notes/changes stay.\n", "a")
         git(flat, "commit", "-qam", "reference paths")
         rc, out = run(L(kit, "relocate") + ["--root", flat], tmp)
@@ -562,7 +562,7 @@ def main():
         write(os.path.join(flat, "dirty.md"), "x\n")
         git(flat, "add", "dirty.md")
         rc, out = run(L(kit, "relocate") + ["--root", flat, "--apply"], tmp)
-        check("apply refuses a tree with uncommitted changes", rc != 0 and "uncommitted" in out and os.path.isdir(os.path.join(flat, "notes")), out)
+        check("apply refuses a notes repository with uncommitted changes", rc != 0 and "uncommitted" in out and os.path.isdir(os.path.join(flat, "notes")), out)
         git(flat, "commit", "-qm", "dirty")
         rc, out = run(L(kit, "relocate") + ["--root", flat, "--apply"], tmp)
         check("apply moves the folders", rc == 0 and not os.path.exists(os.path.join(flat, "notes")) and not os.path.exists(os.path.join(flat, "tools")) and not os.path.exists(os.path.join(flat, "docs")) and os.path.isfile(os.path.join(flat, MY, "state.md")) and os.path.isfile(os.path.join(flat, MY, "tools", "notes_commit.py")), out)
@@ -573,13 +573,13 @@ def main():
         check("workflow and .gitignore follow", T + "/ci-check" in read(os.path.join(flat, ".github", "workflows", "notes-check.yml")) and MY + "/map/" in read(os.path.join(flat, ".gitignore")))
         write(os.path.join(flat, MY, "state.md"), "\n- after relocate\n", "a")
         rc, out = run(L(flat, "notes-commit", T) + ["Moved to the single folder layout"], flat)
-        check("the moved tree commits with its own tools", rc == 0 and "Moved to the single folder layout" in out, out)
+        check("the moved repository commits with its own tools", rc == 0 and "Moved to the single folder layout" in out, out)
         rc, out = run([sys.executable, os.path.join(flat, MY, "tools", "notes-lint.py"), "--quiet"], flat)
         check("lint is clean after the move", rc == 0 and "0 warnings" in out, out)
         rc, out = run(L(kit, "relocate") + ["--root", flat, "--apply"], tmp)
         check("a second run says there is nothing to do", rc == 0 and "already uses" in out, out)
 
-        print("relocate: rename the folder, and a tree with custom folder names")
+        print("relocate: rename the folder, and a notes repository with custom folder names")
         rc, out = run(L(kit, "relocate") + ["--root", flat, "--myco-dir", "project-notes", "--apply"], tmp)
         check("rename moves the whole folder", rc == 0 and os.path.isfile(os.path.join(flat, "project-notes", "state.md")) and not os.path.exists(os.path.join(flat, MY)), out)
         check("rename updates conf, hooks path and references", "MYCO_DIR=project-notes" in read(os.path.join(flat, ".myco-notes.conf")) and git(flat, "config", "core.hooksPath")[1].strip() == "project-notes/tools/hooks" and "project-notes/tools/ci-check" in read(os.path.join(flat, ".github", "workflows", "notes-check.yml")))
@@ -593,7 +593,7 @@ def main():
         git(custom, "commit", "-qm", "custom names")
         rc, out = run(L(kit, "relocate") + ["--root", custom, "--apply"], tmp)
         check("a custom docs folder name and extra notes folders are kept", rc == 0 and os.path.isfile(os.path.join(custom, MY, "myco-docs", "METHODOLOGY.md")) and os.path.isfile(os.path.join(custom, MY, "knowledge-base", "kb.md")) and "DOCS_DIR=myco-notes/myco-docs" in read(os.path.join(custom, ".myco-notes.conf")), out)
-        print("relocate: a tree that already has the layout gets its tools and docs refreshed from the kit")
+        print("relocate: a notes repository that already has the layout gets its tools and docs refreshed from the kit")
         ref = os.path.join(tmp, "refresh")
         run(L(kit, "bootstrap") + [ref, "--name", "Refresh", "--tz", "UTC"], tmp)
         os.remove(os.path.join(ref, MY, "tools", "notes_graph.py"))
@@ -614,7 +614,7 @@ def main():
         write(os.path.join(ref, "dirty.md"), "x\n")
         git(ref, "add", "dirty.md")
         rc, out = run(L(kit, "relocate") + ["--root", ref, "--apply"], tmp)
-        check("apply refuses a tree with uncommitted changes", rc != 0 and "uncommitted" in out, out)
+        check("apply refuses a notes repository with uncommitted changes", rc != 0 and "uncommitted" in out, out)
         git(ref, "commit", "-qm", "dirty")
         rc, out = run(L(kit, "relocate") + ["--root", ref, "--apply"], tmp)
         check("apply copies the files", rc == 0 and os.path.isfile(os.path.join(ref, MY, "tools", "notes_graph.py")) and os.path.isfile(os.path.join(ref, MY, "tools", "graph-template.html")) and "an older copy" not in read(os.path.join(ref, MY, "tools", "notes_commit.py")) and "older team guide" not in read(os.path.join(ref, MY, "docs", "TEAM.md")), out)
@@ -633,7 +633,7 @@ def main():
         rc, out = run(L(kit, "bootstrap") + [sp, "--name", "Sums", "--owner", "Tester", "--tz", "UTC"], tmp)
         slint = [sys.executable, "-B", os.path.join(sp, *T.split("/"), "notes-lint.py")]
         rc, out = run(slint, sp)
-        check("a new tree: the starter notes have summaries and the first sync-log line has the new form", "without a one-line summary" not in out and "sync-log" not in out, out)
+        check("a new notes repository: the starter notes have summaries and the first sync-log line has the new form", "without a one-line summary" not in out and "sync-log" not in out, out)
         rc, out = run(L(sp, "index", T), sp)
         check("index lists a starter note with its summary", rc == 0 and "# sumproj: note index" in out and f"`{MY}/state.md`: Master record: what Sums is" in out and "0 without a summary" in out, out)
         write(os.path.join(sp, MY, "nas.md"), "# NAS\n\nThe [[state|master]] record names it. Second sentence.\n")
@@ -704,7 +704,7 @@ def main():
         run(L(kit, "bootstrap") + [sq, "--name", "Src", "--owner", "Tester", "--tz", "UTC"], tmp)
         NCq = [sys.executable, "-B", os.path.join(sq, *T.split("/"), "notes_commit.py")]
         lintq = [sys.executable, "-B", os.path.join(sq, *T.split("/"), "notes-lint.py")]
-        check("the starter tree has a sources folder", os.path.isfile(os.path.join(sq, MY, "sources", "README.md")))
+        check("the starter notes has a sources folder", os.path.isfile(os.path.join(sq, MY, "sources", "README.md")))
         ing = L(sq, "ingest", T)
         man = "Relay board manual\n\nThe relay board keeps time for 72 hours without power.\n"
         rc, out = run(ing + ["--url", "https://example.invalid/relay", "--title", "Relay board manual", "--summary", "The relay board manual: timing, power, wiring", "--kind", "manual", "--date", "2026-03-02", "--commit"], sq, man)
@@ -747,6 +747,29 @@ def main():
         check("ingest keeps non-ASCII text intact (read as UTF-8 on every system)", rc == 0 and "Temperatur über 30 °C → Lüften" in read(uf), out)
         rc, out = run(ing + ["--url", "https://example.invalid/big", "--title", "Big", "--summary", "s", "--date", "2026-04-03"], sq, ("a" * 99 + "\n") * 2500)
         check("ingest warns about a large text and still saves it", rc == 0 and "warning: the text is 244 KB" in out and os.path.isfile(os.path.join(sq, MY, "sources", "2026-04-03-big.md")), out)
+        rc, out = run(lintq, sq)
+        check("lint: sources saved by ingest match their checksum", "sha256" not in out, out)
+        st_umlaut = read(uf)
+        write(uf, st_umlaut.replace("30 °C", "35 °C"))
+        rc, out = run(lintq, sq)
+        check("lint: a source edited after saving no longer matches its sha256", "2026-04-02-umlaut.md:" in out and "no longer matches its sha256" in out, out)
+        write(uf, st_umlaut)
+        write(os.path.join(sq, MY, "bundle.md"), "---\nsummary: Bundles\n---\n# Bundles\n\nRead `README.md` first; then `sources/README.md`. See `relay.md`.\n")
+        rc, out = run(lintq, sq)
+        warns = "\n".join(l for l in out.splitlines() if l.startswith("WARN"))
+        check("lint: a bare name that several files share is ambiguous; with its folder it is not", "bundle.md:" in warns and "`README.md` is ambiguous" in warns and "`sources/README.md` is ambiguous" not in warns, out)
+        os.remove(os.path.join(sq, MY, "bundle.md"))
+        cpq = os.path.join(sq, ".myco-notes.conf")
+        check("bootstrap records the format version", re.search(r"(?m)^FORMAT_VERSION=1\.0$", read(cpq)) is not None, read(cpq))
+        write(cpq, re.sub(r"(?m)^FORMAT_VERSION=.*\n", "", read(cpq)))
+        git(sq, "add", "-A"); git(sq, "commit", "-qm", "Sources and a notes repository without FORMAT_VERSION")
+        rc, out = run(L(kit, "relocate") + ["--root", sq, "--apply"], sq)
+        cq = read(cpq)
+        check("relocate adds FORMAT_VERSION when it is missing", rc == 0 and re.search(r"(?m)^FORMAT_VERSION=1\.0$", cq) is not None, out)
+        write(cpq, cq.replace("FORMAT_VERSION=1.0", "FORMAT_VERSION=2.0"))
+        git(sq, "add", "-A"); git(sq, "commit", "-qm", "Format 2.0")
+        run(L(kit, "relocate") + ["--root", sq, "--apply"], sq)
+        check("relocate keeps a format version the repository already states", "FORMAT_VERSION=2.0" in read(cpq), read(cpq))
         import datetime as _dt2
         rc, out = run(ing + ["--url", "https://example.invalid/today", "--title", "Today", "--summary", "s"], sq, "today\n")
         check("ingest dates a source by the notes' time zone (TIMEZONE=UTC here)", f"sources/{_dt2.datetime.now(_dt2.timezone.utc).strftime('%Y-%m-%d')}-today.md" in out, out)

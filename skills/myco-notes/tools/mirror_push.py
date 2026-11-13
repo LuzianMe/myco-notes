@@ -23,7 +23,7 @@ one before rsync deletes anything.
 Result: the last line starts with "mirror: synced", "mirror: skipped" or "mirror: failed".
 Exit: 0 synced (or skipped, without --strict), 1 failed, 3 skipped with --strict.
 MIRROR_SCOPE (local directory and ssh targets): tracked = .git plus the tracked files, never ignored or untracked files (new
-trees); all = the whole working copy (the default when the setting is missing, as in trees made before 0.12.0). Files outside
+repositories); all = the whole working copy (the default when the setting is missing, as in repositories made before 0.12.0). Files outside
 the scope that an earlier sync copied are removed from the target.
 
 A local directory target must not be the repository, a folder inside it or a folder that contains it. Because the copy is

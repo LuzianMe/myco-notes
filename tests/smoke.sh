@@ -1,5 +1,5 @@
 #!/bin/bash
-# Smoke test: bootstrap a tree in a temporary folder and exercise the tools. Exit 0 = all passed.
+# Smoke test: bootstrap a notes repository in a temporary folder and exercise the tools. Exit 0 = all passed.
 set -u
 kit="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 repo="$kit"   # the repository root (kit is later pointed at a skill-only copy)
@@ -67,12 +67,12 @@ cd "$tmp/proj" || exit 1
 chk "baseline commit exists"            "git log --oneline | grep -q Baseline"
 chk "placeholders filled"               "! grep -rq '{{' AGENTS.md myco-notes/working-agreement.md myco-notes/state.md .myco-notes.conf"
 chk "hooks path is versioned"           "[ \"\$(git config core.hooksPath)\" = myco-notes/tools/hooks ]"
-chk "bootstrap not copied into tree" "[ ! -e myco-notes/tools/bootstrap ]"
+chk "bootstrap not copied into repository" "[ ! -e myco-notes/tools/bootstrap ]"
 
 echo "notes-commit"
 echo "- **$(date +%F) (test change):** added a thing, tested, undo: revert." >> myco-notes/state.md
 chk "commit with message"               "myco-notes/tools/notes-commit 'Record the test change and why' | grep -q 'Record the test change'"
-chk "clean tree says nothing to commit" "myco-notes/tools/notes-commit 'again' | grep -q 'nothing to commit'"
+chk "clean repository says nothing to commit" "myco-notes/tools/notes-commit 'again' | grep -q 'nothing to commit'"
 printf '#!/bin/bash\nif then\n' > myco-notes/scripts/broken.sh
 chk "syntax error blocks the commit"    "! myco-notes/tools/notes-commit 'broken script'"
 rm myco-notes/scripts/broken.sh
@@ -84,7 +84,7 @@ git reset -q; rm -f myco-notes/secret-test.md
 printf -- '-----BEGIN RSA %s-----\nabc\n' 'PRIVATE KEY' > myco-notes/key-test.md   # assembled at run time: no key-shaped text in this file
 chk "private key block is refused"      "! myco-notes/tools/notes-commit 'add a key'"
 git reset -q; rm -f myco-notes/key-test.md
-chk "tree is clean again"               "[ -z \"\$(git status --porcelain)\" ]"
+chk "repository is clean again"               "[ -z \"\$(git status --porcelain)\" ]"
 
 echo "new folders in the root"
 mkdir runbooks files_input; echo "# r" > runbooks/a.md; echo x > files_input/a.pdf
@@ -94,11 +94,11 @@ chk "the report names the folders and the choices" "myco-notes/tools/notes-commi
 chk "answers commit: add, ignoreall" "myco-notes/tools/notes-commit --folder runbooks=add --folder files_input=ignoreall 'Decide the new folders' >/dev/null && git ls-files | grep -q runbooks/a.md && ! git ls-files | grep -q files_input && git check-ignore -q files_input && grep -q 'files_input' .myco-notes.conf"
 rm -rf runbooks files_input; git rm -rq runbooks; git commit -qam "remove the folder test items"
 sed -i 's/^DATA_DIRS=.*/DATA_DIRS=""/' .myco-notes.conf; sed -i '/^\/files_input\/$/d' .gitignore; git commit -qam "reset the folder test"
-chk "tree is clean again after the folder test" "[ -z \"\$(git status --porcelain)\" ]"
+chk "repository is clean again after the folder test" "[ -z \"\$(git status --porcelain)\" ]"
 
 echo "lint"
 myco-notes/tools/notes-lint.py >/tmp/lint.$$ 2>&1; rc=$?
-chk "lint runs on a fresh tree (exit 0 or 1)" "[ $rc -le 1 ]"
+chk "lint runs on a fresh repository (exit 0 or 1)" "[ $rc -le 1 ]"
 printf '\n## 3. One\n## 3. Two\nSee `missing-note.md`. Pending, review-by 2020-01-01.\n' >> myco-notes/runbook.md
 myco-notes/tools/notes-lint.py >/tmp/lint.$$ 2>&1; rc=$?
 chk "lint finds duplicate heading"      "grep -q 'duplicate heading number 3' /tmp/lint.$$"
@@ -140,7 +140,7 @@ chk "mirror contains .git"              "[ -d $tmp/mirror/.git ]"
 chk "restore drill passes"              "myco-notes/tools/restore-drill $tmp/mirror | grep -q 'fsck: OK'"
 
 echo "team setup (branches, CI check, per-clone setup)"
-chk "team files exist in the bootstrapped tree" "[ -f .github/workflows/notes-check.yml ] && [ -f .github/CODEOWNERS ] && [ -f .github/pull_request_template.md ] && [ -f myco-notes/docs/TEAM.md ]"
+chk "team files exist in the bootstrapped repository" "[ -f .github/workflows/notes-check.yml ] && [ -f .github/CODEOWNERS ] && [ -f .github/pull_request_template.md ] && [ -f myco-notes/docs/TEAM.md ]"
 chk "workflow runs myco-notes/tools/ci-check"      "grep -q 'myco-notes/tools/ci-check' .github/workflows/notes-check.yml"
 chk "workflow builds the map on main and keeps it as an artifact" "grep -q 'myco-notes/tools/build-notes-map.py --out' .github/workflows/notes-check.yml && grep -q 'upload-artifact' .github/workflows/notes-check.yml && grep -q \"if: github.event_name == 'push'\" .github/workflows/notes-check.yml"
 git clone -q "$tmp/proj" "$tmp/clone"
@@ -194,8 +194,8 @@ chk "ci-check fails when the lint cannot run" "! myco-notes/tools/ci-check $base
 git switch -q main; git branch -q -D feat-crash
 
 echo "0.12: restore verdicts, mirror scope and results, narrower commits, kit version, doctor"
-chk "new trees record the kit version"  "grep -q '^KIT_VERSION=[0-9]' .myco-notes.conf && grep -q '^MIRROR_SCOPE=tracked' .myco-notes.conf"
-chk "doctor reports a healthy tree"     "myco-notes/tools/doctor | grep -q 'doctor: healthy'"
+chk "new repositories record the kit and format versions"  "grep -q '^KIT_VERSION=[0-9]' .myco-notes.conf && grep -q '^FORMAT_VERSION=1.0' .myco-notes.conf && grep -q '^MIRROR_SCOPE=tracked' .myco-notes.conf"
+chk "doctor reports a healthy repository"     "myco-notes/tools/doctor | grep -q 'doctor: healthy'"
 git clone -q "$tmp/proj" "$tmp/drill"; rm -f "$tmp/drill/AGENTS.md"; echo changed > "$tmp/drill/myco-notes/state.md"
 chk "restore drill fails an incomplete working copy" "out=\$(myco-notes/tools/restore-drill $tmp/drill); [ \$? -ne 0 ] && echo \"\$out\" | grep -q 'verdict history:      OK' && echo \"\$out\" | grep -q 'working copy: INCOMPLETE'"
 echo "local only" > ignored-local.env; printf 'ignored-local.env\n' >> .git/info/exclude
@@ -258,23 +258,23 @@ if command -v rsync >/dev/null 2>&1; then
   git checkout -q -- .myco-notes.conf
 fi
 
-echo "flat layout and relocate (older trees keep working; relocate moves them)"
+echo "flat layout and relocate (older repositories keep working; relocate moves them)"
 "$kit/tools/bootstrap" "$tmp/flat" --name "Old" --tz "UTC" --layout flat >/dev/null 2>&1
-chk "flat tree has notes/ tools/ docs/ at the root" "[ -d $tmp/flat/notes ] && [ -d $tmp/flat/tools ] && [ -d $tmp/flat/docs ] && [ \"\$(git -C $tmp/flat config core.hooksPath)\" = tools/hooks ]"
+chk "flat repository has notes/ tools/ docs/ at the root" "[ -d $tmp/flat/notes ] && [ -d $tmp/flat/tools ] && [ -d $tmp/flat/docs ] && [ \"\$(git -C $tmp/flat config core.hooksPath)\" = tools/hooks ]"
 chk "flat lint and map work"             "(cd $tmp/flat && tools/notes-lint.py >/dev/null; [ \$? -le 1 ] && python3 tools/build-notes-map.py && [ -f notes-map/index.html ])"
 rm -rf "$tmp/flat/notes-map"
 chk "relocate dry run changes nothing"   "\"$kit/tools/relocate\" --root $tmp/flat | grep -q 'dry run' && [ -d $tmp/flat/notes ]"
-chk "relocate --apply moves the tree"    "\"$kit/tools/relocate\" --root $tmp/flat --apply >/dev/null && [ -f $tmp/flat/myco-notes/state.md ] && [ ! -e $tmp/flat/notes ] && [ \"\$(git -C $tmp/flat config core.hooksPath)\" = myco-notes/tools/hooks ]"
-chk "moved tree: lint clean and commit works" "(cd $tmp/flat && myco-notes/tools/notes-lint.py --quiet | grep -q ' 0 warnings' && myco-notes/tools/notes-commit 'Moved to the single folder layout' | grep -q 'Moved to')"
+chk "relocate --apply moves the repository"    "\"$kit/tools/relocate\" --root $tmp/flat --apply >/dev/null && [ -f $tmp/flat/myco-notes/state.md ] && [ ! -e $tmp/flat/notes ] && [ \"\$(git -C $tmp/flat config core.hooksPath)\" = myco-notes/tools/hooks ]"
+chk "moved repository: lint clean and commit works" "(cd $tmp/flat && myco-notes/tools/notes-lint.py --quiet | grep -q ' 0 warnings' && myco-notes/tools/notes-commit 'Moved to the single folder layout' | grep -q 'Moved to')"
 mkdir -p $tmp/flat/.claude/skills/myco-notes/docs; echo old > $tmp/flat/.claude/skills/myco-notes/SKILL.md; (cd $tmp/flat && git add -A && git commit -q --no-verify -m "stale skill copy")
 chk "relocate refreshes a skill copy under .claude/skills" "\"$kit/tools/relocate\" --root $tmp/flat --apply >/dev/null && cmp -s $kit/SKILL.md $tmp/flat/.claude/skills/myco-notes/SKILL.md && [ -f $tmp/flat/.claude/skills/myco-notes/docs/METHODOLOGY.md ] && [ -f $tmp/flat/.claude/skills/myco-notes/tools/bootstrap.py ]"
 
-echo "demo tree (README screenshots and the live demo)"
-chk "build_demo makes the tree, its map and the mycelium view" "python3 $repo/examples/demo/build_demo.py $tmp/demo | grep -q 'graph: 34 nodes' && [ -f $tmp/demo/myco-notes/map/graph.html ] && [ \"\$(git -C $tmp/demo rev-list --count HEAD)\" -ge 20 ]"
-chk "the demo tree is lint-clean apart from its two staged warnings" "(cd $tmp/demo && myco-notes/tools/notes-lint.py --quiet | grep -q ' 0 errors, 2 warnings')"
+echo "demo notes (README screenshots and the live demo)"
+chk "build_demo makes the repository, its map and the mycelium view" "python3 $repo/examples/demo/build_demo.py $tmp/demo | grep -q 'graph: 35 nodes' && [ -f $tmp/demo/myco-notes/map/graph.html ] && [ \"\$(git -C $tmp/demo rev-list --count HEAD)\" -ge 20 ]"
+chk "the demo notes is lint-clean apart from its two staged warnings" "(cd $tmp/demo && myco-notes/tools/notes-lint.py --quiet | grep -q ' 0 errors, 2 warnings')"
 
 chk "no .gitattributes in the kit rewrites file contents (the plugin directory refuses it)" "! git -C $repo ls-files -z '*.gitattributes' '.gitattributes' | xargs -0 -I{} grep -h -v '^#' $repo/{} | grep -q -E 'eol=|filter|export-|(^| )text( |=|$)'"
 chk ".cmd launchers are stored with CRLF and shell launchers with LF" "git -C $repo ls-files --eol -- skills/myco-notes/tools | awk '/\\.cmd\$/{if(\$1!=\"i/crlf\")bad=1;next} \$1==\"i/crlf\"{bad=1} END{exit bad}'"
-chk "bootstrap gives a new tree the normalising .gitattributes" "grep -q 'eol=lf' myco-notes/../.gitattributes 2>/dev/null || grep -q 'eol=lf' $tmp/demo/.gitattributes"
+chk "bootstrap gives a new notes repository the normalising .gitattributes" "grep -q 'eol=lf' myco-notes/../.gitattributes 2>/dev/null || grep -q 'eol=lf' $tmp/demo/.gitattributes"
 
 echo; echo "passed $pass, failed $fail"; [ "$fail" = 0 ]
