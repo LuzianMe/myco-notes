@@ -4,123 +4,142 @@
     python3 .github/assets/build_overview.py
 
 Writes overview-light.svg and overview-dark.svg next to this script. Edit the texts and the layout here, not in the SVG files.
+The diagram: what you give -> the method (six rules) -> what you get, and underneath the loop that repeats every session.
 Standard library only.
 """
 import os
 from xml.sax.saxutils import escape
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-W, H = 960, 650
+W, H = 960, 640
 FONT = "-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
 
 THEMES = {
-    "light": dict(text="#1f2328", muted="#59636e", box="#f6f8fa", line="#d0d7de", you="#ddf4ff", you_line="#54aeff",
-                  agent="#dafbe1", agent_line="#4ac26b", notes="#fbefff", notes_line="#c297ff", guard="#fff8c5",
-                  guard_line="#d4a72c", arrow="#59636e", bg="#ffffff"),
-    "dark": dict(text="#e6edf3", muted="#9198a1", box="#151b23", line="#3d444d", you="#0c2d6b", you_line="#4493f8",
-                 agent="#0f3a1f", agent_line="#3fb950", notes="#3b1f5c", notes_line="#ab7df8", guard="#3a2c00",
-                 guard_line="#d29922", arrow="#9198a1", bg="#0d1117"),
+    "light": dict(bg="#ffffff", text="#1f2328", muted="#59636e", you="#ddf4ff", you_line="#54aeff", method="#dafbe1",
+                  method_line="#4ac26b", num="#1a7f37", get="#fbefff", get_line="#c297ff", loop="#f6f8fa", loop_line="#d0d7de",
+                  arrow="#59636e"),
+    "dark": dict(bg="#0d1117", text="#e6edf3", muted="#9198a1", you="#0c2d6b", you_line="#4493f8", method="#0f3a1f",
+                 method_line="#3fb950", num="#56d364", get="#3b1f5c", get_line="#ab7df8", loop="#151b23", loop_line="#3d444d",
+                 arrow="#9198a1"),
 }
 
-# Columns: x, width
-YOU_X, YOU_W = 20, 220
-AG_X, AG_W = 290, 330
-NO_X, NO_W = 670, 270
-ROW_Y0, ROW_H, ROW_GAP = 78, 50, 14
-
-INPUTS = [
-    ("Work on your system", ["Checks the live system, updates the", "right notes and commits them"]),
-    ("“Note that …” (also from a phone)", ["Saves it in this month's inbox;", "sorting into the notes comes later"]),
-    ("Ask a question", ["Reads the note index, answers with file", "names, offers to keep a hard-won answer"]),
-    ("Share a link or a manual", ["Keeps it as a source, as found, and", "proposes what it changes in the notes"]),
-    ("Bring an old notes folder", ["Imports or adopts it, after a backup;", "links and structure are kept"]),
+GIVE = [
+    ("Changes you make", "to the system or the project"),
+    ("Quick thoughts", "typed or dictated, also from a phone"),
+    ("Questions", "“what changed on the router?”"),
+    ("Links and manuals", "release notes, forum answers"),
+    ("Your decisions", "yes, no or a change"),
 ]
-
-NOTES = [
-    ("state.md", "master record: what runs now"),
-    ("runbook.md", "how-tos and lessons"),
-    ("one note per device", "or service, decision, plan"),
-    ("inbox/", "quick notes"),
-    ("sources/", "outside documents"),
-    ("logs/  archive/", "history, never rewritten"),
-    ("plans/review-*.md", "proposed fixes"),
+RULES = [
+    ("Check the real system before writing", "not memory, not a script's own “ok”"),
+    ("One home per fact", "other notes point to it; links are checked"),
+    ("Evidence and dates", "the command, the numbers, how to undo it"),
+    ("Supersede, never delete", "git keeps every version of every note"),
+    ("No secrets, ever", "a hook refuses them on every commit"),
+    ("Nothing changes without your yes", "reviews arrive as numbered proposals"),
 ]
+GET = [
+    ("Notes that are true", "and say when they were checked"),
+    ("Answers with their source", "the note, the document, the date"),
+    ("A briefing every session", "what is current, open, waiting on you"),
+    ("Any past date", "what the notes said back then"),
+    ("A map of what connects", "backlinks and the mycelium view"),
+    ("Nothing leaked, nothing lost", "plain Markdown in your own git"),
+]
+LOOP = [["You work or ask"], ["The agent checks", "the system live"], ["Writes it to", "the right note"],
+        ["Checked and", "committed"], ["Next session starts", "from what is true"]]   # one list per box: its lines
+
+GX, GW = 20, 220          # what you give
+MX, MW = 290, 370         # the method
+RX, RW = 710, 230         # what you get
+TOP, AREA = 92, 396       # the three columns share this vertical band
 
 
 def text(x, y, s, c, size=13, weight="normal", anchor="start"):
-    return (f'<text x="{x}" y="{y}" fill="{c}" font-size="{size}" font-weight="{weight}" text-anchor="{anchor}" '
+    return (f'<text x="{x:.1f}" y="{y:.1f}" fill="{c}" font-size="{size}" font-weight="{weight}" text-anchor="{anchor}" '
             f'font-family="{FONT}">{escape(s)}</text>')
 
 
 def box(x, y, w, h, fill, stroke, r=8):
-    return f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{r}" fill="{fill}" stroke="{stroke}" stroke-width="1.2"/>'
+    return f'<rect x="{x:.1f}" y="{y:.1f}" width="{w:.1f}" height="{h:.1f}" rx="{r}" fill="{fill}" stroke="{stroke}" stroke-width="1.2"/>'
 
 
-def arrow(x1, y1, x2, y2, c):
-    return f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="{c}" stroke-width="1.6" marker-end="url(#a)"/>'
+def line(x1, y1, x2, y2, c, end=True):
+    return (f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" stroke="{c}" stroke-width="1.6"'
+            + (' marker-end="url(#a)"' if end else "") + "/>")
 
 
-def path_arrow(d, c):
-    return f'<path d="{d}" fill="none" stroke="{c}" stroke-width="1.6" marker-end="url(#a)"/>'
+def stack(items, x, w, fill, stroke, t, bold=True):
+    """Boxes spread evenly over the shared band; returns the y of each box's middle."""
+    n, gap = len(items), 10
+    h = (AREA - gap * (n - 1)) / n
+    out, mids = [], []
+    for i, (title, sub) in enumerate(items):
+        y = TOP + i * (h + gap)
+        out.append(box(x, y, w, h, fill, stroke))
+        out.append(text(x + 14, y + h / 2 - 3, title, t["text"], 13, "bold" if bold else "normal"))
+        out.append(text(x + 14, y + h / 2 + 14, sub, t["muted"], 12))
+        mids.append(y + h / 2)
+    return out, mids
 
 
 def build(t):
     o = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}" role="img" '
-         f'aria-label="How Myco Notes works: you work and talk to your agent; the agent keeps a notes repository up to date; '
-         f'every commit is checked; you approve review proposals and read briefings and maps.">',
+         f'aria-label="How Myco Notes works. What you give: changes, quick thoughts, questions, links and manuals, decisions. '
+         f'The method: check the real system before writing; one home per fact; evidence and dates; supersede, never delete; '
+         f'no secrets, ever; nothing changes without your yes. What you get: notes that are true, answers with their source, '
+         f'a briefing every session, any past date, a map of what connects, nothing leaked or lost. Session after session: '
+         f'you work or ask, the agent checks it live, writes it to the right note, it is checked and committed, and the next '
+         f'session starts from what is true; now and then a review proposes fixes and you decide.">',
          f'<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">'
          f'<path d="M0,0 L10,5 L0,10 z" fill="{t["arrow"]}"/></marker></defs>',
          f'<rect x="0" y="0" width="{W}" height="{H}" rx="12" fill="{t["bg"]}"/>']   # own background: readable on any page
-    # column headings
-    o.append(text(YOU_X + YOU_W / 2, 40, "You", t["text"], 16, "bold", "middle"))
-    o.append(text(YOU_X + YOU_W / 2, 58, "just keep working", t["muted"], 12, anchor="middle"))
-    o.append(text(AG_X + AG_W / 2, 40, "Your agent + the Myco Notes skill", t["text"], 16, "bold", "middle"))
-    o.append(text(AG_X + AG_W / 2, 58, "does the bookkeeping", t["muted"], 12, anchor="middle"))
-    o.append(text(NO_X + NO_W / 2, 40, "Your notes", t["text"], 16, "bold", "middle"))
-    o.append(text(NO_X + NO_W / 2, 58, "plain Markdown in a git repository", t["muted"], 12, anchor="middle"))
-    # input rows
-    for i, (you, agent) in enumerate(INPUTS):
-        y = ROW_Y0 + i * (ROW_H + ROW_GAP)
-        o.append(box(YOU_X, y, YOU_W, ROW_H, t["you"], t["you_line"]))
-        o.append(text(YOU_X + 14, y + ROW_H / 2 + 4.5, you, t["text"], 13))
-        o.append(arrow(YOU_X + YOU_W + 2, y + ROW_H / 2, AG_X - 4, y + ROW_H / 2, t["arrow"]))
-        o.append(box(AG_X, y, AG_W, ROW_H, t["agent"], t["agent_line"]))
-        o.append(text(AG_X + 14, y + 21, agent[0], t["text"], 13))
-        o.append(text(AG_X + 14, y + 38, agent[1], t["text"], 13))
-        o.append(arrow(AG_X + AG_W + 2, y + ROW_H / 2, NO_X - 4, y + ROW_H / 2, t["arrow"]))
-    rows_bottom = ROW_Y0 + len(INPUTS) * (ROW_H + ROW_GAP) - ROW_GAP
-    # notes column
-    o.append(box(NO_X, ROW_Y0, NO_W, rows_bottom - ROW_Y0, t["notes"], t["notes_line"]))
-    y = ROW_Y0 + 26
-    for name, what in NOTES:
-        o.append(text(NO_X + 16, y, name, t["text"], 13, "bold"))
-        o.append(text(NO_X + 16, y + 16, what, t["muted"], 12))
-        y += 37
-    o.append(text(NO_X + 16, rows_bottom - 12, "every note starts with a one-line summary", t["muted"], 12))
-    # guard bar
-    gy = rows_bottom + 26
-    o.append(box(AG_X, gy, NO_X + NO_W - AG_X, 50, t["guard"], t["guard_line"]))
-    o.append(text(AG_X + 16, gy + 21, "On every commit:  a hook refuses passwords and keys  ·  the lint checks links, dates", t["text"], 13, "bold"))
-    o.append(text(AG_X + 16, gy + 38, "and summaries  ·  git keeps every version, so nothing is lost, only superseded", t["text"], 13))
-    # loop back to you
-    ry = gy + 82
-    o.append(box(AG_X, ry, AG_W, 56, t["agent"], t["agent_line"]))
-    o.append(text(AG_X + 14, ry + 22, "Review: reads what changed and writes", t["text"], 13))
-    o.append(text(AG_X + 14, ry + 40, "each fix as a numbered proposal", t["text"], 13))
-    o.append(path_arrow(f"M{NO_X + NO_W / 2},{gy + 50} L{NO_X + NO_W / 2},{ry + 28} L{AG_X + AG_W + 4},{ry + 28}", t["arrow"]))
-    o.append(box(YOU_X, ry, YOU_W, 56, t["you"], t["you_line"]))
-    o.append(text(YOU_X + 14, ry + 22, "You answer: yes, no or", t["text"], 13))
-    o.append(text(YOU_X + 14, ry + 40, "a change; only yes is applied", t["text"], 13))
-    o.append(arrow(AG_X - 2, ry + 28, YOU_X + YOU_W + 4, ry + 28, t["arrow"]))
-    vy = ry + 82
-    o.append(box(AG_X, vy, AG_W, 56, t["box"], t["line"]))
-    o.append(text(AG_X + 14, vy + 22, "Views: a briefing at each session start,", t["text"], 13))
-    o.append(text(AG_X + 14, vy + 40, "the note index, a map, the mycelium view", t["text"], 13))
-    o.append(path_arrow(f"M{NO_X + NO_W - 40},{gy + 50} L{NO_X + NO_W - 40},{vy + 28} L{AG_X + AG_W + 4},{vy + 28}", t["arrow"]))
-    o.append(box(YOU_X, vy, YOU_W, 56, t["you"], t["you_line"]))
-    o.append(text(YOU_X + 14, vy + 22, "You (or the next session)", t["text"], 13))
-    o.append(text(YOU_X + 14, vy + 40, "start from what is true now", t["text"], 13))
-    o.append(arrow(AG_X - 2, vy + 28, YOU_X + YOU_W + 4, vy + 28, t["arrow"]))
+    for x, w, head, sub in ((GX, GW, "What you give", "just keep working"),
+                            (MX, MW, "The method", "rules your agent follows; tools check what they can"),
+                            (RX, RW, "What you get", "in plain Markdown and git")):
+        o.append(text(x + w / 2, 42, head, t["text"], 17, "bold", "middle"))
+        o.append(text(x + w / 2, 62, sub, t["muted"], 12, anchor="middle"))
+    # what you give -> the method
+    g, gm = stack(GIVE, GX, GW, t["you"], t["you_line"], t)
+    o += g
+    for y in gm:
+        o.append(line(GX + GW + 2, y, MX - 4, y, t["arrow"]))
+    # the method: one box, six numbered rules
+    o.append(box(MX, TOP, MW, AREA, t["method"], t["method_line"], 10))
+    step = AREA / len(RULES)
+    for i, (rule, why) in enumerate(RULES):
+        cy = TOP + step * i + step / 2
+        o.append(f'<circle cx="{MX + 28}" cy="{cy:.1f}" r="13" fill="none" stroke="{t["num"]}" stroke-width="1.6"/>')
+        o.append(text(MX + 28, cy + 5, str(i + 1), t["num"], 14, "bold", "middle"))
+        o.append(text(MX + 52, cy - 3, rule, t["text"], 14, "bold"))
+        o.append(text(MX + 52, cy + 14, why, t["muted"], 12))
+    # the method -> what you get
+    r, rm = stack(GET, RX, RW, t["get"], t["get_line"], t)
+    o += r
+    for y in rm:
+        o.append(line(MX + MW + 2, y, RX - 4, y, t["arrow"]))
+    # the loop underneath
+    ly = TOP + AREA + 34
+    o.append(text(20, ly, "Session after session", t["text"], 15, "bold"))
+    o.append(text(196, ly, "the agent forgets between sessions; the notes do not", t["muted"], 12))
+    by, bh, gap = ly + 14, 52, 18
+    bw = (W - 40 - gap * (len(LOOP) - 1)) / len(LOOP)
+    for i, s in enumerate(LOOP):
+        x = 20 + i * (bw + gap)
+        o.append(box(x, by, bw, bh, t["loop"], t["loop_line"]))
+        lines = s
+        for j, ln in enumerate(lines):
+            o.append(text(x + bw / 2, by + bh / 2 + 5 + (j - (len(lines) - 1) / 2) * 16, ln, t["text"], 13, anchor="middle"))
+        if i < len(LOOP) - 1:
+            o.append(line(x + bw + 2, by + bh / 2, x + bw + gap - 3, by + bh / 2, t["arrow"]))
+    # return arrow: from the last step back to the first, under the row
+    x_first = 20 + bw / 2
+    x_last = 20 + (len(LOOP) - 1) * (bw + gap) + bw / 2
+    ry = by + bh + 26
+    o.append(f'<path d="M{x_last:.1f},{by + bh + 2:.1f} L{x_last:.1f},{ry:.1f} L{x_first:.1f},{ry:.1f} L{x_first:.1f},{by + bh + 5:.1f}" '
+             f'fill="none" stroke="{t["arrow"]}" stroke-width="1.6" marker-end="url(#a)"/>')
+    o.append(f'<rect x="{W / 2 - 250:.1f}" y="{ry - 11:.1f}" width="500" height="22" fill="{t["bg"]}"/>')
+    o.append(text(W / 2, ry + 5, "now and then: a review proposes fixes, and you say yes, no or a change", t["muted"], 12, anchor="middle"))
     o.append("</svg>")
     return "\n".join(o) + "\n"
 

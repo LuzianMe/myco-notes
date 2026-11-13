@@ -1,80 +1,102 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 650" width="960" height="650" role="img" aria-label="How Myco Notes works: you work and talk to your agent; the agent keeps a notes repository up to date; every commit is checked; you approve review proposals and read briefings and maps.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 640" width="960" height="640" role="img" aria-label="How Myco Notes works. What you give: changes, quick thoughts, questions, links and manuals, decisions. The method: check the real system before writing; one home per fact; evidence and dates; supersede, never delete; no secrets, ever; nothing changes without your yes. What you get: notes that are true, answers with their source, a briefing every session, any past date, a map of what connects, nothing leaked or lost. Session after session: you work or ask, the agent checks it live, writes it to the right note, it is checked and committed, and the next session starts from what is true; now and then a review proposes fixes and you decide.">
 <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#9198a1"/></marker></defs>
-<rect x="0" y="0" width="960" height="650" rx="12" fill="#0d1117"/>
-<text x="130.0" y="40" fill="#e6edf3" font-size="16" font-weight="bold" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">You</text>
-<text x="130.0" y="58" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">just keep working</text>
-<text x="455.0" y="40" fill="#e6edf3" font-size="16" font-weight="bold" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Your agent + the Myco Notes skill</text>
-<text x="455.0" y="58" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">does the bookkeeping</text>
-<text x="805.0" y="40" fill="#e6edf3" font-size="16" font-weight="bold" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Your notes</text>
-<text x="805.0" y="58" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">plain Markdown in a git repository</text>
-<rect x="20" y="78" width="220" height="50" rx="8" fill="#0c2d6b" stroke="#4493f8" stroke-width="1.2"/>
-<text x="34" y="107.5" fill="#e6edf3" font-size="13" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Work on your system</text>
-<line x1="242" y1="103.0" x2="286" y2="103.0" stroke="#9198a1" stroke-width="1.6" marker-end="url(#a)"/>
-<rect x="290" y="78" width="330" height="50" rx="8" fill="#0f3a1f" stroke="#3fb950" stroke-width="1.2"/>
-<text x="304" y="99" fill="#e6edf3" font-size="13" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Checks the live system, updates the</text>
-<text x="304" y="116" fill="#e6edf3" font-size="13" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">right notes and commits them</text>
-<line x1="622" y1="103.0" x2="666" y2="103.0" stroke="#9198a1" stroke-width="1.6" marker-end="url(#a)"/>
-<rect x="20" y="142" width="220" height="50" rx="8" fill="#0c2d6b" stroke="#4493f8" stroke-width="1.2"/>
-<text x="34" y="171.5" fill="#e6edf3" font-size="13" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">“Note that …” (also from a phone)</text>
-<line x1="242" y1="167.0" x2="286" y2="167.0" stroke="#9198a1" stroke-width="1.6" marker-end="url(#a)"/>
-<rect x="290" y="142" width="330" height="50" rx="8" fill="#0f3a1f" stroke="#3fb950" stroke-width="1.2"/>
-<text x="304" y="163" fill="#e6edf3" font-size="13" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Saves it in this month's inbox;</text>
-<text x="304" y="180" fill="#e6edf3" font-size="13" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">sorting into the notes comes later</text>
-<line x1="622" y1="167.0" x2="666" y2="167.0" stroke="#9198a1" stroke-width="1.6" marker-end="url(#a)"/>
-<rect x="20" y="206" width="220" height="50" rx="8" fill="#0c2d6b" stroke="#4493f8" stroke-width="1.2"/>
-<text x="34" y="235.5" fill="#e6edf3" font-size="13" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Ask a question</text>
-<line x1="242" y1="231.0" x2="286" y2="231.0" stroke="#9198a1" stroke-width="1.6" marker-end="url(#a)"/>
-<rect x="290" y="206" width="330" height="50" rx="8" fill="#0f3a1f" stroke="#3fb950" stroke-width="1.2"/>
-<text x="304" y="227" fill="#e6edf3" font-size="13" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Reads the note index, answers with file</text>
-<text x="304" y="244" fill="#e6edf3" font-size="13" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">names, offers to keep a hard-won answer</text>
-<line x1="622" y1="231.0" x2="666" y2="231.0" stroke="#9198a1" stroke-width="1.6" marker-end="url(#a)"/>
-<rect x="20" y="270" width="220" height="50" rx="8" fill="#0c2d6b" stroke="#4493f8" stroke-width="1.2"/>
-<text x="34" y="299.5" fill="#e6edf3" font-size="13" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Share a link or a manual</text>
-<line x1="242" y1="295.0" x2="286" y2="295.0" stroke="#9198a1" stroke-width="1.6" marker-end="url(#a)"/>
-<rect x="290" y="270" width="330" height="50" rx="8" fill="#0f3a1f" stroke="#3fb950" stroke-width="1.2"/>
-<text x="304" y="291" fill="#e6edf3" font-size="13" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Keeps it as a source, as found, and</text>
-<text x="304" y="308" fill="#e6edf3" font-size="13" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">proposes what it changes in the notes</text>
-<line x1="622" y1="295.0" x2="666" y2="295.0" stroke="#9198a1" stroke-width="1.6" marker-end="url(#a)"/>
-<rect x="20" y="334" width="220" height="50" rx="8" fill="#0c2d6b" stroke="#4493f8" stroke-width="1.2"/>
-<text x="34" y="363.5" fill="#e6edf3" font-size="13" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Bring an old notes folder</text>
-<line x1="242" y1="359.0" x2="286" y2="359.0" stroke="#9198a1" stroke-width="1.6" marker-end="url(#a)"/>
-<rect x="290" y="334" width="330" height="50" rx="8" fill="#0f3a1f" stroke="#3fb950" stroke-width="1.2"/>
-<text x="304" y="355" fill="#e6edf3" font-size="13" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Imports or adopts it, after a backup;</text>
-<text x="304" y="372" fill="#e6edf3" font-size="13" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">links and structure are kept</text>
-<line x1="622" y1="359.0" x2="666" y2="359.0" stroke="#9198a1" stroke-width="1.6" marker-end="url(#a)"/>
-<rect x="670" y="78" width="270" height="306" rx="8" fill="#3b1f5c" stroke="#ab7df8" stroke-width="1.2"/>
-<text x="686" y="104" fill="#e6edf3" font-size="13" font-weight="bold" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">state.md</text>
-<text x="686" y="120" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">master record: what runs now</text>
-<text x="686" y="141" fill="#e6edf3" font-size="13" font-weight="bold" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">runbook.md</text>
-<text x="686" y="157" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">how-tos and lessons</text>
-<text x="686" y="178" fill="#e6edf3" font-size="13" font-weight="bold" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">one note per device</text>
-<text x="686" y="194" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">or service, decision, plan</text>
-<text x="686" y="215" fill="#e6edf3" font-size="13" font-weight="bold" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">inbox/</text>
-<text x="686" y="231" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">quick notes</text>
-<text x="686" y="252" fill="#e6edf3" font-size="13" font-weight="bold" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">sources/</text>
-<text x="686" y="268" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">outside documents</text>
-<text x="686" y="289" fill="#e6edf3" font-size="13" font-weight="bold" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">logs/  archive/</text>
-<text x="686" y="305" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">history, never rewritten</text>
-<text x="686" y="326" fill="#e6edf3" font-size="13" font-weight="bold" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">plans/review-*.md</text>
-<text x="686" y="342" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">proposed fixes</text>
-<text x="686" y="372" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">every note starts with a one-line summary</text>
-<rect x="290" y="410" width="650" height="50" rx="8" fill="#3a2c00" stroke="#d29922" stroke-width="1.2"/>
-<text x="306" y="431" fill="#e6edf3" font-size="13" font-weight="bold" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">On every commit:  a hook refuses passwords and keys  ·  the lint checks links, dates</text>
-<text x="306" y="448" fill="#e6edf3" font-size="13" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">and summaries  ·  git keeps every version, so nothing is lost, only superseded</text>
-<rect x="290" y="492" width="330" height="56" rx="8" fill="#0f3a1f" stroke="#3fb950" stroke-width="1.2"/>
-<text x="304" y="514" fill="#e6edf3" font-size="13" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Review: reads what changed and writes</text>
-<text x="304" y="532" fill="#e6edf3" font-size="13" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">each fix as a numbered proposal</text>
-<path d="M805.0,460 L805.0,520 L624,520" fill="none" stroke="#9198a1" stroke-width="1.6" marker-end="url(#a)"/>
-<rect x="20" y="492" width="220" height="56" rx="8" fill="#0c2d6b" stroke="#4493f8" stroke-width="1.2"/>
-<text x="34" y="514" fill="#e6edf3" font-size="13" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">You answer: yes, no or</text>
-<text x="34" y="532" fill="#e6edf3" font-size="13" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">a change; only yes is applied</text>
-<line x1="288" y1="520" x2="244" y2="520" stroke="#9198a1" stroke-width="1.6" marker-end="url(#a)"/>
-<rect x="290" y="574" width="330" height="56" rx="8" fill="#151b23" stroke="#3d444d" stroke-width="1.2"/>
-<text x="304" y="596" fill="#e6edf3" font-size="13" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Views: a briefing at each session start,</text>
-<text x="304" y="614" fill="#e6edf3" font-size="13" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">the note index, a map, the mycelium view</text>
-<path d="M900,460 L900,602 L624,602" fill="none" stroke="#9198a1" stroke-width="1.6" marker-end="url(#a)"/>
-<rect x="20" y="574" width="220" height="56" rx="8" fill="#0c2d6b" stroke="#4493f8" stroke-width="1.2"/>
-<text x="34" y="596" fill="#e6edf3" font-size="13" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">You (or the next session)</text>
-<text x="34" y="614" fill="#e6edf3" font-size="13" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">start from what is true now</text>
-<line x1="288" y1="602" x2="244" y2="602" stroke="#9198a1" stroke-width="1.6" marker-end="url(#a)"/>
+<rect x="0" y="0" width="960" height="640" rx="12" fill="#0d1117"/>
+<text x="130.0" y="42.0" fill="#e6edf3" font-size="17" font-weight="bold" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">What you give</text>
+<text x="130.0" y="62.0" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">just keep working</text>
+<text x="475.0" y="42.0" fill="#e6edf3" font-size="17" font-weight="bold" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">The method</text>
+<text x="475.0" y="62.0" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">rules your agent follows; tools check what they can</text>
+<text x="825.0" y="42.0" fill="#e6edf3" font-size="17" font-weight="bold" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">What you get</text>
+<text x="825.0" y="62.0" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">in plain Markdown and git</text>
+<rect x="20.0" y="92.0" width="220.0" height="71.2" rx="8" fill="#0c2d6b" stroke="#4493f8" stroke-width="1.2"/>
+<text x="34.0" y="124.6" fill="#e6edf3" font-size="13" font-weight="bold" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Changes you make</text>
+<text x="34.0" y="141.6" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">to the system or the project</text>
+<rect x="20.0" y="173.2" width="220.0" height="71.2" rx="8" fill="#0c2d6b" stroke="#4493f8" stroke-width="1.2"/>
+<text x="34.0" y="205.8" fill="#e6edf3" font-size="13" font-weight="bold" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Quick thoughts</text>
+<text x="34.0" y="222.8" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">typed or dictated, also from a phone</text>
+<rect x="20.0" y="254.4" width="220.0" height="71.2" rx="8" fill="#0c2d6b" stroke="#4493f8" stroke-width="1.2"/>
+<text x="34.0" y="287.0" fill="#e6edf3" font-size="13" font-weight="bold" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Questions</text>
+<text x="34.0" y="304.0" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">“what changed on the router?”</text>
+<rect x="20.0" y="335.6" width="220.0" height="71.2" rx="8" fill="#0c2d6b" stroke="#4493f8" stroke-width="1.2"/>
+<text x="34.0" y="368.2" fill="#e6edf3" font-size="13" font-weight="bold" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Links and manuals</text>
+<text x="34.0" y="385.2" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">release notes, forum answers</text>
+<rect x="20.0" y="416.8" width="220.0" height="71.2" rx="8" fill="#0c2d6b" stroke="#4493f8" stroke-width="1.2"/>
+<text x="34.0" y="449.4" fill="#e6edf3" font-size="13" font-weight="bold" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Your decisions</text>
+<text x="34.0" y="466.4" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">yes, no or a change</text>
+<line x1="242.0" y1="127.6" x2="286.0" y2="127.6" stroke="#9198a1" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="242.0" y1="208.8" x2="286.0" y2="208.8" stroke="#9198a1" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="242.0" y1="290.0" x2="286.0" y2="290.0" stroke="#9198a1" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="242.0" y1="371.2" x2="286.0" y2="371.2" stroke="#9198a1" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="242.0" y1="452.4" x2="286.0" y2="452.4" stroke="#9198a1" stroke-width="1.6" marker-end="url(#a)"/>
+<rect x="290.0" y="92.0" width="370.0" height="396.0" rx="10" fill="#0f3a1f" stroke="#3fb950" stroke-width="1.2"/>
+<circle cx="318" cy="125.0" r="13" fill="none" stroke="#56d364" stroke-width="1.6"/>
+<text x="318.0" y="130.0" fill="#56d364" font-size="14" font-weight="bold" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">1</text>
+<text x="342.0" y="122.0" fill="#e6edf3" font-size="14" font-weight="bold" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Check the real system before writing</text>
+<text x="342.0" y="139.0" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">not memory, not a script's own “ok”</text>
+<circle cx="318" cy="191.0" r="13" fill="none" stroke="#56d364" stroke-width="1.6"/>
+<text x="318.0" y="196.0" fill="#56d364" font-size="14" font-weight="bold" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">2</text>
+<text x="342.0" y="188.0" fill="#e6edf3" font-size="14" font-weight="bold" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">One home per fact</text>
+<text x="342.0" y="205.0" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">other notes point to it; links are checked</text>
+<circle cx="318" cy="257.0" r="13" fill="none" stroke="#56d364" stroke-width="1.6"/>
+<text x="318.0" y="262.0" fill="#56d364" font-size="14" font-weight="bold" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">3</text>
+<text x="342.0" y="254.0" fill="#e6edf3" font-size="14" font-weight="bold" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Evidence and dates</text>
+<text x="342.0" y="271.0" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">the command, the numbers, how to undo it</text>
+<circle cx="318" cy="323.0" r="13" fill="none" stroke="#56d364" stroke-width="1.6"/>
+<text x="318.0" y="328.0" fill="#56d364" font-size="14" font-weight="bold" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">4</text>
+<text x="342.0" y="320.0" fill="#e6edf3" font-size="14" font-weight="bold" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Supersede, never delete</text>
+<text x="342.0" y="337.0" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">git keeps every version of every note</text>
+<circle cx="318" cy="389.0" r="13" fill="none" stroke="#56d364" stroke-width="1.6"/>
+<text x="318.0" y="394.0" fill="#56d364" font-size="14" font-weight="bold" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">5</text>
+<text x="342.0" y="386.0" fill="#e6edf3" font-size="14" font-weight="bold" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">No secrets, ever</text>
+<text x="342.0" y="403.0" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">a hook refuses them on every commit</text>
+<circle cx="318" cy="455.0" r="13" fill="none" stroke="#56d364" stroke-width="1.6"/>
+<text x="318.0" y="460.0" fill="#56d364" font-size="14" font-weight="bold" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">6</text>
+<text x="342.0" y="452.0" fill="#e6edf3" font-size="14" font-weight="bold" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Nothing changes without your yes</text>
+<text x="342.0" y="469.0" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">reviews arrive as numbered proposals</text>
+<rect x="710.0" y="92.0" width="230.0" height="57.7" rx="8" fill="#3b1f5c" stroke="#ab7df8" stroke-width="1.2"/>
+<text x="724.0" y="117.8" fill="#e6edf3" font-size="13" font-weight="bold" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Notes that are true</text>
+<text x="724.0" y="134.8" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">and say when they were checked</text>
+<rect x="710.0" y="159.7" width="230.0" height="57.7" rx="8" fill="#3b1f5c" stroke="#ab7df8" stroke-width="1.2"/>
+<text x="724.0" y="185.5" fill="#e6edf3" font-size="13" font-weight="bold" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Answers with their source</text>
+<text x="724.0" y="202.5" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">the note, the document, the date</text>
+<rect x="710.0" y="227.3" width="230.0" height="57.7" rx="8" fill="#3b1f5c" stroke="#ab7df8" stroke-width="1.2"/>
+<text x="724.0" y="253.2" fill="#e6edf3" font-size="13" font-weight="bold" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">A briefing every session</text>
+<text x="724.0" y="270.2" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">what is current, open, waiting on you</text>
+<rect x="710.0" y="295.0" width="230.0" height="57.7" rx="8" fill="#3b1f5c" stroke="#ab7df8" stroke-width="1.2"/>
+<text x="724.0" y="320.8" fill="#e6edf3" font-size="13" font-weight="bold" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Any past date</text>
+<text x="724.0" y="337.8" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">what the notes said back then</text>
+<rect x="710.0" y="362.7" width="230.0" height="57.7" rx="8" fill="#3b1f5c" stroke="#ab7df8" stroke-width="1.2"/>
+<text x="724.0" y="388.5" fill="#e6edf3" font-size="13" font-weight="bold" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">A map of what connects</text>
+<text x="724.0" y="405.5" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">backlinks and the mycelium view</text>
+<rect x="710.0" y="430.3" width="230.0" height="57.7" rx="8" fill="#3b1f5c" stroke="#ab7df8" stroke-width="1.2"/>
+<text x="724.0" y="456.2" fill="#e6edf3" font-size="13" font-weight="bold" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Nothing leaked, nothing lost</text>
+<text x="724.0" y="473.2" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">plain Markdown in your own git</text>
+<line x1="662.0" y1="120.8" x2="706.0" y2="120.8" stroke="#9198a1" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="662.0" y1="188.5" x2="706.0" y2="188.5" stroke="#9198a1" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="662.0" y1="256.2" x2="706.0" y2="256.2" stroke="#9198a1" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="662.0" y1="323.8" x2="706.0" y2="323.8" stroke="#9198a1" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="662.0" y1="391.5" x2="706.0" y2="391.5" stroke="#9198a1" stroke-width="1.6" marker-end="url(#a)"/>
+<line x1="662.0" y1="459.2" x2="706.0" y2="459.2" stroke="#9198a1" stroke-width="1.6" marker-end="url(#a)"/>
+<text x="20.0" y="522.0" fill="#e6edf3" font-size="15" font-weight="bold" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Session after session</text>
+<text x="196.0" y="522.0" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="start" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">the agent forgets between sessions; the notes do not</text>
+<rect x="20.0" y="536.0" width="169.6" height="52.0" rx="8" fill="#151b23" stroke="#3d444d" stroke-width="1.2"/>
+<text x="104.8" y="567.0" fill="#e6edf3" font-size="13" font-weight="normal" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">You work or ask</text>
+<line x1="191.6" y1="562.0" x2="204.6" y2="562.0" stroke="#9198a1" stroke-width="1.6" marker-end="url(#a)"/>
+<rect x="207.6" y="536.0" width="169.6" height="52.0" rx="8" fill="#151b23" stroke="#3d444d" stroke-width="1.2"/>
+<text x="292.4" y="559.0" fill="#e6edf3" font-size="13" font-weight="normal" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">The agent checks</text>
+<text x="292.4" y="575.0" fill="#e6edf3" font-size="13" font-weight="normal" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">the system live</text>
+<line x1="379.2" y1="562.0" x2="392.2" y2="562.0" stroke="#9198a1" stroke-width="1.6" marker-end="url(#a)"/>
+<rect x="395.2" y="536.0" width="169.6" height="52.0" rx="8" fill="#151b23" stroke="#3d444d" stroke-width="1.2"/>
+<text x="480.0" y="559.0" fill="#e6edf3" font-size="13" font-weight="normal" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Writes it to</text>
+<text x="480.0" y="575.0" fill="#e6edf3" font-size="13" font-weight="normal" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">the right note</text>
+<line x1="566.8" y1="562.0" x2="579.8" y2="562.0" stroke="#9198a1" stroke-width="1.6" marker-end="url(#a)"/>
+<rect x="582.8" y="536.0" width="169.6" height="52.0" rx="8" fill="#151b23" stroke="#3d444d" stroke-width="1.2"/>
+<text x="667.6" y="559.0" fill="#e6edf3" font-size="13" font-weight="normal" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Checked and</text>
+<text x="667.6" y="575.0" fill="#e6edf3" font-size="13" font-weight="normal" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">committed</text>
+<line x1="754.4" y1="562.0" x2="767.4" y2="562.0" stroke="#9198a1" stroke-width="1.6" marker-end="url(#a)"/>
+<rect x="770.4" y="536.0" width="169.6" height="52.0" rx="8" fill="#151b23" stroke="#3d444d" stroke-width="1.2"/>
+<text x="855.2" y="559.0" fill="#e6edf3" font-size="13" font-weight="normal" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Next session starts</text>
+<text x="855.2" y="575.0" fill="#e6edf3" font-size="13" font-weight="normal" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">from what is true</text>
+<path d="M855.2,590.0 L855.2,614.0 L104.8,614.0 L104.8,593.0" fill="none" stroke="#9198a1" stroke-width="1.6" marker-end="url(#a)"/>
+<rect x="230.0" y="603.0" width="500" height="22" fill="#0d1117"/>
+<text x="480.0" y="619.0" fill="#9198a1" font-size="12" font-weight="normal" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">now and then: a review proposes fixes, and you say yes, no or a change</text>
 </svg>
