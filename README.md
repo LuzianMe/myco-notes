@@ -203,5 +203,14 @@ It started as the operational memory of a long-running, AI-operated engineering 
 
 The name: mycelium is the underground network of threads that connects the trees of a forest and breaks down what has died. Here the notes are the threads, the references between them the network, and old statements are superseded and kept, not thrown away.
 
+## Credits
+
+Built from scratch by a person and an AI agent on a real project. Later we compared it with other work and borrowed from:
+
+- **[LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)** (Andrej Karpathy): a note on having an AI build and maintain a personal wiki from raw documents. We took the source layer (documents kept as found), keeping answers worth keeping, and a one-line summary per note. The difference: there the AI edits the wiki; here every change is a proposal the owner approves.
+- **[Obsidian](https://obsidian.md)**: a Markdown note-taking app. Its `[[wiki links]]` and vault folders are why existing collections can be adopted as they are.
+- **[AGENTS.md](https://agents.md)** and **[Agent Skills](https://agentskills.io/specification)**: open conventions for the file an AI agent reads first and for packaging agent skills. Following them makes the notes and the skill work with any agent.
+- **[RFC 2119](https://www.rfc-editor.org/rfc/rfc2119)**: the standard meaning of MUST and SHOULD, used in the format spec.
+
 ## Tests, contributing, license
 `python3 tests/native.py` (Linux, macOS, Windows) and `bash tests/smoke.sh` (Linux, macOS) run on every push in GitHub Actions. They copy only the skill folder, bootstrap a notes repository from it and exercise every tool. Contributing: see [AGENTS.md](AGENTS.md). License: Apache 2.0, see [LICENSE](LICENSE) and [NOTICE](NOTICE).

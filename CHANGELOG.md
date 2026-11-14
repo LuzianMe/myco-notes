@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.22.2
+- **README: Credits**: what Myco Notes borrowed and from where: Andrej Karpathy's LLM Wiki note (the source layer, keeping answers, one-line summaries; here every change is a proposal the owner approves), Obsidian (wiki links and vaults, why existing collections can be adopted as they are), the AGENTS.md convention and the Agent Skills specification, and RFC 2119 for the format spec's MUST and SHOULD.
+
 ## 0.22.1
 - **Starter notes are fitted to the repository** (method 21.4): when an upgrade review offers a starter note, its proposal shows the text fitted to the repository's real facts (for example, the owner's page lists the mirror that already runs instead of saying the notes exist only on this computer), not the template's generic lines. Seen first in a real full review.
 
