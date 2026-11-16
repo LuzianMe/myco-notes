@@ -42,13 +42,20 @@ def note_files(root, lay):
     return out
 
 
+AREAS = {}   # rel -> the note's `area` header (format 4.2), filled by collect()
+
+
 def collect(root, lay):
-    """[(rel, summary, from_header, is_history)] for every note."""
+    """[(rel, summary, from_header, is_history)] for every note; each note's area goes into AREAS."""
     hist = tuple(lay["notes"] + "/" + h + "/" for h in lay["history"])
     rows = []
     for rel in note_files(root, lay):
         text = open(os.path.join(root, *rel.split("/")), encoding="utf-8", errors="replace").read()
         s, own = _myco.note_summary(text)
+        fm, _ = _myco.frontmatter(text)
+        area = (fm.get("area") or ("",))[0].strip().strip("\"'")
+        if area:
+            AREAS[rel] = area
         rows.append((rel, s, own, rel.startswith(hist)))
     return rows
 
@@ -273,7 +280,7 @@ def main():
     for folder in sorted(groups, key=lambda f: (f != lay["notes"], f)):
         print(f"\n## {folder if folder != '.' else '(repository root)'}/")
         for rel, s, own, _ in groups[folder]:
-            print(f"- `{rel}`: " + (s if own else (f"(first line) {s}" if s else "(no summary)")))
+            print(f"- `{rel}`" + (f" [{AREAS[rel]}]" if rel in AREAS else "") + ": " + (s if own else (f"(first line) {s}" if s else "(no summary)")))
     hist = [r for r in rows if r[3]]
     if hist:
         print("\n## Records (history folders: what was true when written)")
@@ -284,7 +291,7 @@ def main():
         for top in sorted(counts):
             if a.all:
                 for rel, s, own, _ in counts[top]:
-                    print(f"- `{rel}`: " + (s if own else (f"(first line) {s}" if s else "(no summary)")))
+                    print(f"- `{rel}`" + (f" [{AREAS[rel]}]" if rel in AREAS else "") + ": " + (s if own else (f"(first line) {s}" if s else "(no summary)")))
             else:
                 print(f"- `{top}/`: {len(counts[top])} file(s) (`--all` lists them)")
     return 0

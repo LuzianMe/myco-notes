@@ -53,6 +53,39 @@ def default_groups(lay):
     ]
 
 
+def area_groups(groups, info, lay):
+    """The project's own groups (method 9): a note the method's groups left in "other" goes to its `area` header's group, or to the group of
+    the subfolder of the notes folder it sits in. They come right after "Start here", so they get the first colours. Changes info in place."""
+    notes = lay["notes"] + "/"
+    found = {}                                     # group id -> (name, blurb, count)
+    for rel, d in info.items():
+        if d["group"] != "other":
+            continue
+        area = (d["fm"].get("area") or "").strip().strip("\"'")
+        if area:
+            gid = "area-" + re.sub(r"[^a-z0-9]+", "-", area.lower()).strip("-")
+            name, blurb = area, f"Notes about {area} (their area header)."
+        elif rel.startswith(notes) and "/" in rel[len(notes):]:
+            sub = rel[len(notes):].split("/", 1)[0]
+            role = next((g for g in default_groups(lay) if notes + sub + "/" in g[3]), None)
+            if role:                               # a method folder a custom map configuration does not list keeps the method's group
+                gid, name, blurb = role[0], role[1], role[2]
+            else:
+                gid, name, blurb = "dir-" + re.sub(r"[^a-z0-9]+", "-", sub.lower()).strip("-"), sub + "/", f"Notes in {notes}{sub}/."
+        else:
+            continue
+        d["group"] = gid
+        cur = found.get(gid)
+        found[gid] = (cur[0] if cur else name, blurb, (cur[2] if cur else 0) + 1)
+    if not found:
+        return groups
+    roles = {g[0] for g in default_groups(lay)}
+    extra = [(gid, name, blurb, []) for gid, (name, blurb, _) in sorted(found.items(), key=lambda kv: (-kv[1][2], kv[1][0].lower())) if gid not in roles]
+    late = [(gid, name, blurb, []) for gid, (name, blurb, _) in found.items() if gid in roles and gid not in {g[0] for g in groups}]
+    at = next((i + 1 for i, g in enumerate(groups) if g[0] == "start"), 0)
+    return groups[:at] + extra + groups[at:-1] + late + groups[-1:] if groups and groups[-1][0] == "other" else groups[:at] + extra + groups[at:] + late
+
+
 CSS = """:root{--bg:#f4f6f8;--panel:#fff;--fg:#1c252c;--muted:#5d6b76;--line:#d3dadf;--accent:#0b6e6e;--code:#f1f4f6}
 @media (prefers-color-scheme:dark){:root{--bg:#12171b;--panel:#1a2126;--fg:#e3e9ed;--muted:#93a3ae;--line:#2b363e;--accent:#4fc3c3;--code:#161c20}}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 system-ui,sans-serif}a{color:var(--accent)}
@@ -139,6 +172,7 @@ def main():
         info[rel] = dict(id=slug(rel), rel=rel, name=os.path.basename(rel), title=ttl, group=group, text=text, shown=shown, fm={k: v[0] for k, v in fm.items()}, out={}, inn={},
                          hint=hints.get(rel) or (fm["summary"][0] if fm.get("summary", ("",))[0] else "") or (para[:170] + ("..." if len(para) > 170 else "")),
                          mtime=os.path.getmtime(os.path.join(root, rel)), size=len(text.encode("utf-8")))
+    groups = area_groups(groups, info, lay)
     taken = {}
     for rel in sorted(info):                       # a/b.md and a-b.md give the same page name: the later one gets a path hash
         pid = info[rel]["id"]

@@ -1,6 +1,6 @@
 # The Myco Notes format
 
-Format 1.0, 2026-11-13. This document says what a Myco Notes repository looks like on disk, precisely enough that a program or an agent that has never seen this kit can read one, write to one without breaking it, and check one. It is the contract; section 12 adds what an implementation offers on top of it. Together with `METHODOLOGY.md`, which says why the rules exist and how to work with them, it makes up the Myco Notes framework. The kit this document ships with (the tools, the agent skill and the starter notes) is the reference implementation; other implementations are welcome, and notes that follow this document need none of the kit's code.
+Format 1.1, 2026-11-16 (1.0: 2026-11-13). This document says what a Myco Notes repository looks like on disk, precisely enough that a program or an agent that has never seen this kit can read one, write to one without breaking it, and check one. It is the contract; section 12 adds what an implementation offers on top of it. Together with `METHODOLOGY.md`, which says why the rules exist and how to work with them, it makes up the Myco Notes framework. The kit this document ships with (the tools, the agent skill and the starter notes) is the reference implementation; other implementations are welcome, and notes that follow this document need none of the kit's code.
 
 What belongs here and what belongs in the method: **if a tool reads it, it is format; if only people read it, it is method.** The sync-log line, the inbox heading and the review statuses are read by tools, so they are specified here; the changelog, how-to, incident and decision templates are written for people and adapted by each project, so they stay in the method (section 4).
 
@@ -103,6 +103,7 @@ All keys are optional.
 | `valid_from`, `valid_until` | date | the period the content describes; `valid_until` is the last day it was true. `valid_from` MUST NOT be after `valid_until`. |
 | `supersedes`, `superseded_by` | file names | notes this one replaces, or that replace it. Each MUST resolve (5.2). |
 | `sources` | file names | sources (8) the note relies on. Each MUST resolve to a file in `sources/`. |
+| `area` | one short name | the part of the project the note is about (`Network`, `Cameras`, `Billing`), chosen by the project, not by this format. One per note. Readers that group notes (maps, indexes) SHOULD group notes without a fixed role (6) by it. Added in 1.1. |
 
 Review files (7.2) and sources (8.1) add their own keys. A writer MUST keep keys it does not know, and new keys from later versions of this format are added to this table, never given a different meaning.
 

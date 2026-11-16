@@ -247,6 +247,22 @@ def main():
         check("graph: a note past its review date wilts, a current one does not", fo is not None and fo.get("due", 0) >= 1 and fk is not None and fk.get("due", 0) == 0, str((fo, fk)))
         page = read(os.path.join(proj, MY, "map", "p", fo["id"] + ".html")) if fo else ""
         check("map page: the header is shown as a freshness line, not as text", "review after 2020-03-01" in page and "last_confirmed" not in page and "<h2" not in page.split("Fresh old")[0], page[:400])
+        write(os.path.join(proj, MY, "router.md"), "---\nsummary: The router\narea: Network\n---\n# Router\n\nSee `switch.md`.\n")
+        write(os.path.join(proj, MY, "switch.md"), "---\nsummary: The switch\narea: Network\n---\n# Switch\n\nSee `router.md`.\n")
+        write(os.path.join(proj, MY, "cameras", "porch.md"), "---\nsummary: The porch camera\n---\n# Porch\n\nSee `router.md`.\n")
+        write(os.path.join(proj, MY, "plans", "net-plan.md"), "---\nsummary: A plan\narea: Network\n---\n# Net plan\n\nSee `router.md`.\n")
+        rc, out = run([sys.executable, os.path.join(proj, MY, "tools", "build-notes-map.py")], proj)
+        h, g = graph_data(proj, MY + "/map")
+        gname = lambda rel: g["groups"][{n["rel"]: n for n in g["nodes"]}[rel]["g"]]["name"]
+        names = [x["name"] for x in g["groups"]]
+        check("map: notes without a fixed role are grouped by their area, then by their subfolder; a plan keeps its role; areas come after Start here",
+              gname(MY + "/router.md") == "Network" and gname(MY + "/switch.md") == "Network" and gname(MY + "/cameras/porch.md") == "cameras/"
+              and gname(MY + "/plans/net-plan.md") != "Network" and names.index("Network") == names.index("Start here") + 1, str(names))
+        rc, out = run(L(proj, "index", T), proj)
+        check("index shows a note's area", f"`{MY}/router.md` [Network]: The router" in out, out)
+        shutil.rmtree(os.path.join(proj, MY, "cameras"))
+        for f in ("router.md", "switch.md", "plans/net-plan.md"):
+            os.remove(os.path.join(proj, MY, *f.split("/")))
         git(proj, "reset", "-q", "--hard", "before-fresh")
         git(proj, "tag", "-d", "before-fresh")
         shutil.rmtree(os.path.join(proj, MY, "map"), ignore_errors=True)
@@ -807,13 +823,13 @@ def main():
         check("lint: a bare name that several files share is ambiguous; with its folder it is not", "bundle.md:" in warns and "`README.md` is ambiguous" in warns and "`sources/README.md` is ambiguous" not in warns, out)
         os.remove(os.path.join(sq, MY, "bundle.md"))
         cpq = os.path.join(sq, ".myco-notes.conf")
-        check("bootstrap records the format version", re.search(r"(?m)^FORMAT_VERSION=1\.0$", read(cpq)) is not None, read(cpq))
+        check("bootstrap records the format version", re.search(r"(?m)^FORMAT_VERSION=1\.1$", read(cpq)) is not None, read(cpq))
         write(cpq, re.sub(r"(?m)^FORMAT_VERSION=.*\n", "", read(cpq)))
         git(sq, "add", "-A"); git(sq, "commit", "-qm", "Sources and a notes repository without FORMAT_VERSION")
         rc, out = run(L(kit, "relocate") + ["--root", sq, "--apply"], sq)
         cq = read(cpq)
-        check("relocate adds FORMAT_VERSION when it is missing", rc == 0 and re.search(r"(?m)^FORMAT_VERSION=1\.0$", cq) is not None, out)
-        write(cpq, cq.replace("FORMAT_VERSION=1.0", "FORMAT_VERSION=2.0"))
+        check("relocate adds FORMAT_VERSION when it is missing", rc == 0 and re.search(r"(?m)^FORMAT_VERSION=1\.1$", cq) is not None, out)
+        write(cpq, cq.replace("FORMAT_VERSION=1.1", "FORMAT_VERSION=2.0"))
         git(sq, "add", "-A"); git(sq, "commit", "-qm", "Format 2.0")
         run(L(kit, "relocate") + ["--root", sq, "--apply"], sq)
         check("relocate keeps a format version the repository already states", "FORMAT_VERSION=2.0" in read(cpq), read(cpq))

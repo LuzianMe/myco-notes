@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+- **Your project's own groups on the map** (format 1.1, method 9): a new optional header key, `area: <name>`, says which part of the project a note is about (`Network`, `Cameras`, `Billing`; the project chooses the names). Notes without a fixed role (not in the read order, plans, logs and the other method folders) are grouped by their area on the map and in its index, then by the subfolder they sit in, and only then land in "Other notes". The project's groups come right after "Start here". A review proposes 4 to 8 areas when many notes are ungrouped, and the first run proposes the project's main parts as its first areas; `index` shows each note's area. `FORMAT_VERSION` 1.1 only adds the key, so 1.0 repositories conform as they are.
+- **Calmer node sizes in the mycelium view**: nodes are smaller and closer in size (the largest about three times the smallest, before about five), and a hub stands out by its rings and a lighter glow rather than its bulk.
+- **Colours go to the project**: the method's record groups (logs, archive, inbox, sources, the method's documents, other notes) get quiet colours, so the vivid ones go to the read order, the plans and the project's areas; the palette has two more colours. A method folder a custom map configuration does not list (for example `inbox/` or `sources/` in an older repository) now keeps the method's group name.
+
 ## 0.22.2
 - **README: Credits**: what Myco Notes borrowed and from where: Andrej Karpathy's LLM Wiki note (the source layer, keeping answers, one-line summaries; here every change is a proposal the owner approves), Obsidian (wiki links and vaults, why existing collections can be adopted as they are), the AGENTS.md convention and the Agent Skills specification, and RFC 2119 for the format spec's MUST and SHOULD.
 

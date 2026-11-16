@@ -102,8 +102,12 @@ var NODES=D.nodes,NN=NODES.length,NC=D.commits.length;
 var root=document.documentElement;
 
 /* ---------- theme ---------- */
-var DARK_PAL=["#4fe3cf","#ffb454","#b79cff","#ff7f96","#a6e86a","#62beff","#ecd77f","#ff9d73","#7fe0a0","#e58cd9"];
-var LIGHT_PAL=["#0f8f80","#c27410","#7a55d8","#cc3d5d","#5a9a1b","#1b73c4","#a08a14","#c2582b","#2d9a5e","#a8399c"];
+var DARK_PAL=["#4fe3cf","#ffb454","#b79cff","#ff7f96","#a6e86a","#62beff","#ecd77f","#ff9d73","#7fe0a0","#e58cd9","#ff6fd8","#9fb4ff"];
+var LIGHT_PAL=["#0f8f80","#c27410","#7a55d8","#cc3d5d","#5a9a1b","#1b73c4","#a08a14","#c2582b","#2d9a5e","#a8399c","#c2189e","#3f56c4"];
+var DARK_QUIET=["#8a9a94","#a39883","#8f8aa6","#9c8a8f","#7f9aa6","#98a37f"],LIGHT_QUIET=["#5f6f69","#7a6f5a","#665f80","#7a5f66","#557080","#6b7a55"];
+/* the method's record and reference groups get quiet colours, so the vivid ones go to the read order, the plans and the project's own areas */
+var QUIET={logs:1,archive:1,docs:1,inbox:1,sources:1,imported:1,other:1},GCI=[];
+(function(){var v=0,q=0;D.groups.forEach(function(g,i){GCI[i]=QUIET[g.id]?[1,q++]:[0,v++]})})();
 var T={};
 function pickTheme(){
   var p=new URLSearchParams(location.search).get("theme"),s=null;
@@ -133,7 +137,7 @@ function hash(i){var s=Math.sin(i*127.1+311.7)*43758.5453;return s-Math.floor(s)
 NODES.forEach(function(n,i){
   n.i=i;n.vis=false;n.ap=0;n.vx=0;n.vy=0;n.touch=-1;n.z=n.zt=.5;n.px=n.py=0;n.ps=1;n.pz=0;n.pr=n.r||1;
   var a=i*2.399963,r=24*Math.sqrt(i+1);n.x0=n.x=Math.cos(a)*r;n.y0=n.y=Math.sin(a)*r;
-  n.r=(3.4+Math.min(7,Math.sqrt(n.in)*1.7)+Math.min(2.5,Math.log10(1+n.kb)*1.2)+(n.hub?2.5:0))*(n.hist?.8:1);
+  n.r=(2.8+Math.min(3.8,Math.sqrt(n.in)*1.05)+Math.min(1.2,Math.log10(1+n.kb)*.6)+(n.hub?1:0))*(n.hist?.8:1);   /* about 2.8 to 8.8: the largest note about three times the smallest, so hubs do not swamp their neighbours */
   n.low=(n.name+" "+n.title+" "+n.rel).toLowerCase();adj.push([]);
 });
 D.edges.forEach(function(e,k){
@@ -144,7 +148,7 @@ D.edges.forEach(function(e,k){
 var cur=NC;                                   /* commits applied: 0..NC */
 var hov=-1,sel=-1,match=null,alpha=1,playing=false,acc=0,ripples=[];
 var cam={x:0,y:0,k:1,tx:0,ty:0,tk:1},autoFit=true,W=0,H=0,DPR=1,lastT=0,VS=1;
-function gcol(g){return T.pal[g%T.pal.length]}
+function gcol(g){var c=GCI[g]||[0,g],p=c[0]?(T.dark?DARK_QUIET:LIGHT_QUIET):T.pal;return p[c[1]%p.length]}
 
 /* ---------- depth ----------
    The notes float at different depths: the most recently changed ones in front, the ones untouched for longest at the back,
@@ -366,7 +370,7 @@ function onScreen(n){var x=n.px,y=n.py;return x>24&&x<W-24&&y>24&&y<H-24}
 function slotCount(pool){   /* about the square root of the notes in view; zoomed in past the fitted view, up to three times more */
   var z=Math.max(1,Math.min(3,cam.k/(cam.fk||cam.k))),b=sel>=0?8:Math.round(Math.sqrt(pool)*.9*z);if(W<640)b--;return Math.max(2,Math.min(sel>=0?8:16,b))}
 function lrad(n){return n.pr}
-function lbox(n){var w=n.name.length*6.6-14,x=n.px,y=n.py+lrad(n)*(n.hub?2.5:1)+14;return [x-w/2-8,y-13,x+w/2+8,y+5]}
+function lbox(n){var w=n.name.length*6.6-14,x=n.px,y=n.py+lrad(n)*(n.hub?2.1:1)+14;return [x-w/2-8,y-13,x+w/2+8,y+5]}
 function overlaps(b,c){return b[0]<c[2]&&c[0]<b[2]&&b[1]<c[3]&&c[1]<b[3]}
 function updateLabels(now,dt){
   var fresh0=sel!==spotFor;
@@ -418,19 +422,19 @@ function draw(now){
     var rec=recency(n),pulse=reduce||playing?1:1+.1*Math.sin(t/650+n.i)*rec,d=dim(n),sc=ease(n.ap),r=n.pr*sc*pulse,x=n.px,y=n.py,fz=fogOf(n),fog=1-.68*fz;   /* further back: fainter, a softer wider glow, no shine */
     var col=n.due?T.wilt:gcol(n.g);
     cx.globalAlpha=Math.min(1,n.ap)*d*(n.hist?.55:1)*(.14+.6*rec+(n.hub?.2:0)+.12*fz)*(1-.3*fz);
-    var gs=r*(n.hub?4.4:3.2)*(1+.25*fz),gm=Math.max(r*1.6,(n.nn||1e9)*(n.hub?1.3:1.15));if(gs>gm){cx.globalAlpha*=.25+.75*gm/gs;gs=gm}   /* crowded: a smaller, fainter glow */
+    var gs=r*(n.hub?3.4:2.8)*(1+.25*fz),gm=Math.max(r*1.6,(n.nn||1e9)*(n.hub?1.3:1.15));if(gs>gm){cx.globalAlpha*=.25+.75*gm/gs;gs=gm}   /* crowded: a smaller, fainter glow */
     cx.drawImage(sprite(col),x-gs,y-gs,gs*2,gs*2);
     cx.globalAlpha=Math.min(1,n.ap)*d*(n.hist?.6:1)*fog;
     cx.fillStyle=col;cx.beginPath();cx.arc(x,y,r,0,6.3);cx.fill();cx.globalAlpha*=1-fz;cx.fillStyle="rgba(255,255,255,"+(T.dark?.28:.4)+")";cx.beginPath();cx.arc(x-r*.28,y-r*.3,r*.38,0,6.3);cx.fill();cx.globalAlpha=Math.min(1,n.ap)*d*(n.hist?.6:1)*fog;
     if(n.hub){   /* a hub (one of the most-mentioned notes of this project) carries two soft rings, like a fruiting body pushing up through the network */
       var ra=Math.min(1,n.ap)*d*fog;cx.strokeStyle=col;cx.lineWidth=1.4;
-      cx.globalAlpha=ra*.55;cx.beginPath();cx.arc(x,y,Math.max(0,r*1.7+(reduce||playing?0:1.6*Math.sin(t/900+n.i))),0,6.3);cx.stroke();
-      cx.globalAlpha=ra*.25;cx.beginPath();cx.arc(x,y,r*2.5,0,6.3);cx.stroke();
+      cx.globalAlpha=ra*.55;cx.beginPath();cx.arc(x,y,Math.max(0,r*1.55+(reduce||playing?0:1.2*Math.sin(t/900+n.i))),0,6.3);cx.stroke();
+      cx.globalAlpha=ra*.25;cx.beginPath();cx.arc(x,y,r*2.1,0,6.3);cx.stroke();
     }
     if(n.due){cx.setLineDash([2,3]);cx.strokeStyle=T.wilt;cx.lineWidth=1.2;cx.beginPath();cx.arc(x,y,r+3.5,0,6.3);cx.stroke();cx.setLineDash([])}
     if(n.miss&&(cam.k>.7||focus===n.i)){var ang=hash(n.i+9)*6.28,x2=x+Math.cos(ang)*(r+13),y2=y+Math.sin(ang)*(r+13);cx.setLineDash([2,2]);cx.strokeStyle=T.wilt;cx.lineWidth=1;cx.beginPath();cx.moveTo(x+Math.cos(ang)*r,y+Math.sin(ang)*r);cx.lineTo(x2,y2);cx.stroke();cx.setLineDash([]);cx.fillStyle=T.wilt;cx.font="10px system-ui";cx.textAlign="center";cx.fillText("?",x2+Math.cos(ang)*4,y2+Math.sin(ang)*4+3)}
     cx.globalAlpha=1;
-    if(n.la>.01&&d>.5){var la=n.la*n.la*(3-2*n.la);label(n.name.replace(/\.md$/,""),x,y+r*(n.hub?2.5:1)+14+(1-la)*5,n.hub||n.i===sel,la*(forced(n)?1:1-.4*fz))}   /* a name rises a few pixels as it fades in */
+    if(n.la>.01&&d>.5){var la=n.la*n.la*(3-2*n.la);label(n.name.replace(/\.md$/,""),x,y+r*(n.hub?2.1:1)+14+(1-la)*5,n.hub||n.i===sel,la*(forced(n)?1:1-.4*fz))}   /* a name rises a few pixels as it fades in */
   });
   /* ripples: a new or changed note lets out a ring */
   ripples=ripples.filter(function(rp){return t-rp.t<1100});
