@@ -182,7 +182,7 @@ def main():
         check("hubs are the most-mentioned project notes", MY + "/plans/graph-hub.md" in hubs and hubs == {n["rel"] for n in live[:min(6, max(2, len(g["nodes"]) // 8))]} and not any(n["in"] < 2 for n in g["nodes"] if n["hub"]), str(sorted(hubs)))
         check("the entry and method notes are never hubs, however often they are mentioned", not any(n["hub"] and g["groups"][n["g"]]["id"] in ("start", "docs") for n in g["nodes"]) and any(n["in"] >= 2 and g["groups"][n["g"]]["id"] == "start" for n in g["nodes"]), str([(n["rel"], n["in"]) for n in g["nodes"] if n["in"] >= 2]))
         check("the timeline sits in the left column under the search panel, no mushrooms drawn", h.index('id="left"') < h.index('id="head"') < h.index('id="time"') < h.index('id="panel"') and "mushroom" not in h.lower())
-        check("the page needs no network", not _re.search(r'(src|href)="https?:', h) and h.count("</script>") == 2 and "%%" not in h)
+        check("the page needs no network", not _re.search(r'(src|href)="https?:', h) and "<script src" not in h and h.count("</script>") == 5 and "%%" not in h)   # inline only: theme, picker, data, theme colours, view
         node = shutil.which("node")
         if node:
             code = _re.search(r"<script>\n\(function.*?</script>", h, _re.S).group(0)[len("<script>\n"):-len("</script>")]
@@ -258,6 +258,16 @@ def main():
         check("map: notes without a fixed role are grouped by their area, then by their subfolder; a plan keeps its role; areas come after Start here",
               gname(MY + "/router.md") == "Network" and gname(MY + "/switch.md") == "Network" and gname(MY + "/cameras/porch.md") == "cameras/"
               and gname(MY + "/plans/net-plan.md") != "Network" and names.index("Network") == names.index("Start here") + 1, str(names))
+        mp = os.path.join(proj, MY, "map")
+        pages = {"index": read(os.path.join(mp, "index.html")), "note page": read(os.path.join(mp, "p", sorted(os.listdir(os.path.join(mp, "p")))[0])),
+                 "graph": read(os.path.join(mp, "graph.html"))}
+        ids = ["light", "dark", "mycelium", "fruit", "matrix", "amber", "contrast", "deepsea", "paper"]
+        bad = [k for k, v in pages.items() if not ('<select id="theme-pick">' in v and '<option value="auto">' in v
+               and all(f'<option value="{i}">' in v and f':root[data-theme="{i}"]{{' in v for i in ids)
+               and v.index("localStorage.getItem('myco-theme')") < v.index("</head>") and "myco-graph-theme" in v.split("</head>")[0]
+               and "prefers-reduced-motion" in v and "<link" not in v.replace('<link rel="icon" href="data:,">', "") and "http" not in v.split("</head>")[0])]
+        check("map: every page has the theme picker, the early-apply script in <head> and every theme's variables (self-contained)", not bad, str(bad))
+        check("graph: every theme's node and group colours are in the page", all(f'"{i}":{{"dark"' in pages["graph"] for i in ids) and "%%" not in pages["graph"], pages["graph"][:300])
         rc, out = run(L(proj, "index", T), proj)
         check("index shows a note's area", f"`{MY}/router.md` [Network]: The router" in out, out)
         shutil.rmtree(os.path.join(proj, MY, "cameras"))

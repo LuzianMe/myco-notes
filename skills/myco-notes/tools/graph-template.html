@@ -6,11 +6,9 @@
 <title>%%TITLE%% - mycelium</title>
 <link rel="icon" href="data:,">
 <style>
-:root{--bg:#0a0f0d;--bg2:#12201a;--fg:#e1ece6;--muted:#8da39a;--panel:rgba(13,22,18,.88);--line:#27382f;--accent:#58e0c8;--halo:#0a0f0d}
-@media (prefers-color-scheme:light){:root:not([data-theme=dark]){--bg:#f1eee3;--bg2:#fbf9f0;--fg:#1c2923;--muted:#5a6a62;--panel:rgba(255,253,245,.92);--line:#d6d1bb;--accent:#0b7a6c;--halo:#f1eee3}}
-:root[data-theme=light]{--bg:#f1eee3;--bg2:#fbf9f0;--fg:#1c2923;--muted:#5a6a62;--panel:rgba(255,253,245,.92);--line:#d6d1bb;--accent:#0b7a6c;--halo:#f1eee3}
+%%THEME_CSS%%
 *{box-sizing:border-box}
-html,body{margin:0;height:100%;overflow:hidden;background:radial-gradient(ellipse at 50% 45%,var(--bg2),var(--bg) 70%);color:var(--fg);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+html,body{margin:0;height:100%;overflow:hidden;background:radial-gradient(ellipse at 50% 45%,var(--bg2),var(--bg) 70%);color:var(--fg);font:14px/1.45 var(--font)}
 canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
 canvas.hover{cursor:pointer}canvas.drag{cursor:grabbing}
 .box{position:fixed;background:var(--panel);border:1px solid var(--line);border-radius:12px;backdrop-filter:blur(8px)}
@@ -26,6 +24,8 @@ input[type=search]:focus-visible,button:focus-visible,a:focus-visible,input[type
 #tools{top:12px;right:12px;display:flex;gap:6px;padding:6px}
 #tools a,#tools button{font:inherit;font-size:12.5px;padding:4px 10px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--fg);text-decoration:none;cursor:pointer}
 #tools a:hover,#tools button:hover,.chip:hover{border-color:var(--accent)}
+.theme-pick{display:inline-flex;align-items:center}.theme-pick select{font:inherit;font-size:12.5px;padding:3px 4px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--fg);cursor:pointer}
+.theme-pick select:hover{border-color:var(--accent)}button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 #depth[aria-pressed=true]{border-color:var(--accent);color:var(--accent)}
 #panel{top:64px;right:12px;width:min(310px,calc(100vw - 24px));padding:14px;max-height:calc(100vh - 170px);overflow:auto}
 #panel[hidden]{display:none}#panel h2{font-size:16px;margin:0 0 2px;padding-right:22px}#panel .rel{color:var(--muted);font:12px ui-monospace,Menlo,Consolas,monospace;word-break:break-all}
@@ -80,6 +80,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .notime #panel{bottom:12px}
 }
 </style>
+%%THEME_HEAD%%
 </head>
 <body>
 <canvas id="c" role="img" aria-label="Graph of the notes: each note is a node, each mention between notes is a thread. The list of all notes follows for keyboard and screen reader use."></canvas>
@@ -88,10 +89,11 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 <div id="left"><div id="head" class="box"><button id="fold" type="button" aria-expanded="true" aria-controls="head" title="Hide the search and the legend">&minus;</button><h1>%%TITLE%%</h1><p id="stats"></p>
 <input id="q" type="search" placeholder="Find a note..." aria-label="Find a note"><div id="legend" role="group" aria-label="Show or hide a group of notes"></div></div>
 <div id="time" class="box" hidden><button id="play" type="button">Replay</button><span id="when"></span><input id="slide" type="range" min="0" value="0" aria-label="Position in the history of the notes"><div id="what"></div><label id="speedl"><span class="lbl">Speed </span><select id="speed" aria-label="Replay speed"><option value="0.5">0.5x</option><option value="1" selected>1x</option><option value="2">2x</option><option value="4">4x</option></select></label></div></div>
-<div id="tools" class="box"><button id="find" type="button" aria-expanded="false" aria-controls="head">Find</button><a href="index.html">Map</a><button id="fit" type="button" title="Fit the whole network in view">Fit</button><button id="depth" type="button" aria-pressed="true" title="Depth: recently changed notes float in front, notes untouched for longest sink to the back. Turn the view with Shift-drag or right-drag, two fingers moved together, or a sideways trackpad swipe; Fit turns it back.">Depth</button><button id="theme" type="button" title="Switch light and dark">Theme</button></div>
+<div id="tools" class="box"><button id="find" type="button" aria-expanded="false" aria-controls="head">Find</button><a href="index.html">Map</a><button id="fit" type="button" title="Fit the whole network in view">Fit</button><button id="depth" type="button" aria-pressed="true" title="Depth: recently changed notes float in front, notes untouched for longest sink to the back. Turn the view with Shift-drag or right-drag, two fingers moved together, or a sideways trackpad swipe; Fit turns it back.">Depth</button>%%THEME_PICKER%%</div>
 <aside id="panel" class="box" hidden aria-live="polite"></aside>
 <nav class="sr" aria-label="All notes"><ul>%%LINKS%%</ul></nav>
 <script id="data" type="application/json">%%DATA%%</script>
+<script id="themes" type="application/json">%%THEMES%%</script>
 <script>
 (function(){
 "use strict";
@@ -102,25 +104,20 @@ var NODES=D.nodes,NN=NODES.length,NC=D.commits.length;
 var root=document.documentElement;
 
 /* ---------- theme ---------- */
-var DARK_PAL=["#4fe3cf","#ffb454","#b79cff","#ff7f96","#a6e86a","#62beff","#ecd77f","#ff9d73","#7fe0a0","#e58cd9","#ff6fd8","#9fb4ff"];
-var LIGHT_PAL=["#0f8f80","#c27410","#7a55d8","#cc3d5d","#5a9a1b","#1b73c4","#a08a14","#c2582b","#2d9a5e","#a8399c","#c2189e","#3f56c4"];
-var DARK_QUIET=["#8a9a94","#a39883","#8f8aa6","#9c8a8f","#7f9aa6","#98a37f"],LIGHT_QUIET=["#5f6f69","#7a6f5a","#665f80","#7a5f66","#557080","#6b7a55"];
+/* every theme's node, group and thread colours (map_themes.py): pal = vivid groups, quiet = the method's record groups */
+var TH=JSON.parse(document.getElementById("themes").textContent);
 /* the method's record and reference groups get quiet colours, so the vivid ones go to the read order, the plans and the project's own areas */
 var QUIET={logs:1,archive:1,docs:1,inbox:1,sources:1,imported:1,other:1},GCI=[];
 (function(){var v=0,q=0;D.groups.forEach(function(g,i){GCI[i]=QUIET[g.id]?[1,q++]:[0,v++]})})();
 var T={};
-function pickTheme(){
-  var p=new URLSearchParams(location.search).get("theme"),s=null;
-  try{s=localStorage.getItem("myco-graph-theme")}catch(e){}
-  var t=p||s;
-  if(t==="light"||t==="dark")root.setAttribute("data-theme",t);
-}
+/* The theme is set on <html> before the first paint (the script in <head>); no attribute means Auto: light when the system asks
+   for it, otherwise dark, as before themes existed. The picker sends a "myco-theme" event when the choice changes. */
 function readTheme(){
-  var attr=root.getAttribute("data-theme");
-  var dark=attr?attr==="dark":!(window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches);
-  T=dark?{dark:true,pal:DARK_PAL,hypha:"140,232,205",wilt:"#b9824a",halo:"#0a0f0d",text:"#e1ece6"}
-        :{dark:false,pal:LIGHT_PAL,hypha:"30,105,88",wilt:"#8f5f2d",halo:"#f1eee3",text:"#1c2923"};
-  sprites={};
+  var id=root.getAttribute("data-theme");
+  if(!TH[id])id=window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches?"light":"dark";
+  var x=TH[id];
+  T={id:id,dark:x.dark,pal:x.pal,quiet:x.quiet,hypha:x.hypha,wilt:x.wilt,halo:x.halo,text:x.text,font:x.font};
+  sprites={};shades={};
   paintLegend();
 }
 var sprites={};
@@ -148,7 +145,7 @@ D.edges.forEach(function(e,k){
 var cur=NC;                                   /* commits applied: 0..NC */
 var hov=-1,sel=-1,match=null,alpha=1,playing=false,acc=0,ripples=[];
 var cam={x:0,y:0,k:1,tx:0,ty:0,tk:1},autoFit=true,W=0,H=0,DPR=1,lastT=0,VS=1;
-function gcol(g){var c=GCI[g]||[0,g],p=c[0]?(T.dark?DARK_QUIET:LIGHT_QUIET):T.pal;return p[c[1]%p.length]}
+function gcol(g){var c=GCI[g]||[0,g],p=c[0]?T.quiet:T.pal;return p[c[1]%p.length]}
 
 /* ---------- depth ----------
    The notes float at different depths: the most recently changed ones in front, the ones untouched for longest at the back,
@@ -332,7 +329,7 @@ function tip(p,r){cx.beginPath();cx.arc(p[0],p[1],r,0,6.3);cx.fill()}
    darker on the dark theme and a little lighter on the light one, so it reads as part of the source and still stands out. */
 var shades={};
 function budRGB(n){
-  var c=n.due?T.wilt:gcol(n.g),k=(T.dark?"d":"l")+c;
+  var c=n.due?T.wilt:gcol(n.g),k=T.id+c;
   if(!shades[k]){var v=parseInt(c.slice(1),16),r=v>>16&255,g=v>>8&255,b=v&255;
     shades[k]=(T.dark?[r*.72,g*.72,b*.72]:[r+(255-r)*.3,g+(255-g)*.3,b+(255-b)*.3]).map(Math.round).join(",")}
   return shades[k];
@@ -353,7 +350,7 @@ function hypha(e,w,grow,col,tipA){
   }
 }
 function label(txt,x,y,bold,a){
-  cx.globalAlpha=a;cx.font=(bold?"600 ":"")+"12px system-ui,Segoe UI,sans-serif";cx.textAlign="center";cx.lineWidth=3.5;cx.strokeStyle=T.halo;cx.fillStyle=T.text;
+  cx.globalAlpha=a;cx.font=(bold?"600 ":"")+"12px "+T.font;cx.textAlign="center";cx.lineWidth=3.5;cx.strokeStyle=T.halo;cx.fillStyle=T.text;
   cx.strokeText(txt,x,y);cx.fillText(txt,x,y);cx.globalAlpha=1;
 }
 
@@ -554,11 +551,9 @@ cv.addEventListener("wheel",function(ev){
 cv.addEventListener("contextmenu",function(ev){ev.preventDefault()});   /* right-drag turns, so no menu over the network */
 cv.addEventListener("dblclick",function(){autoFit=true;turnHome()});
 document.getElementById("fit").addEventListener("click",function(){autoFit=true;turnHome()});
-document.getElementById("theme").addEventListener("click",function(){
-  var next=T.dark?"light":"dark";root.setAttribute("data-theme",next);
-  try{localStorage.setItem("myco-graph-theme",next)}catch(e){}
-  readTheme();
-});
+document.addEventListener("myco-theme",readTheme);   /* the picker changed the theme */
+if(window.matchMedia){var mq=matchMedia("(prefers-color-scheme: light)"),onSys=function(){if(!root.getAttribute("data-theme"))readTheme()};
+  if(mq.addEventListener)mq.addEventListener("change",onSys);else if(mq.addListener)mq.addListener(onSys)}   /* Auto follows a system change */
 var panel=document.getElementById("panel");
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e}
 /* The detail panel can shrink to a strip (title, counts, Open, More) and the search box can fold to the title and counts.
@@ -655,7 +650,7 @@ function showHint(){
 }
 
 /* ---------- start ---------- */
-pickTheme();readTheme();resize();
+readTheme();resize();
 if(NN===0){document.getElementById("empty").style.display="flex"}
 document.getElementById("time").hidden=NC<2;root.classList.toggle("notime",NC<2);
 setStep(NC,false);

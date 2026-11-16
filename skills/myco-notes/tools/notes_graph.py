@@ -12,6 +12,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import _myco  # noqa: E402
+import map_themes  # noqa: E402
 MAX_COMMITS = 2000
 DUE = re.compile(r"\b(after|about|due|review-by|waiting until|on or after)\s+(\d{4}-\d{2}-\d{2})\b")
 ILLUSTRATIVE = " *<>{}$|()[]"
@@ -133,6 +134,8 @@ def build(root, lay, info, groups, out, title, sh, today, built):
     with open(os.path.join(HERE, "graph-template.html"), encoding="utf-8") as fh:
         page = fh.read()
     links = "".join(f'<li><a href="p/{n["id"]}.html">{_esc(n["title"])} ({_esc(n["rel"])})</a></li>' for n in nodes)
+    page = (page.replace("%%THEME_CSS%%", map_themes.graph_css()).replace("%%THEME_HEAD%%", map_themes.head_script())
+            .replace("%%THEME_PICKER%%", map_themes.picker("sr")).replace("%%THEMES%%", map_themes.graph_json().replace("</", "<\\/")))
     page = page.replace("%%TITLE%%", _esc(title)).replace("%%LINKS%%", links).replace("%%DATA%%", blob)
     with open(os.path.join(out, "graph.html"), "w", encoding="utf-8", newline="\n") as fh:
         fh.write(page)
