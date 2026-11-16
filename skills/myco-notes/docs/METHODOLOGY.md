@@ -465,7 +465,7 @@ Paths are relative to the kit, which is the skill folder `skills/myco-notes/` (i
 | What the notes said on a date, what changed since, history of one note (7.1) | `tools/asof` |
 | Relation map, backlinks, history, publication gate (9, 8.2) | `tools/build-notes-map.py` |
 | Colour themes of the map pages (a reader's choice, kept in the browser; not part of the notes) | `tools/map_themes.py`, contrast checked by `tests/contrast.py` in the kit |
-| The relations as a network, freshness (recently changed notes glow and float in front, untouched ones sink back), stale follow-ups, missing references, replay of the history (9, 10) | `tools/build-notes-map.py` writes `graph.html` (`tools/notes_graph.py`, `tools/graph-template.html`) |
+| The relations as a network grown like a colony (the read-order notes in the middle, every note in a ring by its distance in links), freshness (recently changed notes glow and are lifted a little), stale follow-ups, missing references, replay of the history (9, 10) | `tools/build-notes-map.py` writes `graph.html` (`tools/notes_graph.py`, `tools/graph-template.html`) |
 | Mirror (8.4); refuses a target that overlaps the repository or holds other files; `--dry-run`; `MIRROR_SCOPE`, `--strict` | `tools/mirror-push` |
 | Restore drill with history and working-copy verdicts (8.4, 11.6) | `tools/restore-drill` |
 | The first run: questions, then where the owner stands (11.5a) | the skill's setup mode, `template/notes/getting-started.md`, the summary `tools/bootstrap` prints at the end |

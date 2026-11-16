@@ -89,7 +89,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 <div id="left"><div id="head" class="box"><button id="fold" type="button" aria-expanded="true" aria-controls="head" title="Hide the search and the legend">&minus;</button><h1>%%TITLE%%</h1><p id="stats"></p>
 <input id="q" type="search" placeholder="Find a note..." aria-label="Find a note"><div id="legend" role="group" aria-label="Show or hide a group of notes"></div></div>
 <div id="time" class="box" hidden><button id="play" type="button">Replay</button><span id="when"></span><input id="slide" type="range" min="0" value="0" aria-label="Position in the history of the notes"><div id="what"></div><label id="speedl"><span class="lbl">Speed </span><select id="speed" aria-label="Replay speed"><option value="0.5">0.5x</option><option value="1" selected>1x</option><option value="2">2x</option><option value="4">4x</option></select></label></div></div>
-<div id="tools" class="box"><button id="find" type="button" aria-expanded="false" aria-controls="head">Find</button><a href="index.html">Map</a><button id="fit" type="button" title="Fit the whole network in view">Fit</button><button id="depth" type="button" aria-pressed="true" title="Depth: recently changed notes float in front, notes untouched for longest sink to the back. Turn the view with Shift-drag or right-drag, two fingers moved together, or a sideways trackpad swipe; Fit turns it back.">Depth</button>%%THEME_PICKER%%</div>
+<div id="tools" class="box"><button id="find" type="button" aria-expanded="false" aria-controls="head">Find</button><a href="index.html">Map</a><button id="fit" type="button" title="Fit the whole network in view">Fit</button><button id="depth" type="button" aria-pressed="true" title="Depth: the colony as a dome, with recently changed notes lifted a little. Turn the view with Shift-drag or right-drag, two fingers moved together, or a sideways trackpad swipe; Fit turns it back.">Depth</button>%%THEME_PICKER%%</div>
 <aside id="panel" class="box" hidden aria-live="polite"></aside>
 <nav class="sr" aria-label="All notes"><ul>%%LINKS%%</ul></nav>
 <script id="data" type="application/json">%%DATA%%</script>
@@ -132,7 +132,7 @@ function sprite(color){
 var hidden={},adj=[],E=[];
 function hash(i){var s=Math.sin(i*127.1+311.7)*43758.5453;return s-Math.floor(s)}
 NODES.forEach(function(n,i){
-  n.i=i;n.vis=false;n.ap=0;n.vx=0;n.vy=0;n.touch=-1;n.z=n.zt=.5;n.px=n.py=0;n.ps=1;n.pz=0;n.pr=n.r||1;
+  n.i=i;n.vis=false;n.ap=0;n.vx=0;n.vy=0;n.touch=-1;n.z=n.zt=.5;n.rec=.5;n.ring=0;n.px=n.py=0;n.ps=1;n.pz=0;n.pr=n.r||1;
   var a=i*2.399963,r=24*Math.sqrt(i+1);n.x0=n.x=Math.cos(a)*r;n.y0=n.y=Math.sin(a)*r;
   n.r=(2.8+Math.min(3.8,Math.sqrt(n.in)*1.05)+Math.min(1.2,Math.log10(1+n.kb)*.6)+(n.hub?1:0))*(n.hist?.8:1);   /* about 2.8 to 8.8: the largest note about three times the smallest, so hubs do not swamp their neighbours */
   n.low=(n.name+" "+n.title+" "+n.rel).toLowerCase();adj.push([]);
@@ -148,9 +148,11 @@ var cam={x:0,y:0,k:1,tx:0,ty:0,tk:1},autoFit=true,W=0,H=0,DPR=1,lastT=0,VS=1;
 function gcol(g){var c=GCI[g]||[0,g],p=c[0]?T.quiet:T.pal;return p[c[1]%p.length]}
 
 /* ---------- depth ----------
-   The notes float at different depths: the most recently changed ones in front, the ones untouched for longest at the back,
-   smaller, fainter and without their shine. Depth is a rank among the notes in view (ties share it), so it spreads evenly
-   whatever the project's pace, and a replay pulls each commit's notes forward while the rest recede. The camera looks from
+   In depth the colony (below) is a dome: its middle toward the viewer, its rim falling back. Recency adds a small lift: the
+   most recently changed notes stand a little above the dome, the ones untouched for longest a little below it, smaller, fainter
+   and without their shine. Recency is a rank among the notes in view (ties share it), so it spreads evenly whatever the
+   project's pace, and a replay lifts each commit's notes while the rest settle. The network turns on the colony's own axis,
+   about its centre of mass (or a selected note). The camera looks from
    slightly above; left alone for a few seconds the network turns slowly, about once a minute, around its centre after Fit, around
    the selected note if there is one, otherwise around the note nearest the middle of the screen (not with reduced motion, and not
    while the pointer rests on a note). A turn keeps its momentum when it is let go, slows to that idle pace and sets its direction
@@ -163,7 +165,7 @@ var depthOn=true,depthAmt=1,rot={x:0,y:0,home:false},tilt={x:0,y:0},ZS=0,cyw=1,s
 /* the idle turn: on = turning by itself; dir = its direction (set by the last turn the reader made); vy, vx = the current turning
    speed in radians per ms (a released turn starts at its own speed); last = time of the last interaction; node = the pivot note
    chosen when the turn started without a selection; samples = recent positions of a turn in progress, for its release speed */
-var SPIN=6.2832/60000,IDLE=3000,spin={on:false,dir:1,vy:0,vx:0,last:performance.now(),node:-1,samples:[]};
+var SPIN=6.2832/60000,IDLE=3000,TILT=.45,spin={on:false,dir:1,vy:0,vx:0,last:performance.now(),node:-1,samples:[]};
 function poke(){spin.last=performance.now();spin.on=false;spin.node=-1}   /* the reader did something: stop turning by itself for a while */
 function sample(){var t=performance.now();spin.samples.push({t:t,y:rot.y,x:rot.x});while(spin.samples.length>2&&t-spin.samples[0].t>120)spin.samples.shift()}
 function release(){   /* a turn was let go: keep its speed (then slow to the idle pace) and its direction */
@@ -174,7 +176,7 @@ function release(){   /* a turn was let go: keep its speed (then slow to the idl
   if(Math.abs(vy)>.00025)spin.dir=vy>0?1:-1;
 }
 function pivotTarget(){   /* the point the network turns about */
-  if(autoFit||!P)return {x:C.x,y:C.y,z:.5};
+  if(autoFit||!P){var mx=0,my=0,c=0;NODES.forEach(function(n){if(n.vis){mx+=n.x;my+=n.y;c++}});return c?{x:mx/c,y:my/c,z:.5}:{x:0,y:0,z:.5}}   /* the centre of mass of the notes in view */
   var n=sel>=0?NODES[sel]:spin.node>=0?NODES[spin.node]:null;
   return spin.on&&n&&n.vis?{x:n.x,y:n.y,z:n.z}:P;
 }
@@ -195,14 +197,45 @@ function leash(){   /* never lose the network: when fewer than three notes are o
 function minK(){return Math.max(.12,(cam.fk||.3)*.5)}   /* zooming out stops at half the size Fit gives */
 function depthTargets(){
   var vs=NODES.filter(function(n){return n.vis&&n.touch>=0}).sort(function(a,b){return b.touch-a.touch}),m=Math.max(1,vs.length-1),k0=0;
-  NODES.forEach(function(n){if(n.touch<0)n.zt=1});
-  vs.forEach(function(n,k){if(k&&n.touch!==vs[k-1].touch)k0=k;n.zt=Math.max(0,Math.min(1,.8*k0/m+.2*hash(n.i+11)))});
+  NODES.forEach(function(n){if(n.touch<0)n.rec=1});
+  vs.forEach(function(n,k){if(k&&n.touch!==vs[k-1].touch)k0=k;n.rec=Math.max(0,Math.min(1,.8*k0/m+.2*hash(n.i+11)))});
+  colony();
 }
+/* ---------- the colony ----------
+   The notes grow like a fungal colony from its food: the read-order notes (the "Start here" group; without it the hubs) sit in
+   the middle, and every other note in a ring by how many links it is from them. Notes no link reaches sit on the rim like stray
+   spores. RR[k] is the radius of ring k, wide enough for the notes in it; RM is the colony's radius. In depth the colony is a dome:
+   the middle bulges toward the viewer, the rim falls back, and a recently changed note is lifted a little above the surface. */
+var RR=[0],RM=200;
+function colony(){
+  var vs=NODES.filter(function(n){return n.vis}),core=vs.filter(function(n){return D.groups[n.g]&&D.groups[n.g].id==="start"});
+  if(!core.length)core=vs.filter(function(n){return n.hub});
+  if(!core.length&&vs.length)core=[vs.slice().sort(function(a,b){return b.in-a.in})[0]];
+  var key=function(n){return n.g*1e4+n.i};   /* siblings in group order: each group's threads grow side by side */
+  NODES.forEach(function(n){n.ring=-1;n.kids=[]});core.sort(function(a,b){return key(a)-key(b)}).forEach(function(n){n.ring=0});
+  var fr=core,d=0;   /* breadth first: a note's parent is the first ring-closer note that links to it */
+  while(fr.length){var nx=[];fr.forEach(function(n){adj[n.i].map(function(a){return a.n}).sort(function(a,b){return key(a)-key(b)}).forEach(function(m){
+    if(m.vis&&m.ring<0){m.ring=d+1;n.kids.push(m);nx.push(m)}})});fr=nx;d++}
+  var mx=0;vs.forEach(function(n){if(n.ring>mx)mx=n.ring});
+  var spores=vs.filter(function(n){return n.ring<0});spores.forEach(function(n){n.ring=mx+1});
+  var cnt=[];vs.forEach(function(n){cnt[n.ring]=(cnt[n.ring]||0)+1});
+  var S=68;for(var k=1;k<cnt.length;k++)S=Math.max(S,(cnt[k]||0)*26/(6.2832*k));S=Math.min(S,130);   /* ring spacing: room for the busiest ring; a crowded ring becomes a thicker band */
+  RR=[core.length>1?S*.35:0];for(k=1;k<cnt.length;k++)RR[k]=k*S;
+  if(spores.length&&mx>0)RR[mx+1]=RR[mx]+S*.5;   /* notes no link reaches: just outside the outer ring */
+  RM=Math.max(120,RR[RR.length-1]+30);
+  function wgt(n){var w=1;n.kids.forEach(function(c){w+=wgt(c)});n.w=w;return w}
+  function place(n,a,span){n.ang=a+span/2;var x=a;n.kids.forEach(function(c){var sp=span*c.w/Math.max(1,n.w-1);place(c,x,sp);x+=sp})}
+  var tot=0;core.forEach(function(c){tot+=wgt(c)});
+  var a0=-Math.PI/2;core.forEach(function(c){var sp=6.2832*c.w/Math.max(1,tot);place(c,a0,sp);a0+=sp});   /* each branch gets a sector by its size */
+  spores.forEach(function(n){n.ang=hash(n.i+3)*6.2832});
+  vs.forEach(function(n){var r=RR[n.ring]||0;n.cx=Math.cos(n.ang)*r;n.cy=Math.sin(n.ang)*r});
+}
+function domeZ(n){var s=Math.min(1,Math.hypot(n.x,n.y)/RM);return .85*(1-Math.sqrt(1-s*s))+.15*(n.rec==null?.5:n.rec)}
 function proj(x,y,z){   /* world position and depth (0 front, 1 back) -> [screen x, screen y, scale, distance after turning, apparent x, apparent y] */
   var ax=x,ay=y,sc=1,Z2=0;
   if(depthAmt>0&&P){   /* turn about the pivot (the network's centre, or a note), then look at the result like a flat picture: the camera pans and zooms it */
-    var X=x-P.x,Y=(y-P.y)*VS,Z=(z-P.z)*ZS*depthAmt,X1=X*cyw+Z*syw,Z1=Z*cyw-X*syw,Y1=Y*cpt-Z1*spt,f=ZS*1.9;
-    Z2=Z1*cpt+Y*spt;sc=f/Math.max(f*.3,f+Z2);ax=P.x+X1*sc;ay=P.y+Y1*sc/VS;
+    var X=x-P.x,Y=(y-P.y)*VS,Z=(z-P.z)*ZS*depthAmt,X1=X*cyw-Y*syw,Yr=X*syw+Y*cyw,Y1=Yr*cpt-Z*spt,f=ZS*2.4;   /* spin in the colony's own plane, then tilt */
+    Z2=Z*cpt+Yr*spt;sc=f/Math.max(f*.3,f+Z2);ax=P.x+X1*sc;ay=P.y+Y1*sc/VS;
   }
   return [(ax-cam.x)*cam.k+W/2,(ay-cam.y)*cam.k*VS+H/2,sc,Z2,ax,ay];
 }
@@ -219,12 +252,13 @@ function project(now,dt){
     var sg=spin.on&&depthOn&&!reduce&&hov<0?spin.dir*SPIN:0;
     spin.vy=sg+(spin.vy-sg)*Math.exp(-dt/(Math.abs(spin.vy)>Math.abs(sg)?700:1600));spin.vx*=Math.exp(-dt/350);
     rot.y+=spin.vy*dt;rot.x=Math.max(-1.45,Math.min(1,rot.x+spin.vx*dt));
+    if(spin.on&&!reduce&&rot.x<TILT)rot.x+=(TILT-rot.x)*Math.min(1,dt/1500);   /* turning by itself: tilt to show the dome */
   }
   var yaw=depthAmt*(rot.y+tilt.y),pitch=depthAmt*(rot.x+tilt.x+.2);
   cyw=Math.cos(yaw);syw=Math.sin(yaw);cpt=Math.cos(pitch);spt=Math.sin(pitch);
   var x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
-  NODES.forEach(function(n){if(!n.vis)return;n.z+=(n.zt-n.z)*(n.ap<.05?1:Math.min(1,dt/900));x0=Math.min(x0,n.x);x1=Math.max(x1,n.x);y0=Math.min(y0,n.y);y1=Math.max(y1,n.y)});
-  var zs=Math.max(160,Math.max(x1-x0,y1-y0)*.85);ZS=ZS?ZS+(zs-ZS)*.05:zs;
+  NODES.forEach(function(n){if(!n.vis)return;n.zt=domeZ(n);n.z+=(n.zt-n.z)*(n.ap<.05?1:Math.min(1,dt/900));x0=Math.min(x0,n.x);x1=Math.max(x1,n.x);y0=Math.min(y0,n.y);y1=Math.max(y1,n.y)});
+  var zs=Math.max(120,RM);ZS=ZS?ZS+(zs-ZS)*.05:zs;
   if(x0<x1||y0<y1){var cx1=(x0+x1)/2,cy1=(y0+y1)/2;if(!C)C={x:cx1,y:cy1};else{C.x+=(cx1-C.x)*.1;C.y+=(cy1-C.y)*.1}}
   if(C){var pt=pivotTarget();if(!P)P={x:pt.x,y:pt.y,z:pt.z};else if(pt!==P){var pe=reduce?1:Math.min(1,dt/450);P.x+=(pt.x-P.x)*pe;P.y+=(pt.y-P.y)*pe;P.z+=(pt.z-P.z)*pe}}
   var kk=Math.max(.7,Math.min(1.6,cam.k)),lo=1e9,hi=-1e9;
@@ -294,14 +328,11 @@ function tick(){
   E.forEach(function(e){
     if(!e.a.vis||!e.b.vis)return;
     var dx=e.b.x-e.a.x,dy=e.b.y-e.a.y,d=Math.sqrt(dx*dx+dy*dy)+.01,L=40+e.a.r+e.b.r+26/Math.sqrt(e.w);
-    var f=(d-L)/d*.05*a*Math.min(2,.6+Math.sqrt(e.w)*.3);
+    var f=(d-L)/d*.016*a*Math.min(2,.6+Math.sqrt(e.w)*.3);   /* soft: the colony's shape leads, the links bend it */
     e.a.vx+=dx*f;e.a.vy+=dy*f;e.b.vx-=dx*f;e.b.vy-=dy*f;
   });
-  var cen={};
-  vs.forEach(function(n){var c=cen[n.g]||(cen[n.g]={x:0,y:0,c:0});c.x+=n.x;c.y+=n.y;c.c++});
   vs.forEach(function(n){
-    var c=cen[n.g];n.vx+=(c.x/c.c-n.x)*.012*a;n.vy+=(c.y/c.c-n.y)*.012*a;
-    var gr=(n.hub?.03:adj[n.i].length?.007:.016)*a;n.vx-=n.x*gr;n.vy-=n.y*gr;   /* a note nobody mentions is pulled in a little harder, so it does not drift out of the picture */
+    if(n.cx!=null){var f=.1*a;n.vx+=(n.cx-n.x)*f;n.vy+=(n.cy-n.y)*f}   /* each note toward its place in the colony: its ring, in its branch's direction */
     if(n.fixed){n.vx=n.vy=0;return}
     var dmp=calm?.6:.8,cap=calm?3:14;
     n.vx*=dmp;n.vy*=dmp;var sp=Math.sqrt(n.vx*n.vx+n.vy*n.vy);if(sp>cap){n.vx*=cap/sp;n.vy*=cap/sp}
@@ -314,13 +345,8 @@ function fitTarget(soft){
   var x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
   vs.forEach(function(n){var x=n.wx==null?n.x:n.wx,y=n.wy==null?n.y:n.wy,r=n.r*2*(n.ps||1);x0=Math.min(x0,x-r);x1=Math.max(x1,x+r);y0=Math.min(y0,y-r);y1=Math.max(y1,y+r)});   /* what is on screen: with depth, the turned picture */
   var wide=W>700,bw=Math.max(80,x1-x0),bh=Math.max(80,y1-y0)*VS,padX=wide?382:32,padY=wide?80:176;
-  var nk=Math.max(.15,Math.min(2.2,Math.min((W-padX)/bw,(H-padY)/bh)))*(1-.1*depthAmt),nx=(x0+x1)/2-(wide?171/nk:0),ny=(y0+y1)/2;   /* centre the network in the space right of the left column */
-  if(depthAmt>0&&C&&ZS){   /* turning: fit the sphere the network turns in, so the zoom stays put while it turns */
-    var ds=vs.map(function(n){return Math.hypot(n.x-C.x,(n.y-C.y)*VS,(n.z-.5)*ZS*depthAmt)+n.r*2}).sort(function(a,b){return a-b}),
-        R=Math.max(40,ds[Math.min(ds.length-1,Math.floor(ds.length*.95))]);   /* the 95th percentile: a few far-out notes do not shrink the whole picture */
-    var f=ZS*1.9,sm=f/Math.max(f*.3,f-R);
-    nk=Math.max(.15,Math.min(2.2,Math.min(W-padX,H-padY)/(2*R*sm)));nx=C.x-(wide?171/nk:0);ny=C.y;
-  }
+  var nk=Math.max(.15,Math.min(2.2,Math.min((W-padX)/bw,(H-padY)/bh)))*(1-.04*depthAmt),nx=(x0+x1)/2-(wide?171/nk:0),ny=(y0+y1)/2;   /* centre the network in the space right of the left column */
+  if(cam.fit&&!soft){var e=Math.min(1,(fitTarget.dt||16)/1100);cam.tk+=(nk-cam.tk)*e;cam.tx+=(nx-cam.tx)*e;cam.ty+=(ny-cam.ty)*e;cam.fk=cam.tk;return}   /* the zoom glides to what fills the screen now */
   /* soft (during a replay): ignore small changes of the bounding box, so one node drifting at the edge does not make the whole picture breathe */
   if(soft&&cam.fit&&Math.abs(nk-cam.tk)/cam.tk<.07&&Math.hypot(nx-cam.tx,ny-cam.ty)*cam.tk<30)return;
   cam.tk=nk;cam.tx=nx;cam.ty=ny;cam.fit=true;cam.fk=nk;
@@ -511,7 +537,7 @@ function frame(now){
   NODES.forEach(function(n){if(n.vis&&n.ap<1)n.ap=Math.min(1,n.ap+dt/650);if(!n.vis)n.ap=0});
   if(alpha>0){tick();if(!playing)tick()}
   if(!spin.on&&!drag&&!pinch&&depthOn&&!reduce&&now-spin.last>IDLE){spin.on=true;if(sel>=0)autoFit=false;else if(!autoFit)spin.node=nearMiddle()}
-  if(autoFit)fitTarget(playing||depthAmt>0);   /* small changes (a replay, notes settling) are ignored, or the view would breathe */
+  fitTarget.dt=dt;if(autoFit)fitTarget(playing);   /* the fit glides with the turning picture; during a replay small changes are ignored */
   else if(spin.on&&P&&(sel>=0||spin.node>=0)){cam.tx=P.x;cam.ty=P.y}   /* turning about a note: keep it in the middle */
   else if(!drag&&!pinch)leash();
   var k=playing?.045:.1;cam.x+=(cam.tx-cam.x)*k;cam.y+=(cam.ty-cam.y)*k;cam.k+=(cam.tk-cam.k)*k;
@@ -575,11 +601,11 @@ cv.addEventListener("pointermove",function(ev){
   spin.last=performance.now();
   if(drag.turn){turnTo(drag.ry+dx*.005,drag.rx-dy*.005);sample();return}   /* Shift-drag turns the view */
   if(drag.id>=0){var n=NODES[drag.id];
-    if(depthAmt>0){n.x=drag.nx+dx*cyw/(cam.k*n.ps);n.y=drag.ny+dy*cpt/(cam.k*n.ps*VS)}   /* turned: follow the finger along the note's own axes */else{var w=world(ev.clientX,ev.clientY);n.x=w.x;n.y=w.y}
+    if(depthAmt>0){var u=dx/(cam.k*n.ps),v=dy/(cam.k*n.ps*Math.max(.3,cpt));n.x=drag.nx+u*cyw+v*syw;n.y=drag.ny+(-u*syw+v*cyw)/VS}   /* turned: follow the finger along the note's own axes */else{var w=world(ev.clientX,ev.clientY);n.x=w.x;n.y=w.y}
     alpha=Math.max(alpha,.35)}
   else{autoFit=false;var ex=ev.clientX-drag.lx,ey=ev.clientY-drag.ly,res=notesInView()<needOn()?.3:1;drag.lx=ev.clientX;drag.ly=ev.clientY;   /* past the edge of the network the view pulls back like a rubber band */
     cam.tx-=ex*res/cam.k;cam.ty-=ey*res/(cam.k*VS);cam.x=cam.tx;cam.y=cam.ty;
-    if(depthOn&&!reduce){tilt.y=Math.max(-.3,Math.min(.3,tilt.y+(ev.movementX||0)*.002));tilt.x=Math.max(-.2,Math.min(.2,tilt.x-(ev.movementY||0)*.002))}}   /* a pan tilts the view a little; it springs back */
+    if(depthOn&&!reduce){tilt.x=Math.max(-.2,Math.min(.2,tilt.x-(ev.movementY||0)*.002))}}   /* a pan tilts the view a little; it springs back */
 });
 cv.addEventListener("pointercancel",function(ev){endPointer(ev);if(drag&&drag.id>=0)NODES[drag.id].fixed=false;drag=null;cv.classList.remove("drag")});
 cv.addEventListener("pointerup",function(ev){

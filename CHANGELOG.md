@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.26.0
+The mycelium view grows like a colony.
+- **A colony layout**: the read-order notes (the "Start here" group, or the most-mentioned notes without one) sit in the middle, like the food a fungus grows from. Every other note sits in a ring by how many links it is from them, in the direction of the note that leads to it, and each branch gets a sector by its size, so the threads radiate outward like hyphae instead of hanging in clumps like roots. A crowded ring becomes a thicker band; notes no link reaches sit just outside the rim like stray spores. Links still pull related notes together, more softly than before.
+- **A dome with a little recency**: in depth the colony is a half sphere, its middle toward the viewer. Recently changed notes are lifted a little above the dome (and still glow); the ones untouched for longest sit a little below it. A replay lifts each commit's notes and the colony visibly grows outward.
+- **Turning like a planet, not a galaxy**: the network turns on the colony's own axis about the centre of mass of the notes in view (or the selected note), and while it turns by itself it tilts to show the dome.
+- **A fit that fills the screen and glides**: Fit now uses the picture as it is at each moment, so the colony fills as much of the screen as it can at every angle, and the zoom glides there over about a second instead of jumping. The colony is drawn about twice as large as in 0.25.0 on a real notes repository.
+
 ## 0.25.0
 The mycelium view moves more calmly and more like an object you can spin.
 - **A steady turn instead of a sway**: left alone for three seconds (no click, drag, zoom or key), the network turns slowly, about once a minute, in one direction. Before, it swayed back and forth and Fit kept re-measuring the turned picture, so the view seemed to zoom in and out. Fit now measures the sphere the network turns in (ignoring the farthest few notes), so the zoom holds still while it turns. The turn pauses while the pointer rests on a note, needs Depth on, and never happens with reduced motion.
