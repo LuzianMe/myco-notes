@@ -132,7 +132,7 @@ function sprite(color){
 var hidden={},adj=[],E=[];
 function hash(i){var s=Math.sin(i*127.1+311.7)*43758.5453;return s-Math.floor(s)}
 NODES.forEach(function(n,i){
-  n.i=i;n.vis=false;n.ap=0;n.vx=0;n.vy=0;n.touch=-1;n.z=n.zt=.5;n.rec=.5;n.ring=0;n.px=n.py=0;n.ps=1;n.pz=0;n.pr=n.r||1;
+  n.i=i;n.vis=false;n.ap=0;n.vx=0;n.vy=0;n.touch=-1;n.z=n.zt=.5;n.rec=.5;n.ring=0;n.spore=true;n.px=n.py=0;n.ps=1;n.pz=0;n.pr=n.r||1;
   var a=i*2.399963,r=24*Math.sqrt(i+1);n.x0=n.x=Math.cos(a)*r;n.y0=n.y=Math.sin(a)*r;
   n.r=(2.8+Math.min(3.8,Math.sqrt(n.in)*1.05)+Math.min(1.2,Math.log10(1+n.kb)*.6)+(n.hub?1:0))*(n.hist?.8:1);   /* about 2.8 to 8.8: the largest note about three times the smallest, so hubs do not swamp their neighbours */
   n.low=(n.name+" "+n.title+" "+n.rel).toLowerCase();adj.push([]);
@@ -140,7 +140,7 @@ NODES.forEach(function(n,i){
 D.edges.forEach(function(e,k){
   /* dir: 1 = a mentions b, -1 = b mentions a, 0 = they mention each other */
   var a=NODES[e[0]],b=NODES[e[1]],o={a:a,b:b,w:e[2]+e[3],k:k,off:(hash(k)-.5)*.34,dir:e[2]&&e[3]?0:e[2]?1:-1};
-  E.push(o);adj[a.i].push({n:b,e:o,out:e[2]>0,inn:e[3]>0});adj[b.i].push({n:a,e:o,out:e[3]>0,inn:e[2]>0});
+  a.spore=b.spore=false;E.push(o);adj[a.i].push({n:b,e:o,out:e[2]>0,inn:e[3]>0});adj[b.i].push({n:a,e:o,out:e[3]>0,inn:e[2]>0});
 });
 var cur=NC;                                   /* commits applied: 0..NC */
 var hov=-1,sel=-1,match=null,alpha=1,playing=false,acc=0,ripples=[];
@@ -224,7 +224,7 @@ function colony(){
   var cnt=[];vs.forEach(function(n){cnt[n.ring]=(cnt[n.ring]||0)+1});
   var big=0;for(var k=1;k<cnt.length;k++)big=Math.max(big,cnt[k]||0);
   var S=Math.max(70,Math.min(130,Math.sqrt(big)*12));   /* ring spacing: room for the busiest ring around its sphere */
-  RR=[core.length>1?S*.4:0];for(k=1;k<=mx;k++)RR[k]=k*S;if(spores.length)RR[mx+1]=(mx||1)*S+S*.6;
+  RR=[core.length>1?S*.4:0];for(k=1;k<=mx;k++)RR[k]=k*S;if(spores.length)RR[mx+1]=(mx||1)*S*.85;   /* spores: inside the outer third, not beyond */
   function fib(list){var m=list.length;list.forEach(function(n,i){var z=1-2*(i+.5)/m,r=Math.sqrt(Math.max(0,1-z*z)),a=i*2.39996;n.dx=r*Math.cos(a);n.dy=r*Math.sin(a);n.dz=z})}
   fib(core);fib(vs.filter(function(n){return n.ring===1}).sort(function(a,b){return key(a)-key(b)}));fib(spores);
   vs.slice().sort(function(a,b){return a.ring-b.ring}).forEach(function(n){   /* further notes: the parent's direction, bent a little */
@@ -335,7 +335,8 @@ function tick(){
     e.a.vx+=dx*f;e.a.vy+=dy*f;e.b.vx-=dx*f;e.b.vy-=dy*f;
   });
   vs.forEach(function(n){
-    if(n.cx!=null){var f=.1*a;n.vx+=(n.cx-n.x)*f;n.vy+=(n.cy-n.y)*f}   /* each note toward its place in the colony: its ring, in its branch's direction */
+    if(n.cx!=null){var f=.1*a;n.vx+=(n.cx-n.x)*f;n.vy+=(n.cy-n.y)*f;
+      var rr=Math.hypot(n.x,n.y),cap=RM-20;if(rr>cap){n.vx-=n.x*(rr-cap)/rr*.08;n.vy-=n.y*(rr-cap)/rr*.08}}   /* nothing drifts beyond the colony's edge */   /* each note toward its place in the colony: its ring, in its branch's direction */
     if(n.fixed){n.vx=n.vy=0;return}
     var dmp=calm?.6:.8,cap=calm?3:14;
     n.vx*=dmp;n.vy*=dmp;var sp=Math.sqrt(n.vx*n.vx+n.vy*n.vy);if(sp>cap){n.vx*=cap/sp;n.vy*=cap/sp}
@@ -372,9 +373,18 @@ function curve(e,t){
    joined by an even thread with a tip at both ends, like two hyphae that met and fused. A new thread grows along its length
    instead of fading in. Everything is in screen pixels. */
 function srad(n){return n.pr}
+/* Threads are fractal, like hyphae: midpoint displacement bends the curve sideways and in depth, each halving step with about
+   half the amplitude, so there are slow bends with small wiggles on them. The shape comes from the thread's own seed, so it
+   never flickers. Long threads carry one or two faint side branches that lead nowhere (decoration, not links). */
+function frac(seed,n){var a=[],i,amp=1,st=n;for(i=0;i<=n;i++)a[i]=0;while(st>1){var h=st/2;for(i=h;i<n;i+=st)a[i]=(a[i-h]+a[i+h])/2+(hash(seed+i*7.13)-.5)*amp;amp*=.55;st=h}return a}
 function hyphaPath(e){
-  var P=[],N=16,s,p;
-  for(s=0;s<=N;s++){p=curve(e,s/N);var q=proj(p.x,p.y,e.a.z+(e.b.z-e.a.z)*s/N);P.push([q[0],q[1]])}
+  var P=[],N=32,s,p,W=[];
+  if(!e.fx){e.fx=frac(e.k*3.1+.7,N);e.fz=frac(e.k*5.7+1.3,N)}
+  var dx=e.b.x-e.a.x,dy=e.b.y-e.a.y,L=Math.hypot(dx,dy)||1,am=.11,ux=-dy/L,uy=dx/L;
+  var px=L*cam.k,st=px<50?8:px<110?4:px<220?2:1;   /* level of detail: a short thread on screen needs few points */
+  for(s=0;s<=N;s+=st){p=curve(e,s/N);var o=e.fx[s]*L*am,wx=p.x+ux*o,wy=p.y+uy*o,wz=e.a.z+(e.b.z-e.a.z)*s/N+(ZS?e.fz[s]*L*am/ZS:0);
+    W.push([wx,wy,wz]);var q=proj(wx,wy,wz);P.push([q[0],q[1]])}
+  e.W=W;e.L=L;
   return clipEnd(clipEnd(P,srad(e.b)+1.5).reverse(),srad(e.a)+1.5).reverse();   /* from the rim of a to the rim of b */
 }
 function clipEnd(P,r){   /* drop the points inside the circle of radius r around the last point, ending exactly on its rim */
@@ -411,8 +421,17 @@ function budRGB(n){
     shades[k]=(T.dark?[r*.72,g*.72,b*.72]:[r+(255-r)*.3,g+(255-g)*.3,b+(255-b)*.3]).map(Math.round).join(",")}
   return shades[k];
 }
+function twigs(e,w,col){   /* faint side branches on long threads: decoration only */
+  if(!e.W||e.L*cam.k<150)return;var nb=e.L*cam.k>260?2:1,ga=cx.globalAlpha;cx.strokeStyle=col;cx.lineWidth=Math.max(.5,w*.35);cx.globalAlpha=ga*.5;
+  for(var b=0;b<nb;b++){var t=.3+.4*hash(e.k+b*3.3),i=Math.round(t*(e.W.length-1)),p0=e.W[i],p1=e.W[Math.min(e.W.length-1,i+1)],
+    tx=p1[0]-p0[0],ty=p1[1]-p0[1],tl=Math.hypot(tx,ty)||1,sg=hash(e.k+b*5.1)<.5?-1:1,an=sg*(.5+.4*hash(e.k+b)),
+    c=Math.cos(an),sn=Math.sin(an),vx=(tx*c-ty*sn)/tl,vy=(tx*sn+ty*c)/tl,len=e.L*(.1+.08*hash(e.k+b*2.2)),f=frac(e.k*9.1+b,8);
+    cx.beginPath();for(var j=0;j<=8;j++){var u=j/8,o=f[j]*len*.25,q=proj(p0[0]+vx*len*u-vy*o,p0[1]+vy*len*u+vx*o,p0[2]);if(j)cx.lineTo(q[0],q[1]);else cx.moveTo(q[0],q[1])}
+    cx.stroke()}
+  cx.globalAlpha=ga;
+}
 function hypha(e,w,grow,col,tipA){
-  var P=hyphaPath(e);if(P.length<2)return;
+  var P=hyphaPath(e);if(P.length<2)return;if(grow>=1)twigs(e,w,col);
   var tot=0,i;for(i=1;i<P.length;i++)tot+=Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1]);
   if(tot<2)return;
   var tr=.9+w*.9;cx.fillStyle=col;
@@ -497,9 +516,9 @@ function draw(now){
     var col=n.due?T.wilt:gcol(n.g);
     cx.globalAlpha=Math.min(1,n.ap)*d*(n.hist?.55:1)*(.14+.6*rec+(n.hub?.2:0)+.12*fz)*(1-.3*fz);
     var gs=r*(n.hub?3.4:2.8)*(1+.25*fz),gm=Math.max(r*1.6,(n.nn||1e9)*(n.hub?1.3:1.15));if(gs>gm){cx.globalAlpha*=.25+.75*gm/gs;gs=gm}   /* crowded: a smaller, fainter glow */
-    cx.drawImage(sprite(col),x-gs,y-gs,gs*2,gs*2);
+    if(!n.spore)cx.drawImage(sprite(col),x-gs,y-gs,gs*2,gs*2);   /* a spore (no link at all) has no glow */
     cx.globalAlpha=Math.min(1,n.ap)*d*(n.hist?.6:1)*fog;
-    cx.fillStyle=col;cx.beginPath();cx.arc(x,y,r,0,6.3);cx.fill();cx.globalAlpha*=1-fz;cx.fillStyle="rgba(255,255,255,"+(T.dark?.28:.4)+")";cx.beginPath();cx.arc(x-r*.28,y-r*.3,r*.38,0,6.3);cx.fill();cx.globalAlpha=Math.min(1,n.ap)*d*(n.hist?.6:1)*fog;
+    if(n.spore){cx.strokeStyle=col;cx.lineWidth=1.3;cx.beginPath();cx.arc(x,y,Math.max(1.5,r*.8),0,6.3);cx.stroke();cx.globalAlpha=0}else{cx.fillStyle=col;cx.beginPath();cx.arc(x,y,r,0,6.3);cx.fill()}cx.globalAlpha*=1-fz;cx.fillStyle="rgba(255,255,255,"+(T.dark?.28:.4)+")";cx.beginPath();cx.arc(x-r*.28,y-r*.3,r*.38,0,6.3);cx.fill();cx.globalAlpha=Math.min(1,n.ap)*d*(n.hist?.6:1)*fog;
     if(n.hub){   /* a hub (one of the most-mentioned notes of this project) carries two soft rings, like a fruiting body pushing up through the network */
       var ra=Math.min(1,n.ap)*d*fog;cx.strokeStyle=col;cx.lineWidth=1.4;
       cx.globalAlpha=ra*.55;cx.beginPath();cx.arc(x,y,Math.max(0,r*1.55+(reduce||playing?0:1.2*Math.sin(t/900+n.i))),0,6.3);cx.stroke();

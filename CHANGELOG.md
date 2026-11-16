@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.27.0
+- **Threads like hyphae**: every thread is bent by midpoint displacement (a fractal: slow bends with smaller wiggles on them, sideways and in depth), from its own fixed seed, so it never flickers. Long threads carry one or two faint side branches that lead nowhere: decoration, not links. Short threads on screen use fewer points, so drawing stays light.
+- **Spores stay inside the colony**: notes no link reaches now sit in the outer third of the ball instead of beyond it, drawn as small hollow circles without a glow, and no note drifts past the colony's edge. The fit no longer shrinks for a few far-out notes (about 10% larger on a real notes repository).
+
 ## 0.26.1
 The colony of 0.26.0 is now a ball, and it turns like a planet.
 - **Notes fill the colony instead of lining a bowl**: in 0.26.0 every note sat on the surface of the dome, so the colony looked like a bowl. Now the colony grows in all three dimensions: the notes one link from the read-order notes point in directions spread evenly over a sphere (notes of the same group side by side), every further note grows on in roughly its parent's direction, and distances vary inside each ring, so the threads radiate outward through the volume like mycelium grown into a ball. Depth is scaled by how far the layout actually spreads, so the ball stays round from every side.
