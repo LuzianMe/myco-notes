@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.26.1
+The colony of 0.26.0 is now a ball, and it turns like a planet.
+- **Notes fill the colony instead of lining a bowl**: in 0.26.0 every note sat on the surface of the dome, so the colony looked like a bowl. Now the colony grows in all three dimensions: the notes one link from the read-order notes point in directions spread evenly over a sphere (notes of the same group side by side), every further note grows on in roughly its parent's direction, and distances vary inside each ring, so the threads radiate outward through the volume like mycelium grown into a ball. Depth is scaled by how far the layout actually spreads, so the ball stays round from every side.
+- **Turning about the vertical axis**: 0.26.0 turned the colony on its own axis and tilted it, like a turntable. It now turns about the vertical axis through the centre of mass of the notes in view, like a planet, as asked for; there is no idle tilt.
+- **Recency at the tips**: recently changed notes reach a little further out (a colony grows at its tips) and still glow, instead of being lifted toward the viewer.
+
 ## 0.26.0
 The mycelium view grows like a colony.
 - **A colony layout**: the read-order notes (the "Start here" group, or the most-mentioned notes without one) sit in the middle, like the food a fungus grows from. Every other note sits in a ring by how many links it is from them, in the direction of the note that leads to it, and each branch gets a sector by its size, so the threads radiate outward like hyphae instead of hanging in clumps like roots. A crowded ring becomes a thicker band; notes no link reaches sit just outside the rim like stray spores. Links still pull related notes together, more softly than before.
