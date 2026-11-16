@@ -151,12 +151,48 @@ function gcol(g){var c=GCI[g]||[0,g],p=c[0]?T.quiet:T.pal;return p[c[1]%p.length
    The notes float at different depths: the most recently changed ones in front, the ones untouched for longest at the back,
    smaller, fainter and without their shine. Depth is a rank among the notes in view (ties share it), so it spreads evenly
    whatever the project's pace, and a replay pulls each commit's notes forward while the rest recede. The camera looks from
-   slightly above and sways a little (not with reduced motion); panning tilts it; Shift-drag, two fingers moved together (one
+   slightly above; left alone for a few seconds the network turns slowly, about once a minute, around its centre after Fit, around
+   the selected note if there is one, otherwise around the note nearest the middle of the screen (not with reduced motion, and not
+   while the pointer rests on a note). A turn keeps its momentum when it is let go, slows to that idle pace and sets its direction
+   until the next turn. Panning tilts the view a little; Shift-drag, two fingers moved together (one
    finger pans) or a sideways trackpad swipe turn it, all the way round, and tilt it up to about 70 degrees (never over the
    top). The network turns about its own centre; notes fade with their distance from the viewer, so from behind the oldest
    notes are the near, bright ones. Fit (or a double-click) turns it back to the front. With the Depth button off, the
    projection is exactly the flat view. */
-var depthOn=true,depthAmt=1,rot={x:0,y:0,home:false},tilt={x:0,y:0},ZS=0,cyw=1,syw=0,cpt=1,spt=0,C=null;
+var depthOn=true,depthAmt=1,rot={x:0,y:0,home:false},tilt={x:0,y:0},ZS=0,cyw=1,syw=0,cpt=1,spt=0,C=null,P=null;
+/* the idle turn: on = turning by itself; dir = its direction (set by the last turn the reader made); vy, vx = the current turning
+   speed in radians per ms (a released turn starts at its own speed); last = time of the last interaction; node = the pivot note
+   chosen when the turn started without a selection; samples = recent positions of a turn in progress, for its release speed */
+var SPIN=6.2832/60000,IDLE=3000,spin={on:false,dir:1,vy:0,vx:0,last:performance.now(),node:-1,samples:[]};
+function poke(){spin.last=performance.now();spin.on=false;spin.node=-1}   /* the reader did something: stop turning by itself for a while */
+function sample(){var t=performance.now();spin.samples.push({t:t,y:rot.y,x:rot.x});while(spin.samples.length>2&&t-spin.samples[0].t>120)spin.samples.shift()}
+function release(){   /* a turn was let go: keep its speed (then slow to the idle pace) and its direction */
+  var s=spin.samples,t=performance.now();spin.samples=[];spin.last=t;spin.on=depthOn&&!reduce;spin.node=-1;
+  if(reduce||s.length<2||t-s[s.length-1].t>90){spin.vy=spin.vx=0;return}
+  var a=s[0],b=s[s.length-1],d=Math.max(16,b.t-a.t),vy=(b.y-a.y)/d,vx=(b.x-a.x)/d;
+  spin.vy=Math.max(-.006,Math.min(.006,vy));spin.vx=Math.max(-.004,Math.min(.004,vx));   /* at most about one turn a second */
+  if(Math.abs(vy)>.00025)spin.dir=vy>0?1:-1;
+}
+function pivotTarget(){   /* the point the network turns about */
+  if(autoFit||!P)return {x:C.x,y:C.y,z:.5};
+  var n=sel>=0?NODES[sel]:spin.node>=0?NODES[spin.node]:null;
+  return spin.on&&n&&n.vis?{x:n.x,y:n.y,z:n.z}:P;
+}
+function nearMiddle(){   /* the note drawn nearest the middle of the free part of the screen */
+  var m=W>700?350:0,cxs=(W+m)/2,best=-1,bd=1e9;
+  NODES.forEach(function(n){if(!n.vis||n.ap<.3)return;var d=Math.hypot(n.px-cxs,n.py-H/2);if(d<bd){bd=d;best=n.i}});
+  return best;
+}
+function notesInView(){var m=W>700?350:0,c=0;NODES.forEach(function(n){if(n.vis&&n.ap>.3&&n.px>m&&n.px<W&&n.py>0&&n.py<H)c++});return c}
+function needOn(){var c=0;NODES.forEach(function(n){if(n.vis&&n.ap>.3)c++});return Math.min(cam.k>(cam.fk||1)*1.5?1:3,c)}   /* zoomed in closely, one note on screen is enough */
+function leash(){   /* never lose the network: when fewer than three notes are on screen, bring the nearest ones back to the middle */
+  var need=needOn();if(!need||notesInView()>=need)return;
+  var m=W>700?350:0,cxs=(W+m)/2,vs=NODES.filter(function(n){return n.vis&&n.ap>.3});
+  vs.sort(function(a,b){return Math.hypot(a.px-cxs,a.py-H/2)-Math.hypot(b.px-cxs,b.py-H/2)});
+  var gx=0,gy=0;vs.slice(0,need).forEach(function(n){gx+=n.wx;gy+=n.wy});
+  cam.tx=gx/need-(m/2)/cam.k;cam.ty=gy/need;
+}
+function minK(){return Math.max(.12,(cam.fk||.3)*.5)}   /* zooming out stops at half the size Fit gives */
 function depthTargets(){
   var vs=NODES.filter(function(n){return n.vis&&n.touch>=0}).sort(function(a,b){return b.touch-a.touch}),m=Math.max(1,vs.length-1),k0=0;
   NODES.forEach(function(n){if(n.touch<0)n.zt=1});
@@ -164,9 +200,9 @@ function depthTargets(){
 }
 function proj(x,y,z){   /* world position and depth (0 front, 1 back) -> [screen x, screen y, scale, distance after turning, apparent x, apparent y] */
   var ax=x,ay=y,sc=1,Z2=0;
-  if(depthAmt>0&&C){   /* turn about the network's centre, then look at the result like a flat picture: the camera pans and zooms it */
-    var X=x-C.x,Y=(y-C.y)*VS,Z=(z-.5)*ZS*depthAmt,X1=X*cyw+Z*syw,Z1=Z*cyw-X*syw,Y1=Y*cpt-Z1*spt,f=ZS*1.9;
-    Z2=Z1*cpt+Y*spt;sc=f/Math.max(f*.3,f+Z2);ax=C.x+X1*sc;ay=C.y+Y1*sc/VS;
+  if(depthAmt>0&&P){   /* turn about the pivot (the network's centre, or a note), then look at the result like a flat picture: the camera pans and zooms it */
+    var X=x-P.x,Y=(y-P.y)*VS,Z=(z-P.z)*ZS*depthAmt,X1=X*cyw+Z*syw,Z1=Z*cyw-X*syw,Y1=Y*cpt-Z1*spt,f=ZS*1.9;
+    Z2=Z1*cpt+Y*spt;sc=f/Math.max(f*.3,f+Z2);ax=P.x+X1*sc;ay=P.y+Y1*sc/VS;
   }
   return [(ax-cam.x)*cam.k+W/2,(ay-cam.y)*cam.k*VS+H/2,sc,Z2,ax,ay];
 }
@@ -178,13 +214,19 @@ function project(now,dt){
   if(rot.home){   /* back to the front by the shortest way round */
     var gy=Math.round(rot.y/6.2832)*6.2832,e=reduce?1:Math.min(1,dt/300);rot.y+=(gy-rot.y)*e;rot.x-=rot.x*e;
     if(Math.abs(gy-rot.y)<.002&&Math.abs(rot.x)<.002){rot.y=rot.x=0;rot.home=false}
+    spin.vy=spin.vx=0;
+  }else if(!(drag&&drag.turn&&drag.moved)&&!(pinch&&depthOn)){   /* momentum of a released turn, easing to the idle pace (or to rest) */
+    var sg=spin.on&&depthOn&&!reduce&&hov<0?spin.dir*SPIN:0;
+    spin.vy=sg+(spin.vy-sg)*Math.exp(-dt/(Math.abs(spin.vy)>Math.abs(sg)?700:1600));spin.vx*=Math.exp(-dt/350);
+    rot.y+=spin.vy*dt;rot.x=Math.max(-1.45,Math.min(1,rot.x+spin.vx*dt));
   }
-  var sw=reduce?0:1,yaw=depthAmt*(rot.y+tilt.y+sw*.2*Math.sin(now/6500)),pitch=depthAmt*(rot.x+tilt.x+.2+sw*.05*Math.sin(now/8300));
+  var yaw=depthAmt*(rot.y+tilt.y),pitch=depthAmt*(rot.x+tilt.x+.2);
   cyw=Math.cos(yaw);syw=Math.sin(yaw);cpt=Math.cos(pitch);spt=Math.sin(pitch);
   var x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
   NODES.forEach(function(n){if(!n.vis)return;n.z+=(n.zt-n.z)*(n.ap<.05?1:Math.min(1,dt/900));x0=Math.min(x0,n.x);x1=Math.max(x1,n.x);y0=Math.min(y0,n.y);y1=Math.max(y1,n.y)});
   var zs=Math.max(160,Math.max(x1-x0,y1-y0)*.85);ZS=ZS?ZS+(zs-ZS)*.05:zs;
   if(x0<x1||y0<y1){var cx1=(x0+x1)/2,cy1=(y0+y1)/2;if(!C)C={x:cx1,y:cy1};else{C.x+=(cx1-C.x)*.1;C.y+=(cy1-C.y)*.1}}
+  if(C){var pt=pivotTarget();if(!P)P={x:pt.x,y:pt.y,z:pt.z};else if(pt!==P){var pe=reduce?1:Math.min(1,dt/450);P.x+=(pt.x-P.x)*pe;P.y+=(pt.y-P.y)*pe;P.z+=(pt.z-P.z)*pe}}
   var kk=Math.max(.7,Math.min(1.6,cam.k)),lo=1e9,hi=-1e9;
   NODES.forEach(function(n){var q=proj(n.x,n.y,n.z);n.px=q[0];n.py=q[1];n.ps=q[2];n.pz=q[3];n.wx=q[4];n.wy=q[5];n.pr=n.r*kk*q[2];
     if(n.vis){lo=Math.min(lo,n.pz);hi=Math.max(hi,n.pz)}});
@@ -273,6 +315,12 @@ function fitTarget(soft){
   vs.forEach(function(n){var x=n.wx==null?n.x:n.wx,y=n.wy==null?n.y:n.wy,r=n.r*2*(n.ps||1);x0=Math.min(x0,x-r);x1=Math.max(x1,x+r);y0=Math.min(y0,y-r);y1=Math.max(y1,y+r)});   /* what is on screen: with depth, the turned picture */
   var wide=W>700,bw=Math.max(80,x1-x0),bh=Math.max(80,y1-y0)*VS,padX=wide?382:32,padY=wide?80:176;
   var nk=Math.max(.15,Math.min(2.2,Math.min((W-padX)/bw,(H-padY)/bh)))*(1-.1*depthAmt),nx=(x0+x1)/2-(wide?171/nk:0),ny=(y0+y1)/2;   /* centre the network in the space right of the left column */
+  if(depthAmt>0&&C&&ZS){   /* turning: fit the sphere the network turns in, so the zoom stays put while it turns */
+    var ds=vs.map(function(n){return Math.hypot(n.x-C.x,(n.y-C.y)*VS,(n.z-.5)*ZS*depthAmt)+n.r*2}).sort(function(a,b){return a-b}),
+        R=Math.max(40,ds[Math.min(ds.length-1,Math.floor(ds.length*.95))]);   /* the 95th percentile: a few far-out notes do not shrink the whole picture */
+    var f=ZS*1.9,sm=f/Math.max(f*.3,f-R);
+    nk=Math.max(.15,Math.min(2.2,Math.min(W-padX,H-padY)/(2*R*sm)));nx=C.x-(wide?171/nk:0);ny=C.y;
+  }
   /* soft (during a replay): ignore small changes of the bounding box, so one node drifting at the edge does not make the whole picture breathe */
   if(soft&&cam.fit&&Math.abs(nk-cam.tk)/cam.tk<.07&&Math.hypot(nx-cam.tx,ny-cam.ty)*cam.tk<30)return;
   cam.tk=nk;cam.tx=nx;cam.ty=ny;cam.fit=true;cam.fk=nk;
@@ -462,7 +510,10 @@ function frame(now){
   }
   NODES.forEach(function(n){if(n.vis&&n.ap<1)n.ap=Math.min(1,n.ap+dt/650);if(!n.vis)n.ap=0});
   if(alpha>0){tick();if(!playing)tick()}
-  if(autoFit)fitTarget(playing||depthAmt>0);   /* with depth the picture sways: ignore the small changes it makes, or the view would breathe */
+  if(!spin.on&&!drag&&!pinch&&depthOn&&!reduce&&now-spin.last>IDLE){spin.on=true;if(sel>=0)autoFit=false;else if(!autoFit)spin.node=nearMiddle()}
+  if(autoFit)fitTarget(playing||depthAmt>0);   /* small changes (a replay, notes settling) are ignored, or the view would breathe */
+  else if(spin.on&&P&&(sel>=0||spin.node>=0)){cam.tx=P.x;cam.ty=P.y}   /* turning about a note: keep it in the middle */
+  else if(!drag&&!pinch)leash();
   var k=playing?.045:.1;cam.x+=(cam.tx-cam.x)*k;cam.y+=(cam.ty-cam.y)*k;cam.k+=(cam.tk-cam.k)*k;
   project(now,dt);
   updateLabels(now,dt);
@@ -491,18 +542,18 @@ function downPts(){return Object.keys(ptr).map(function(k){return ptr[k]})}
 function pinchState(){var p=downPts(),a=p[0],b=p[1];return {d:Math.hypot(a.x-b.x,a.y-b.y)||1,mx:(a.x+b.x)/2,my:(a.y+b.y)/2}}
 function endPointer(ev){
   delete ptr[ev.pointerId];
-  if(pinch){if(downPts().length<2)pinch=null;drag=null;cv.classList.remove("drag");return true}   /* lifting a finger after a pinch selects nothing */
+  if(pinch){if(downPts().length<2){if(depthOn)release();pinch=null}drag=null;cv.classList.remove("drag");return true}   /* lifting a finger after a pinch selects nothing */
   return false;
 }
 cv.addEventListener("pointerdown",function(ev){
-  cv.setPointerCapture(ev.pointerId);
+  cv.setPointerCapture(ev.pointerId);poke();spin.vy=spin.vx=0;spin.samples=[];
   ptr[ev.pointerId]={x:ev.clientX,y:ev.clientY};
   if(downPts().length>=2){
     if(drag&&drag.id>=0)NODES[drag.id].fixed=false;
     drag=null;autoFit=false;var s=pinchState();pinch={d:s.d,k:cam.tk,w:world(s.mx,s.my),mx:s.mx,my:s.my,ry:rot.y,rx:rot.x};return;
   }
   var i=ev.button===2?-1:pick(ev.clientX,ev.clientY);   /* the right button always turns (with depth), even over a note */
-  drag={id:i,sx:ev.clientX,sy:ev.clientY,cx:cam.tx,cy:cam.ty,moved:false,turn:depthOn&&(ev.button===2||i<0&&ev.shiftKey),ry:rot.y,rx:rot.x,nx:i>=0?NODES[i].x:0,ny:i>=0?NODES[i].y:0};
+  drag={id:i,sx:ev.clientX,sy:ev.clientY,lx:ev.clientX,ly:ev.clientY,cx:cam.tx,cy:cam.ty,moved:false,turn:depthOn&&(ev.button===2||i<0&&ev.shiftKey),ry:rot.y,rx:rot.x,nx:i>=0?NODES[i].x:0,ny:i>=0?NODES[i].y:0};
   if(i>=0){NODES[i].fixed=true}
   cv.classList.add("drag");
 });
@@ -511,21 +562,23 @@ cv.addEventListener("pointermove",function(ev){
   if(pinch){   /* zoom by the change of the finger distance around the midpoint; moving both fingers together turns the view
                   (with depth; one finger pans) or, in the flat view, pans */
     if(downPts().length<2)return;
-    var s=pinchState();cam.tk=cam.k=Math.max(.12,Math.min(5,pinch.k*s.d/pinch.d));
+    var s=pinchState();cam.tk=cam.k=Math.max(minK(),Math.min(5,pinch.k*s.d/pinch.d));spin.last=performance.now();
     var ax=depthOn?pinch.mx:s.mx,ay=depthOn?pinch.my:s.my;
     cam.tx=cam.x=pinch.w.x-(ax-W/2)/cam.k;cam.ty=cam.y=pinch.w.y-(ay-H/2)/(cam.k*VS);
-    if(depthOn)turnTo(pinch.ry+(s.mx-pinch.mx)*.006,pinch.rx-(s.my-pinch.my)*.006);
+    if(depthOn){turnTo(pinch.ry+(s.mx-pinch.mx)*.006,pinch.rx-(s.my-pinch.my)*.006);sample()}
     return;
   }
   if(!drag){var i=pick(ev.clientX,ev.clientY);if(i!==hov){hov=i;cv.classList.toggle("hover",i>=0)}return}
   var dx=ev.clientX-drag.sx,dy=ev.clientY-drag.sy;
   if(!drag.moved&&Math.abs(dx)+Math.abs(dy)>4)drag.moved=true;
   if(!drag.moved)return;
-  if(drag.turn){turnTo(drag.ry+dx*.005,drag.rx-dy*.005);return}   /* Shift-drag turns the view */
+  spin.last=performance.now();
+  if(drag.turn){turnTo(drag.ry+dx*.005,drag.rx-dy*.005);sample();return}   /* Shift-drag turns the view */
   if(drag.id>=0){var n=NODES[drag.id];
     if(depthAmt>0){n.x=drag.nx+dx*cyw/(cam.k*n.ps);n.y=drag.ny+dy*cpt/(cam.k*n.ps*VS)}   /* turned: follow the finger along the note's own axes */else{var w=world(ev.clientX,ev.clientY);n.x=w.x;n.y=w.y}
     alpha=Math.max(alpha,.35)}
-  else{autoFit=false;cam.tx=drag.cx-dx/cam.k;cam.ty=drag.cy-dy/(cam.k*VS);cam.x=cam.tx;cam.y=cam.ty;
+  else{autoFit=false;var ex=ev.clientX-drag.lx,ey=ev.clientY-drag.ly,res=notesInView()<needOn()?.3:1;drag.lx=ev.clientX;drag.ly=ev.clientY;   /* past the edge of the network the view pulls back like a rubber band */
+    cam.tx-=ex*res/cam.k;cam.ty-=ey*res/(cam.k*VS);cam.x=cam.tx;cam.y=cam.ty;
     if(depthOn&&!reduce){tilt.y=Math.max(-.3,Math.min(.3,tilt.y+(ev.movementX||0)*.002));tilt.x=Math.max(-.2,Math.min(.2,tilt.x-(ev.movementY||0)*.002))}}   /* a pan tilts the view a little; it springs back */
 });
 cv.addEventListener("pointercancel",function(ev){endPointer(ev);if(drag&&drag.id>=0)NODES[drag.id].fixed=false;drag=null;cv.classList.remove("drag")});
@@ -534,6 +587,7 @@ cv.addEventListener("pointerup",function(ev){
   cv.classList.remove("drag");
   if(!drag)return;
   if(drag.id>=0)NODES[drag.id].fixed=false;
+  if(drag.turn&&drag.moved)release();
   if(!drag.moved&&ev.button!==2){if(drag.id>=0)select(drag.id);else select(-1)}
   drag=null;
 });
@@ -542,15 +596,16 @@ cv.addEventListener("wheel",function(ev){
   /* a sideways two-finger swipe on a trackpad turns the view (with depth); a mouse wheel and a vertical swipe zoom, and so
      does a trackpad pinch (which the browser sends as a wheel with ctrlKey) */
   var px=ev.deltaMode===1?16:ev.deltaMode===2?400:1;
-  if(depthOn&&!ev.ctrlKey&&Math.abs(ev.deltaX)>Math.abs(ev.deltaY)){turnTo(rot.y-ev.deltaX*px*.004,rot.x);return}
-  autoFit=false;
+  if(depthOn&&!ev.ctrlKey&&Math.abs(ev.deltaX)>Math.abs(ev.deltaY)){   /* the trackpad brings its own momentum; the swipe sets the turning direction */
+    turnTo(rot.y-ev.deltaX*px*.004,rot.x);spin.vy=0;spin.last=performance.now();if(Math.abs(ev.deltaX)>1)spin.dir=ev.deltaX>0?-1:1;spin.on=!reduce;spin.node=-1;return}
+  poke();autoFit=false;
   var before=world(ev.clientX,ev.clientY),f=Math.exp(-ev.deltaY*.0015);
-  cam.tk=Math.max(.12,Math.min(5,cam.tk*f));cam.k=cam.tk;
+  cam.tk=Math.max(minK(),Math.min(5,cam.tk*f));cam.k=cam.tk;
   var after=world(ev.clientX,ev.clientY);cam.tx+=before.x-after.x;cam.ty+=before.y-after.y;cam.x=cam.tx;cam.y=cam.ty;
 },{passive:false});
 cv.addEventListener("contextmenu",function(ev){ev.preventDefault()});   /* right-drag turns, so no menu over the network */
-cv.addEventListener("dblclick",function(){autoFit=true;turnHome()});
-document.getElementById("fit").addEventListener("click",function(){autoFit=true;turnHome()});
+cv.addEventListener("dblclick",function(){poke();autoFit=true;turnHome()});
+document.getElementById("fit").addEventListener("click",function(){poke();autoFit=true;turnHome()});
 document.addEventListener("myco-theme",readTheme);   /* the picker changed the theme */
 if(window.matchMedia){var mq=matchMedia("(prefers-color-scheme: light)"),onSys=function(){if(!root.getAttribute("data-theme"))readTheme()};
   if(mq.addEventListener)mq.addEventListener("change",onSys);else if(mq.addListener)mq.addListener(onSys)}   /* Auto follows a system change */
@@ -567,7 +622,7 @@ document.getElementById("fold").addEventListener("click",function(){var f=!docum
 setFold(pref("head")==="fold");
 function setPanelFull(f){panelFull=f;panel.classList.toggle("min",!f);var m=document.getElementById("more");if(m){m.textContent=f?"Less":"More";m.setAttribute("aria-expanded",f?"true":"false")}}
 function select(i){
-  sel=i;
+  sel=i;poke();
   if(i<0){panel.hidden=true;return}
   var n=NODES[i],g=D.groups[n.g];panel.hidden=false;panel.textContent="";
   var x=el("button",null,"×");x.id="close";x.setAttribute("aria-label","Close");x.addEventListener("click",function(){select(-1)});panel.appendChild(x);
@@ -625,7 +680,7 @@ slide.max=NC;
 slide.addEventListener("input",function(){stopPlay();setStep(parseInt(slide.value,10),false)});
 playBtn.addEventListener("click",function(){playing?stopPlay():startPlay()});
 document.addEventListener("keydown",function(ev){
-  if(ev.target===q)return;
+  poke();if(ev.target===q)return;
   if(ev.key===" "&&NC>1){ev.preventDefault();playing?stopPlay():startPlay()}
   if(ev.key==="Escape")select(-1);
 });
