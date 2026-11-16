@@ -29,6 +29,7 @@ import _myco  # noqa: E402
 import notes_graph  # noqa: E402
 import secret_scan  # noqa: E402
 import hashlib  # noqa: E402
+import map_themes  # noqa: E402
 
 SKIP_DIRS = {".git", "site", "notes-map", "node_modules", "__pycache__", ".obsidian", ".trash"}
 MARKER = ".myco-notes-map"   # marks a folder this tool made, so it may empty and rebuild it
@@ -86,9 +87,12 @@ def area_groups(groups, info, lay):
     return groups[:at] + extra + groups[at:-1] + late + groups[-1:] if groups and groups[-1][0] == "other" else groups[:at] + extra + groups[at:] + late
 
 
-CSS = """:root{--bg:#f4f6f8;--panel:#fff;--fg:#1c252c;--muted:#5d6b76;--line:#d3dadf;--accent:#0b6e6e;--code:#f1f4f6}
-@media (prefers-color-scheme:dark){:root{--bg:#12171b;--panel:#1a2126;--fg:#e3e9ed;--muted:#93a3ae;--line:#2b363e;--accent:#4fc3c3;--code:#161c20}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 system-ui,sans-serif}a{color:var(--accent)}
+CSS = map_themes.page_css() + """
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 var(--font)}a{color:var(--accent)}
+.top{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 14px}.top>p,.top>h1{margin:0 0 6px;min-width:0}
+.theme-pick{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);margin:0 0 6px auto;white-space:nowrap}
+.theme-pick select{font:inherit;font-size:13px;padding:3px 6px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--fg)}
+.theme-pick select:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .wrap{max-width:1100px;margin:0 auto;padding:18px 16px 50px}h1{font-size:24px;margin:0 0 6px}.sub{color:var(--muted);margin:0 0 14px}
 input{font:inherit;padding:7px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--fg);width:100%;max-width:360px}
 .grp{background:var(--panel);border:1px solid var(--line);border-radius:8px;margin:12px 0;padding:6px 14px}.grp h2{font-size:16px;margin:8px 0 2px}.grp p{margin:0 0 6px;color:var(--muted);font-size:13px}
@@ -97,6 +101,8 @@ article{background:var(--panel);border:1px solid var(--line);border-radius:8px;p
 article pre{background:var(--code);padding:12px;overflow:auto;border-radius:6px}article table{display:block;overflow-x:auto;border-collapse:collapse}article th,article td{border:1px solid var(--line);padding:5px 9px}
 .rel{border:1px solid var(--line);border-radius:8px;padding:8px 12px;margin:10px 0;font-size:13px;background:var(--bg)}.chip{display:inline-block;margin:2px 4px 2px 0;padding:1px 9px;border-radius:99px;border:1px solid var(--line);text-decoration:none;background:var(--panel)}
 .recent{color:var(--muted);font-size:13px}.recent code{font:12px ui-monospace,monospace}"""
+HEAD = map_themes.head_script()   # applies the stored theme before the first paint
+PICK = map_themes.picker()        # the theme picker, the same on every page
 
 
 def sh(args, cwd):
@@ -226,8 +232,8 @@ def main():
         hist = log_rows(["--follow", "-n", "12", "--format=%h\t%as\t%s", "--", rel])
         histh = ("<details class='rel'><summary><b>History</b> (%d recent changes)</summary><ul>%s</ul></details>" % (len(hist), "".join(f"<li><code>{h}</code> {dt} &middot; {html.escape(s)}</li>" for h, dt, s in hist))) if hist else ""
         age = datetime.date.fromtimestamp(d["mtime"]).isoformat()
-        page = (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(d["title"])}</title><style>{CSS}</style></head><body><div class="wrap">'
-                f'<p><a href="../index.html">&larr; {html.escape(title)}</a> &middot; <code>{html.escape(rel)}</code> &middot; {d["size"]//1024 or 1} KB &middot; edited {age} &middot; <a href="../raw/{d["id"]}.md">raw</a></p>'
+        page = (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(d["title"])}</title><style>{CSS}</style>{HEAD}</head><body><div class="wrap">'
+                f'<div class="top"><p><a href="../index.html">&larr; {html.escape(title)}</a> &middot; <code>{html.escape(rel)}</code> &middot; {d["size"]//1024 or 1} KB &middot; edited {age} &middot; <a href="../raw/{d["id"]}.md">raw</a></p>{PICK}</div>'
                 f'<p class="sub">{html.escape(d["hint"])}</p>{"<div class=rel>"+relh+"</div>" if relh else ""}{histh}<details class="rel"><summary><b>On this page</b></summary>{toc}</details><article>{body}</article></div></body></html>')
         open(os.path.join(out, "p", d["id"] + ".html"), "w", encoding="utf-8").write(page)
         shutil.copy(os.path.join(root, rel), os.path.join(out, "raw", d["id"] + ".md"))
@@ -247,8 +253,8 @@ def main():
         sections.append(f'<section class="grp"><h2>{html.escape(gname)} ({len(items)})</h2><p>{html.escape(blurb)}</p>{rows}</section>')
     rec = ("<div class='recent'><h2>Recent changes</h2><ul>%s</ul></div>" % "".join(f"<li><code>{h}</code> {dt} &middot; {html.escape(s)}</li>" for h, dt, s in recent)) if recent else ""
     built = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-    index = (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(title)}</title><style>{CSS}</style></head><body><div class="wrap">'
-             f'<h1>{html.escape(title)}</h1><p class="sub">{len(info)} notes. Built {built}. Search filters the list; open a note to see what it mentions, what mentions it and how it changed. <a href="graph.html">Open the mycelium view</a> (graph and timeline).</p>'
+    index = (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(title)}</title><style>{CSS}</style>{HEAD}</head><body><div class="wrap">'
+             f'<div class="top"><h1>{html.escape(title)}</h1>{PICK}</div><p class="sub">{len(info)} notes. Built {built}. Search filters the list; open a note to see what it mentions, what mentions it and how it changed. <a href="graph.html">Open the mycelium view</a> (graph and timeline).</p>'
              f'<p><input id="q" type="search" placeholder="Search names, titles, hints..." aria-label="Search notes"></p>{"".join(sections)}{rec}</div>'
              "<script>const q=document.getElementById('q');q.addEventListener('input',()=>{const t=q.value.toLowerCase();document.querySelectorAll('.note').forEach(n=>{n.style.display=n.dataset.s.includes(t)?'':'none'});document.querySelectorAll('.grp').forEach(g=>{g.style.display=[...g.querySelectorAll('.note')].some(n=>n.style.display!=='none')?'':'none'})})</script></body></html>")
     open(os.path.join(out, "index.html"), "w", encoding="utf-8").write(index)

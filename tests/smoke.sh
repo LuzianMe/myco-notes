@@ -196,6 +196,7 @@ git switch -q main; git branch -q -D feat-crash
 echo "0.12: restore verdicts, mirror scope and results, narrower commits, kit version, doctor"
 chk "new repositories record the kit and format versions"  "grep -q '^KIT_VERSION=[0-9]' .myco-notes.conf && grep -q '^FORMAT_VERSION=1.1' .myco-notes.conf && grep -q '^MIRROR_SCOPE=tracked' .myco-notes.conf"
 mkdir -p "$tmp/home"
+chk "every map theme meets the WCAG contrast minimums" "python3 $repo/tests/contrast.py"
 chk "doctor reports a healthy repository"     "myco-notes/tools/doctor --home $tmp/home | grep -q 'doctor: healthy'"
 for d in "$tmp/home2/.agentx/skills/myco-notes" "$tmp/home2/.agentx/plugins/cache/m/p/1.0/skills/myco-notes" "$tmp/home2/.othera/skills/myco-notes"; do
   mkdir -p "$d"; printf -- '---\nname: myco-notes\n---\n' > "$d/SKILL.md"; done
