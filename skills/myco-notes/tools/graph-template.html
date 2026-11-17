@@ -389,26 +389,55 @@ function hyphaPath(e){
     W.push([wx,wy,wz]);var q=proj(wx,wy,wz);P.push([q[0],q[1]])}
   e.W=W;e.L=L;
   var C=clipEnd(clipEnd(P,srad(e.b)+1.5).reverse(),srad(e.a)+1.5).reverse();   /* from the rim of a to the rim of b */
-  if(T.style==="circuit")C=circuit(e,C);else if(T.style==="fractal")C=stairs(circuit(e,C),e,e.L*cam.k>300?2:1);   /* short threads on screen: one level of steps */else e.cs=null;
-  e.SP=C;return C;
+  if(T.style==="circuit")C=circuit(e,C);else if(T.style==="fractal")C=fractalPath(e,W);else e.cs=null;
+  e.SP=C;e.SPL=plen(C);return C;
 }
 function circuit(e,P){   /* the digital themes: a trace through a few points of the thread, straight runs turning by 45 or 90 degrees */
   if(P.length<2)return P;var n=P.length-1,ks=[0,Math.round(n*.35),Math.round(n*.7),n].filter(function(v,i,a){return a.indexOf(v)===i}),Q=[P[0]],cs=[];
   for(var i=1;i<ks.length;i++){var A=Q[Q.length-1],B=P[ks[i]],dx=B[0]-A[0],dy=B[1]-A[1],d=Math.min(Math.abs(dx),Math.abs(dy)),sx=dx<0?-1:1,sy=dy<0?-1:1,M;
     if(hash(e.k+i*1.7)<.5)M=[A[0]+sx*d,A[1]+sy*d];else M=Math.abs(dx)>Math.abs(dy)?[B[0]-sx*d,A[1]]:[A[0],B[1]-sy*d];
+    if(A.length>2)M.push((A[2]+B[2])/2);
     Q.push(M);cs.push(M);Q.push(B);if(i<ks.length-1)cs.push(B)}
   e.cs=cs;return Q;
 }
 function stairs(P,e,lv){   /* Matrix: every run becomes a staircase of steps, and the steps become smaller staircases (a digital fractal);
-                               about a third of the runs step at 60 or 120 degrees instead of square, so it is not a grid */
+                               step heights come from a small set (1, 2 or 3 units), so motifs repeat; snap6 then sets the angles */
   var out=[P[0]];
   for(var i=1;i<P.length;i++){var A=P[i-1],B=P[i],dx=B[0]-A[0],dy=B[1]-A[1],L=Math.hypot(dx,dy);
-    if(L<(lv>1?30:18)||out.length>220){out.push(B);continue}
-    var ux=dx/L,uy=dy/L,m=2+Math.floor(hash(e.k+i*3.7+lv)*2),h=L/(m*2.3)*(hash(e.k+i*1.9+lv)<.5?1:-1),ro=hash(e.k+i*5.3+lv)<.33?(hash(e.k+i+lv)<.5?.52:-.52):0,
+    if(L<(lv>1?30:18)||out.length>16){out.push(B);continue}
+    var ux=dx/L,uy=dy/L,m=2+Math.floor(hash(e.k+i*3.7+lv)*2),u=Math.max(3,L/10),h=u*(1+Math.floor(hash(e.k+i*1.9+lv)*3))*(hash(e.k+i*4.1+lv)<.5?1:-1),ro=0,
       nx=-uy*Math.cos(ro)-ux*Math.sin(ro),ny=-uy*Math.sin(ro)+ux*Math.cos(ro);
-    for(var j=0;j<m;j++){var t0=j/m,t2=(j+1)/m,sg=j%2?0:h,a=[A[0]+dx*t0,A[1]+dy*t0],c=[A[0]+dx*t2,A[1]+dy*t2];
-      if(sg){out.push([a[0]+nx*sg,a[1]+ny*sg]);out.push([c[0]+nx*sg,c[1]+ny*sg])}out.push(c)}}
+    var dz=A.length>2?B[2]-A[2]:0,z3=A.length>2;
+    for(var j=0;j<m;j++){var t0=j/m,t2=(j+1)/m,sg=j%2?0:h,za=z3?A[2]+dz*t0:0,zc=z3?A[2]+dz*t2:0,a=[A[0]+dx*t0,A[1]+dy*t0],c=[A[0]+dx*t2,A[1]+dy*t2];
+      if(sg){out.push(z3?[a[0]+nx*sg,a[1]+ny*sg,za]:[a[0]+nx*sg,a[1]+ny*sg]);out.push(z3?[c[0]+nx*sg,c[1]+ny*sg,zc]:[c[0]+nx*sg,c[1]+ny*sg])}out.push(z3?[c[0],c[1],zc]:c)}}
   return lv>1?stairs(out,e,lv-1):out;
+}
+function fractalPath(e,W){   /* Matrix: the staircase is built once per thread in the network's own space (again only when the thread moves or
+                                 the level of detail changes) and just projected on each redraw; one level of steps while the view moves */
+  var lv=(busyNow||e.L*cam.k<=450)?1:2,key=[Math.round(e.a.x),Math.round(e.a.y),Math.round(e.b.x),Math.round(e.b.y),Math.round(e.a.z*60),Math.round(e.b.z*60),lv,W.length].join();
+  if(e.fk!==key){e.fk=key;var c=circuit(e,W);e.FC=e.cs||[];e.FW=stairs(c,e,lv)}
+  var P=e.FW.map(function(p){var q=proj(p[0],p[1],p[2]);return [q[0],q[1]]});
+  e.cs=e.FC.map(function(p){var q=proj(p[0],p[1],p[2]);return [q[0],q[1]]});
+  return snap6(clipEnd(clipEnd(P,srad(e.b)+1.5).reverse(),srad(e.a)+1.5).reverse(),e);
+}
+function snap6(P,e){   /* Matrix: every run on screen follows a multiple of pi/6 (0, 30, 60, 90 degrees...): it is split into two strokes along
+                          the two lattice directions either side of it, so the trace still lands exactly where it was going */
+  var out=[P[0]],st=Math.PI/6;
+  for(var i=1;i<P.length;i++){var A=out[out.length-1],B=P[i],vx=B[0]-A[0],vy=B[1]-A[1];if(Math.abs(vx)+Math.abs(vy)<.5)continue;
+    var th=Math.atan2(vy,vx),k=Math.floor(th/st),t1=k*st,t2=t1+st,c1=Math.cos(t1),s1=Math.sin(t1),c2=Math.cos(t2),s2=Math.sin(t2),det=c1*s2-s1*c2,
+      a=(vx*s2-vy*c2)/det,b=(c1*vy-s1*vx)/det;
+    out.push(hash(e.k+i*2.3)<.5?[A[0]+c1*a,A[1]+s1*a]:[A[0]+c2*b,A[1]+s2*b]);out.push(B)}
+  return out;
+}
+function polyUpto(P,upto){var Q=[P[0]],acc=0;for(var i=1;i<P.length;i++){var sl=Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1]);
+  if(acc+sl>=upto){var f=(upto-acc)/(sl||1);Q.push([P[i-1][0]+(P[i][0]-P[i-1][0])*f,P[i-1][1]+(P[i][1]-P[i-1][1])*f]);return Q}acc+=sl;Q.push(P[i])}return Q}
+function linePath(Q){cx.moveTo(Q[0][0],Q[0][1]);for(var i=1;i<Q.length;i++)cx.lineTo(Q[i][0],Q[i][1])}
+function digiHypha(e,P,w,grow,col,tipA,tot,tr){   /* the digital themes: an even trace is a line, far cheaper than an outline */
+  cx.strokeStyle=col;cx.fillStyle=col;cx.lineWidth=Math.max(.8,w*1.4);cx.lineJoin="miter";
+  if(e.dir===0){cx.beginPath();linePath(polyUpto(P,tot*grow));cx.stroke();if(grow>=1){cx.fillStyle="rgba("+budRGB(e.a)+","+tipA+")";tip(P[P.length-1],tr);cx.fillStyle="rgba("+budRGB(e.b)+","+tipA+")";tip(P[0],tr)}return}
+  var S=e.dir>0?P:P.slice().reverse(),Q=polyUpto(S,tot*grow);cx.beginPath();linePath(Q);cx.stroke();
+  if(grow>=1){cx.beginPath();pads(e,w);cx.fill()}
+  cx.fillStyle="rgba("+budRGB(e.dir>0?e.a:e.b)+","+tipA+")";tip(Q[Q.length-1],tr);
 }
 function pads(e,w){if(!e.cs)return;var r=Math.max(1.2,w*.9);e.cs.forEach(function(c){cx.rect(c[0]-r,c[1]-r,2*r,2*r)})}
 function clipEnd(P,r){   /* drop the points inside the circle of radius r around the last point, ending exactly on its rim */
@@ -441,19 +470,21 @@ function tip(p,r){cx.beginPath();if(T.style!=="organic")cx.rect(p[0]-r,p[1]-r,2*
 /* A bud has the colour of the note the thread comes from (as that note is drawn: its group, or the wilt colour), a little
    darker on the dark theme and a little lighter on the light one, so it reads as part of the source and still stands out. */
 var shades={};
-/* the digital themes draw notes as chips (Amber terminal: a square with a pin on each side) or as pixels (Matrix: one block, or a
-   2x2 or 3x3 grid of blocks of slightly uneven brightness for busier notes), with a square glow and no shine; hubs get square frames */
+/* the digital themes draw notes as pads (Amber terminal: an octagon with a drill hole, like the vias circuit traces end on, octagon
+   frames on hubs) or as pixels (Matrix: a diamond, or a diamond of 4 or 9 small diamonds of uneven brightness), without the shine */
 function sqSprite(color){var dm=T.nodes==="pixel",k=(dm?"dm":"sq")+color;if(sprites[k])return sprites[k];var c=document.createElement("canvas");c.width=c.height=96;var g=c.getContext("2d");g.fillStyle=color;
   for(var i=0;i<12;i++){var q=48-i*3.6;g.globalAlpha=.075;g.beginPath();if(dm){g.moveTo(48,48-q);g.lineTo(48+q,48);g.lineTo(48,48+q);g.lineTo(48-q,48);g.closePath()}else g.rect(48-q,48-q,2*q,2*q);g.fill()}sprites[k]=c;return c}
 function dia(x,y,q){cx.moveTo(x,y-q);cx.lineTo(x+q,y);cx.lineTo(x,y+q);cx.lineTo(x-q,y);cx.closePath()}   /* Matrix: a diamond (a square turned by 45 degrees) */
-function ringPath(x,y,R){if(T.nodes==="pixel")dia(x,y,R*1.25);else if(T.nodes)cx.rect(x-R,y-R,2*R,2*R);else cx.arc(x,y,R,0,6.3)}
+function oct(x,y,q){var a=q*.4142;cx.moveTo(x-a,y-q);cx.lineTo(x+a,y-q);cx.lineTo(x+q,y-a);cx.lineTo(x+q,y+a);cx.lineTo(x+a,y+q);cx.lineTo(x-a,y+q);cx.lineTo(x-q,y+a);cx.lineTo(x-q,y-a);cx.closePath()}   /* Amber terminal: an octagon */
+function ringPath(x,y,R){if(T.nodes==="pixel")dia(x,y,R*1.25);else if(T.nodes==="pad")oct(x,y,R*1.08);else if(T.nodes)cx.rect(x-R,y-R,2*R,2*R);else cx.arc(x,y,R,0,6.3)}
 function digiNode(n,x,y,r,col){
-  if(n.spore){cx.strokeStyle=col;cx.lineWidth=1.2;var q=Math.max(1.5,r*.75);cx.beginPath();if(T.nodes==="pixel")dia(x,y,q*1.25);else cx.rect(x-q,y-q,2*q,2*q);cx.stroke();return}
+  if(n.spore){cx.strokeStyle=col;cx.lineWidth=1.2;var q=Math.max(1.5,r*.75);cx.beginPath();if(T.nodes==="pixel")dia(x,y,q*1.25);else if(T.nodes==="pad")oct(x,y,q*1.08);else cx.rect(x-q,y-q,2*q,2*q);cx.stroke();return}
   cx.fillStyle=col;
-  if(T.nodes==="chip"){var s=r*.9,p=Math.max(1,r*.3);cx.fillRect(x-s,y-s,2*s,2*s);cx.fillRect(x-p/2,y-s-p*1.5,p,p*1.5);cx.fillRect(x-p/2,y+s,p,p*1.5);cx.fillRect(x-s-p*1.5,y-p/2,p*1.5,p);cx.fillRect(x+s,y-p/2,p*1.5,p);return}
-  var g=r<4?1:r<6.5?2:3,b=2*r/g,ga=cx.globalAlpha;   /* Matrix: a diamond of diamonds */
-  for(var i=0;i<g;i++)for(var j=0;j<g;j++){var ox=(i-(g-1)/2)*b,oy=(j-(g-1)/2)*b;cx.globalAlpha=ga*(.6+.4*hash(n.i*9+i*3+j));
-    cx.beginPath();dia(x+(ox-oy)*.7071,y+(ox+oy)*.7071,Math.max(.8,b*.7071-.5));cx.fill()}
+  if(T.nodes==="pad"){cx.beginPath();oct(x,y,r*1.05);cx.fill();cx.fillStyle=T.halo;cx.beginPath();oct(x,y,Math.max(.7,r*.42));cx.fill();return}   /* a pad with its drill hole, like the vias a trace ends on */
+  var g=r<4?1:r<6.5?2:3,b=2*r/g,h=Math.max(.8,b*.7071-.5),ga=cx.globalAlpha;   /* Matrix: a diamond of diamonds, the brighter and the dimmer ones each in one fill */
+  for(var pass=0;pass<2;pass++){cx.globalAlpha=ga*(pass?1:.62);cx.beginPath();
+    for(var i=0;i<g;i++)for(var j=0;j<g;j++){if((hash(n.i*9+i*3+j)<.5)===!pass)continue;var ox=(i-(g-1)/2)*b,oy=(j-(g-1)/2)*b;dia(x+(ox-oy)*.7071,y+(ox+oy)*.7071,h)}
+    cx.fill()}
   cx.globalAlpha=ga;
 }
 function budRGB(n){
@@ -479,7 +510,7 @@ function threadRGB(n){var c=n.due?T.wilt:gcol(n.g),k=T.id+c;if(!tcache[k]){var v
 function threadFill(e,P,al){if(e.dir!==0)return "rgba("+threadRGB(e.dir>0?e.a:e.b)+","+al+")";
   var g=cx.createLinearGradient(P[0][0],P[0][1],P[P.length-1][0],P[P.length-1][1]);g.addColorStop(0,"rgba("+threadRGB(e.a)+","+al+")");g.addColorStop(1,"rgba("+threadRGB(e.b)+","+al+")");return g}
 function along(e,t){
-  if(T.style!=="organic"&&e.SP&&e.SP.length>1){var S=e.SP,d=t*plen(S),acc=0,i=1;for(;i<S.length-1;i++){var sl=Math.hypot(S[i][0]-S[i-1][0],S[i][1]-S[i-1][1]);if(acc+sl>=d)break;acc+=sl}
+  if(T.style!=="organic"&&e.SP&&e.SP.length>1){var S=e.SP,d=t*(e.SPL||plen(S)),acc=0,i=1;for(;i<S.length-1;i++){var sl=Math.hypot(S[i][0]-S[i-1][0],S[i][1]-S[i-1][1]);if(acc+sl>=d)break;acc+=sl}
     var A=S[i-1],B=S[i],u=Math.max(0,Math.min(1,(d-acc)/(Math.hypot(B[0]-A[0],B[1]-A[1])||1)));return [A[0]+(B[0]-A[0])*u,A[1]+(B[1]-A[1])*u,(e.a.ps+e.b.ps)/2]}
   var W=e.W;if(!W||W.length<2){var p=curve(e,t);return proj(p.x,p.y,e.a.z+(e.b.z-e.a.z)*t)}   /* a point on the wavy thread, 0 at a, 1 at b */
   var f=t*(W.length-1),i=Math.min(W.length-2,Math.floor(f)),u=f-i,A=W[i],B=W[i+1];return proj(A[0]+(B[0]-A[0])*u,A[1]+(B[1]-A[1])*u,A[2]+(B[2]-A[2])*u)}
@@ -487,7 +518,7 @@ function hypha(e,w,grow,al,tipA){
   var P=hyphaPath(e);if(P.length<2)return;var col=threadFill(e,P,al);if(grow>=1&&twigOK())twigs(e,w,col);
   var tot=0,i;for(i=1;i<P.length;i++)tot+=Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1]);
   if(tot<2)return;
-  var tr=.9+w*.9;cx.fillStyle=col;
+  var tr=.9+w*.9;cx.fillStyle=col;if(T.style!=="organic")return digiHypha(e,P,w,grow,col,tipA,tot,tr);
   if(e.dir===0){   /* each side grows half the way; the two meet in the middle */
     var R=P.slice().reverse(),h=w*.5;
     strand(P,tot*grow/2+.5,h,h);var q=strand(R,tot*grow/2+.5,h,h);
@@ -530,16 +561,24 @@ function drawSpikes(now){
 }
 function quietThreads(list){   /* into the cache: one fill per colour (the theme's glow, the thread, the buds), fused threads with their fade */
   var keep=cx;cx=tcx;cx.setTransform(1,0,0,1,0,0);cx.clearRect(0,0,tc.width,tc.height);cx.setTransform(DPR,0,0,DPR,0,0);
-  var tw=twigOK(),groups={},fused=[];
+  var tw=twigOK(),groups={},fused=[],dig=T.style!=="organic";
   list.forEach(function(e){var a=Math.min(e.a.ap,e.b.ap),d=Math.min(dim(e.a),dim(e.b)),w=Math.min(2.6,.6+Math.sqrt(e.w)*.45)*Math.min(1.4,cam.k+.3),al=.26*Math.min(1,a*2)*Math.max(d,.35);
     var ef=(fogOf(e.a)+fogOf(e.b))/2;w*=(e.a.ps+e.b.ps)/2;al*=1-.7*ef;
     if(e.dir===0){fused.push([e,w,a,al]);return}
-    var P=hyphaPath(e);if(P.length<2)return;var src=e.dir>0?e.a:e.b,ab=Math.round(al*25)/25,k=threadRGB(src)+"|"+ab;
-    (groups[k]||(groups[k]={rgb:threadRGB(src),bud:budRGB(src),al:ab,it:[]})).it.push([e.dir>0?P:P.slice().reverse(),w,a,e])});
+    var P=hyphaPath(e);if(P.length<2)return;var src=e.dir>0?e.a:e.b,ab=Math.round(al*25)/25,wb=dig?Math.round(w*2)/2:0,k=threadRGB(src)+"|"+ab+"|"+wb;
+    (groups[k]||(groups[k]={rgb:threadRGB(src),bud:budRGB(src),al:ab,w:wb,it:[]})).it.push([e.dir>0?P:P.slice().reverse(),w,a,e])});
   cx=gcx;cx.setTransform(1,0,0,1,0,0);cx.clearRect(0,0,gc.width,gc.height);cx.setTransform(DPR/2,0,0,DPR/2,0,0);   /* a soft glow in the theme's thread colour, drawn small and scaled up */
-  Object.keys(groups).forEach(function(k){var g=groups[k];cx.fillStyle="rgba("+T.hypha+","+(g.al*.4).toFixed(3)+")";cx.beginPath();g.it.forEach(function(x){strandPath(x[0],plen(x[0])*x[2],x[1]*2.2,x[1]*.6)});cx.fill()});
+  Object.keys(groups).forEach(function(k){var g=groups[k];
+    if(dig){cx.strokeStyle="rgba("+T.hypha+","+(g.al*.4).toFixed(3)+")";cx.lineWidth=Math.max(1.5,g.w*3);cx.lineJoin="miter";cx.beginPath();g.it.forEach(function(x){if(x[2]<1)return;var P=x[0],e=x[3];var cs=e.cs||[];linePath([P[0]].concat(e.dir<0?cs.slice().reverse():cs,[P[P.length-1]]))});cx.stroke();return}   /* the glow follows the trace's main route only: a blur needs no zigzag */
+    cx.fillStyle="rgba("+T.hypha+","+(g.al*.4).toFixed(3)+")";cx.beginPath();g.it.forEach(function(x){strandPath(x[0],plen(x[0])*x[2],x[1]*2.2,x[1]*.6)});cx.fill()});
   cx=tcx;cx.setTransform(1,0,0,1,0,0);cx.drawImage(gc,0,0,tc.width,tc.height);cx.setTransform(DPR,0,0,DPR,0,0);
   Object.keys(groups).forEach(function(k){var g=groups[k],ends=[];
+    if(dig){cx.strokeStyle="rgba("+g.rgb+","+g.al+")";cx.lineWidth=Math.max(.8,g.w*1.4);cx.lineJoin="miter";cx.beginPath();
+      g.it.forEach(function(x){var Q=polyUpto(x[0],plen(x[0])*x[2]);linePath(Q);ends.push([Q[Q.length-1],.9+x[1]*.9])});cx.stroke();
+      cx.fillStyle="rgba("+g.rgb+","+g.al+")";cx.beginPath();g.it.forEach(function(x){if(x[2]>=1)pads(x[3],x[1])});cx.fill();
+      cx.fillStyle="rgba("+g.bud+","+Math.min(1,g.al*3).toFixed(3)+")";cx.beginPath();ends.forEach(function(t){var r=t[1];cx.rect(t[0][0]-r,t[0][1]-r,2*r,2*r)});cx.fill();
+      if(tw){cx.strokeStyle="rgba("+g.rgb+","+(g.al*.5).toFixed(3)+")";cx.lineWidth=.6;cx.beginPath();g.it.forEach(function(x){twigPath(x[3])});cx.stroke()}
+      return}
     var ci=T.style!=="organic";cx.fillStyle="rgba("+g.rgb+","+g.al+")";cx.beginPath();g.it.forEach(function(x){var end=strandPath(x[0],plen(x[0])*x[2],ci?x[1]*.7:x[1]*1.15,ci?x[1]*.7:x[1]*.12);if(end)ends.push([end,.9+x[1]*.9]);if(ci&&x[2]>=1)pads(x[3],x[1])});cx.fill();
     cx.fillStyle="rgba("+g.bud+","+Math.min(1,g.al*3).toFixed(3)+")";cx.beginPath();ends.forEach(function(t){var r=t[1];if(ci)cx.rect(t[0][0]-r,t[0][1]-r,2*r,2*r);else{cx.moveTo(t[0][0]+r,t[0][1]);cx.arc(t[0][0],t[0][1],r,0,6.3)}});cx.fill();
     if(tw){cx.strokeStyle="rgba("+g.rgb+","+(g.al*.5).toFixed(3)+")";cx.lineWidth=.6;cx.beginPath();g.it.forEach(function(x){twigPath(x[3])});cx.stroke()}
@@ -625,8 +664,8 @@ function draw(now){
     var col=n.due?T.wilt:gcol(n.g);
     cx.globalAlpha=Math.min(1,n.ap)*d*(n.hist?.55:1)*(.14+.6*rec+(n.hub?.2:0)+.12*fz)*(1-.3*fz);
     var gs=r*(n.hub?3.4:2.8)*(1+.25*fz),gm=Math.max(r*1.6,(n.nn||1e9)*(n.hub?1.3:1.15));if(gs>gm){cx.globalAlpha*=.25+.75*gm/gs;gs=gm}   /* crowded: a smaller, fainter glow */
-    if(!n.spore)cx.drawImage(T.nodes?sqSprite(col):sprite(col),x-gs,y-gs,gs*2,gs*2);   /* a spore (no link at all) has no glow */
-    if(n.fl&&t-n.fl<500){var fa=(t-n.fl)/500;cx.globalAlpha=(1-fa)*n.flA;if(T.nodes==="chip"){var fq=r*(1.3+fa*2);cx.strokeStyle=col;cx.lineWidth=1.5;cx.strokeRect(x-fq,y-fq,2*fq,2*fq)}else{var fs=r*5;cx.drawImage(T.nodes?sqSprite(col):sprite(col),x-fs,y-fs,fs*2,fs*2)}}   /* a spike just arrived */
+    if(!n.spore)cx.drawImage(T.nodes&&T.nodes!=="pad"?sqSprite(col):sprite(col),x-gs,y-gs,gs*2,gs*2);   /* a spore (no link at all) has no glow */
+    if(n.fl&&t-n.fl<500){var fa=(t-n.fl)/500;cx.globalAlpha=(1-fa)*n.flA;if(T.nodes==="chip"||T.nodes==="pad"){var fq=r*(1.3+fa*2);cx.strokeStyle=col;cx.lineWidth=1.5;cx.beginPath();if(T.nodes==="pad")oct(x,y,fq);else cx.rect(x-fq,y-fq,2*fq,2*fq);cx.stroke()}else{var fs=r*5;cx.drawImage(T.nodes&&T.nodes!=="pad"?sqSprite(col):sprite(col),x-fs,y-fs,fs*2,fs*2)}}   /* a spike just arrived */
     cx.globalAlpha=Math.min(1,n.ap)*d*(n.hist?.6:1)*fog;
     if(T.nodes)digiNode(n,x,y,r,col);else{if(n.spore){cx.strokeStyle=col;cx.lineWidth=1.3;cx.beginPath();cx.arc(x,y,Math.max(1.5,r*.8),0,6.3);cx.stroke();cx.globalAlpha=0}else{cx.fillStyle=col;cx.beginPath();cx.arc(x,y,r,0,6.3);cx.fill()}cx.globalAlpha*=1-fz;cx.fillStyle="rgba(255,255,255,"+(T.dark?.28:.4)+")";cx.beginPath();cx.arc(x-r*.28,y-r*.3,r*.38,0,6.3);cx.fill();}cx.globalAlpha=Math.min(1,n.ap)*d*(n.hist?.6:1)*fog;
     if(n.hub){   /* a hub (one of the most-mentioned notes of this project) carries two soft rings, like a fruiting body pushing up through the network */
