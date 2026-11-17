@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.32.0
+- **Octagonal pads in Amber terminal**: a note is an octagon with a drill hole, like the pads and vias that circuit traces end on (octagon frames on hubs, hollow octagons for spores, an expanding octagon when a spike arrives), with a soft round glow. They replace the square chips of 0.31.0.
+- **Matrix on a pi/6 lattice**: every run of a Matrix trace on screen now follows a multiple of 30 degrees, split into two strokes along the lattice directions either side of it, and step heights come from three sizes, so the fractal circuits form triangle and hexagon motifs instead of random squiggles.
+- **A second tone**: every third group colour is an electric cyan in Matrix and an ice blue in Amber terminal, so busy areas are easier to tell apart; all themes still pass the contrast check.
+- **Faster Matrix**: staircases are built once per thread and only projected on each redraw (one level of steps while the view moves), capped in points; digital threads are drawn as lines, their glow follows only the trace's main route, and diamond clusters take two fills. About 18% faster on a real notes repository in a browser without a graphics card (the lattice gives a little of that back).
+
 ## 0.31.0
 - **Digital notes for the digital themes**: in Amber terminal a note is a chip (a square with a pin on each side, a square glow, square frames on hubs, an outline that expands when a spike arrives); in Matrix a note is a diamond, or a diamond-shaped cluster of small diamonds of uneven brightness for busier notes, with a diamond glow, diamond frames on hubs and diamond spores. Neither has the round shine of the organic themes.
 - **Fractal circuits in Matrix**: Matrix's threads are staircases of steps with smaller steps on the long ones (a digital fractal), about a third of them stepping at 60 or 120 degrees, so they look less like a grid; Amber terminal keeps its clean traces at 45 and 90 degrees. Each theme carries its node and thread style in `map_themes.py`.
