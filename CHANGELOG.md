@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.32.1
+- **Matrix traces that only move forward**: the fractal staircases of 0.31.0 and 0.32.0 stepped out and back and read as noise, and they were slow. A Matrix thread is now built on screen from its two ends: the way is split into the two pi/6 lattice directions either side of it and walked in 1 to 4 alternating steps whose lengths come from three fixed ratios, so the same staircase shapes recur and nothing doubles back; small diamond pads sit at some bends. A handful of points per thread: Matrix now draws as fast as Amber terminal (about 38 ms against 49 ms per frame on a real notes repository, in a browser without a graphics card).
+
 ## 0.32.0
 - **Octagonal pads in Amber terminal**: a note is an octagon with a drill hole, like the pads and vias that circuit traces end on (octagon frames on hubs, hollow octagons for spores, an expanding octagon when a spike arrives), with a soft round glow. They replace the square chips of 0.31.0.
 - **Matrix on a pi/6 lattice**: every run of a Matrix trace on screen now follows a multiple of 30 degrees, split into two strokes along the lattice directions either side of it, and step heights come from three sizes, so the fractal circuits form triangle and hexagon motifs instead of random squiggles.
