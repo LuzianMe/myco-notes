@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.35.1
+- **The replay panel folds**: like the search panel, it has a small fold button; folded it shows only Replay and the date, on a computer and on a phone, and the choice is kept in the browser.
+- **Screensaver mode**: a small moon button among the view's buttons hides the panels, centres the network at the current zoom, turns the labels off and lets it turn by itself. Dragging and zooming still work and it starts turning again a moment later; the same button (or Escape) brings everything back.
+
 ## 0.35.0
 Each theme now picks its own threads, notes, hub rings, hit effect and glow strength from one table in `map_themes.py`.
 - **The original threads for the classic themes**: Light, Dark, High contrast and Paper draw the smooth curve the map had before hyphae (no waves, no side branches).
