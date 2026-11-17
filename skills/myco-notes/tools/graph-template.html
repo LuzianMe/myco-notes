@@ -126,7 +126,7 @@ function readTheme(){
   var id=root.getAttribute("data-theme");
   if(!TH[id])id=window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches?"light":"dark";
   var x=TH[id];
-  T={id:id,dark:x.dark,pal:x.pal,quiet:x.quiet,hypha:x.hypha,wilt:x.wilt,halo:x.halo,text:x.text,font:x.font,style:x.style||"organic",nodes:x.nodes||"",rings:x.rings||"rings",hit:x.hit||"glow",glow:x.glow==null?1:x.glow};
+  T={id:id,dark:x.dark,pal:x.pal,quiet:x.quiet,hypha:x.hypha,wilt:x.wilt,halo:x.halo,text:x.text,font:x.font,style:x.style||"organic",nodes:x.nodes||"",rings:x.rings||"rings",hit:x.hit||"glow",glow:x.glow==null?1:x.glow,tglow:x.tglow==null?(x.glow==null?1:x.glow):x.tglow};
   sprites={};shades={};tcache={};tKey="";
   paintLegend();
 }
@@ -510,15 +510,18 @@ function glassPad(n,x,y,r,col){   /* Amber terminal: a glass disc with eight sid
    not happen with reduced motion, and the hub particles stand still. */
 var parts=[];
 function burst(n,amt,now){
-  if(reduce||(T.hit!=="spores"&&T.hit!=="bubbles"))return;var b=T.hit==="bubbles",k=Math.round((b?4:7)*amt);
-  for(var i=0;i<k;i++){var a=Math.random()*6.28,sp=b?.008+Math.random()*.01:.02+Math.random()*.025;
-    parts.push({n:n,dx:0,dy:0,vx:b?(Math.random()-.5)*.012:Math.cos(a)*sp,vy:b?-(.025+Math.random()*.02):Math.sin(a)*sp,t0:now,life:b?900+Math.random()*300:500+Math.random()*200,sz:b?1.2+Math.random()*1.4:.7+Math.random()*.7,w:Math.random()*6.28,b:b})}
+  if(reduce||(T.hit!=="spores"&&T.hit!=="bubbles"))return;var b=T.hit==="bubbles",k=Math.round((b?4:14)*amt);
+  if(!b)parts.push({n:n,puff:1,t0:now,life:260,vx:0,vy:0});   /* spores: a quick bright puff, then the spores fly */
+  for(var i=0;i<k;i++){var a=Math.random()*6.28,sp=b?.008+Math.random()*.01:.035+Math.random()*.045;
+    parts.push({n:n,dx:0,dy:0,vx:b?(Math.random()-.5)*.012:Math.cos(a)*sp,vy:b?-(.025+Math.random()*.02):Math.sin(a)*sp,t0:now,life:b?900+Math.random()*300:700+Math.random()*400,sz:b?1.2+Math.random()*1.4:1+Math.random()*1.3,w:Math.random()*6.28,b:b})}
   if(parts.length>160)parts.splice(0,parts.length-160);
 }
 function drawParts(now){
   parts=parts.filter(function(p){var a=(now-p.t0)/p.life;if(a>=1||!p.n.vis)return false;var dt=now-p.t0,x=p.n.px+p.vx*dt+(p.b?Math.sin(p.w+dt*.008)*2:0),y=p.n.py+p.vy*dt,
-    col=p.n.due?T.wilt:gcol(p.n.g);cx.globalAlpha=(1-a)*(p.b?.7:.75);
-    if(p.b){cx.strokeStyle=shade(col,.55);cx.lineWidth=.9;cx.beginPath();cx.arc(x,y,p.sz*(1+a*.6),0,6.3);cx.stroke()}else{cx.fillStyle=shade(col,.3);cx.beginPath();cx.arc(x,y,p.sz,0,6.3);cx.fill()}
+    col=p.n.due?T.wilt:gcol(p.n.g);
+    if(p.puff){var pr=(p.n.pr||4)*(1.5+a*2.5);cx.globalAlpha=(1-a)*.75;cx.drawImage(sprite(shade(col,.5).replace(/rgb\((\d+),(\d+),(\d+)\)/,function(m,r,g,b){return "#"+[r,g,b].map(function(v){return (+v).toString(16).padStart(2,"0")}).join("")})),x-pr,y-pr,pr*2,pr*2);return true}
+    cx.globalAlpha=(1-a)*(p.b?.7:.95);
+    if(p.b){cx.strokeStyle=shade(col,.55);cx.lineWidth=.9;cx.beginPath();cx.arc(x,y,p.sz*(1+a*.6),0,6.3);cx.stroke()}else{cx.fillStyle=shade(col,.5);cx.beginPath();cx.arc(x,y,p.sz*(1-a*.4),0,6.3);cx.fill()}
     return true});
   cx.globalAlpha=1;
 }
@@ -639,8 +642,8 @@ function quietThreads(list){   /* into the cache: one fill per colour (the theme
     (groups[k]||(groups[k]={rgb:threadRGB(src),bud:budRGB(src),al:ab,w:wb,it:[]})).it.push([e.dir>0?P:P.slice().reverse(),w,a,e])});
   cx=gcx;cx.setTransform(1,0,0,1,0,0);cx.clearRect(0,0,gc.width,gc.height);cx.setTransform(DPR/2,0,0,DPR/2,0,0);   /* a soft glow in the theme's thread colour, drawn small and scaled up */
   Object.keys(groups).forEach(function(k){var g=groups[k];
-    if(dig){cx.strokeStyle="rgba("+T.hypha+","+(g.al*.4*T.glow).toFixed(3)+")";cx.lineWidth=Math.max(1.5,g.w*3);cx.lineJoin="miter";cx.beginPath();g.it.forEach(function(x){if(x[2]<1)return;var P=x[0],e=x[3];var cs=e.cs||[];linePath([P[0]].concat(e.dir<0?cs.slice().reverse():cs,[P[P.length-1]]))});cx.stroke();return}   /* the glow follows the trace's main route only: a blur needs no zigzag */
-    cx.fillStyle="rgba("+T.hypha+","+(g.al*.4*T.glow).toFixed(3)+")";cx.beginPath();g.it.forEach(function(x){strandPath(x[0],plen(x[0])*x[2],x[1]*2.2,x[1]*.6)});cx.fill()});
+    if(dig){cx.strokeStyle="rgba("+T.hypha+","+(g.al*.4*T.tglow).toFixed(3)+")";cx.lineWidth=Math.max(1.5,g.w*3);cx.lineJoin="miter";cx.beginPath();g.it.forEach(function(x){if(x[2]<1)return;var P=x[0],e=x[3];var cs=e.cs||[];linePath([P[0]].concat(e.dir<0?cs.slice().reverse():cs,[P[P.length-1]]))});cx.stroke();return}   /* the glow follows the trace's main route only: a blur needs no zigzag */
+    cx.fillStyle="rgba("+T.hypha+","+(g.al*.4*T.tglow).toFixed(3)+")";cx.beginPath();g.it.forEach(function(x){strandPath(x[0],plen(x[0])*x[2],x[1]*2.2,x[1]*.6)});cx.fill()});
   cx=tcx;cx.setTransform(1,0,0,1,0,0);cx.drawImage(gc,0,0,tc.width,tc.height);cx.setTransform(DPR,0,0,DPR,0,0);
   Object.keys(groups).forEach(function(k){var g=groups[k],ends=[];
     if(dig){cx.strokeStyle="rgba("+g.rgb+","+g.al+")";cx.lineWidth=Math.max(.8,g.w*1.4);cx.lineJoin="miter";cx.beginPath();

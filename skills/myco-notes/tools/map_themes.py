@@ -43,7 +43,7 @@ THEMES = [
          page=dict(bg="#fff4e8", bg2="#fffaf3", panel="#ffffff", fg="#2b1c2a", muted="#6c5266", line="#f0d6c8", accent="#a8174f", code="#fdebe0"),
          pal=["#b0185a", "#4c8a0d", "#c05a00", "#3a4fc0", "#7b3fa0", "#1f7a3a", "#b04020", "#5b3aa8", "#a01836", "#00756a", "#8a6a00", "#c2185b"],
          quiet=["#7d6c70", "#7a6c5c", "#6c6680", "#7d6670", "#5f7180", "#6c7a5c"], hypha="176,70,110", wilt="#9a5b20", text="#2b1c2a"),
-    dict(id="matrix", label="Matrix", dark=True, font=MONO, style="fractal", nodes="pixel", hit="flash",
+    dict(id="matrix", label="Matrix", dark=True, font=MONO, style="fractal", nodes="pixel", hit="flash", tglow=.3,
          page=dict(bg="#020805", bg2="#07150c", panel="#06110a", fg="#a8ffbb", muted="#6fd486", line="#1c3d25", accent="#4dff7c", code="#051009"),
          pal=["#39ff6a", "#b6ff4d", "#4de8ff", "#7dffd6", "#d6ffa8", "#7fd8ff", "#b46cff", "#00ff9c", "#5fffe0", "#5fd9b0", "#c88cff", "#3fc8ff"],   # every third an electric cyan; two "Mystery Data" violets
          quiet=["#4f9a60", "#62904e", "#4c927e", "#6c966c", "#548a7c", "#7c975e"], hypha="80,255,120", wilt="#d8b02e", text="#a8ffbb"),
@@ -111,7 +111,7 @@ def graph_css():
 def graph_data():
     """The view's colours per theme, for its script: {id: {dark, pal, quiet, hypha, wilt, text, halo, font}}."""
     return {t["id"]: dict(dark=t["dark"], pal=t["pal"], quiet=t["quiet"], hypha=t["hypha"], wilt=t["wilt"], text=t["text"],
-                          halo=t.get("halo") or graph_vars(t)["halo"], font=t.get("graph_font", t["font"]), style=t.get("style", "organic"), nodes=t.get("nodes", ""), rings=t.get("rings", "rings"), hit=t.get("hit", "glow"), glow=t.get("glow", 1)) for t in THEMES}
+                          halo=t.get("halo") or graph_vars(t)["halo"], font=t.get("graph_font", t["font"]), style=t.get("style", "organic"), nodes=t.get("nodes", ""), rings=t.get("rings", "rings"), hit=t.get("hit", "glow"), glow=t.get("glow", 1), tglow=t.get("tglow", t.get("glow", 1))) for t in THEMES}
 
 
 def head_script():
