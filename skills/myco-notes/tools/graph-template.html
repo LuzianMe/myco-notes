@@ -119,7 +119,7 @@ function readTheme(){
   var id=root.getAttribute("data-theme");
   if(!TH[id])id=window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches?"light":"dark";
   var x=TH[id];
-  T={id:id,dark:x.dark,pal:x.pal,quiet:x.quiet,hypha:x.hypha,wilt:x.wilt,halo:x.halo,text:x.text,font:x.font,style:x.style||"organic",nodes:x.nodes||""};
+  T={id:id,dark:x.dark,pal:x.pal,quiet:x.quiet,hypha:x.hypha,wilt:x.wilt,halo:x.halo,text:x.text,font:x.font,style:x.style||"organic",nodes:x.nodes||"",rings:x.rings||"rings",hit:x.hit||"glow",glow:x.glow==null?1:x.glow};
   sprites={};shades={};tcache={};tKey="";
   paintLegend();
 }
@@ -383,7 +383,7 @@ function frac(seed,n){var a=[],i,amp=1,st=n;for(i=0;i<=n;i++)a[i]=0;while(st>1){
 function hyphaPath(e){
   var P=[],N=32,s,p,W=[];
   if(!e.fx){e.fx=frac(e.k*3.1+.7,N);e.fz=frac(e.k*5.7+1.3,N)}
-  var dx=e.b.x-e.a.x,dy=e.b.y-e.a.y,L=Math.hypot(dx,dy)||1,am=.11,ux=-dy/L,uy=dx/L;
+  var dx=e.b.x-e.a.x,dy=e.b.y-e.a.y,L=Math.hypot(dx,dy)||1,am=T.style==="smooth"?0:.11,   /* smooth: the original curve */ux=-dy/L,uy=dx/L;
   var px=L*cam.k,st=px<50?8:px<110?4:px<220?2:1;   /* level of detail: a short thread on screen needs few points */
   for(s=0;s<=N;s+=st){p=curve(e,s/N);var o=e.fx[s]*L*am,wx=p.x+ux*o,wy=p.y+uy*o,wz=e.a.z+(e.b.z-e.a.z)*s/N+(ZS?e.fz[s]*L*am/ZS:0);
     W.push([wx,wy,wz]);var q=proj(wx,wy,wz);P.push([q[0],q[1]])}
@@ -449,7 +449,7 @@ function strandPath(P,upto,w0,w1){   /* add the path P up to the length `upto` t
   cx.closePath();
   return Q[Q.length-1];
 }
-function tip(p,r){cx.beginPath();if(T.style!=="organic")cx.rect(p[0]-r,p[1]-r,2*r,2*r);else cx.arc(p[0],p[1],r,0,6.3);cx.fill()}
+function tip(p,r){cx.beginPath();if((T.style==="circuit"||T.style==="fractal"))cx.rect(p[0]-r,p[1]-r,2*r,2*r);else cx.arc(p[0],p[1],r,0,6.3);cx.fill()}
 /* A bud has the colour of the note the thread comes from (as that note is drawn: its group, or the wilt colour), a little
    darker on the dark theme and a little lighter on the light one, so it reads as part of the source and still stands out. */
 var shades={};
@@ -459,7 +459,7 @@ function sqSprite(color){var dm=T.nodes==="pixel",k=(dm?"dm":"sq")+color;if(spri
   for(var i=0;i<12;i++){var q=48-i*3.6;g.globalAlpha=.075;g.beginPath();if(dm){g.moveTo(48,48-q);g.lineTo(48+q,48);g.lineTo(48,48+q);g.lineTo(48-q,48);g.closePath()}else g.rect(48-q,48-q,2*q,2*q);g.fill()}sprites[k]=c;return c}
 function dia(x,y,q){cx.moveTo(x,y-q);cx.lineTo(x+q,y);cx.lineTo(x,y+q);cx.lineTo(x-q,y);cx.closePath()}   /* Matrix: a diamond (a square turned by 45 degrees) */
 function oct(x,y,q){var a=q*.4142;cx.moveTo(x-a,y-q);cx.lineTo(x+a,y-q);cx.lineTo(x+q,y-a);cx.lineTo(x+q,y+a);cx.lineTo(x+a,y+q);cx.lineTo(x-a,y+q);cx.lineTo(x-q,y+a);cx.lineTo(x-q,y-a);cx.closePath()}   /* Amber terminal: an octagon */
-function ringPath(x,y,R){if(T.nodes==="pixel")dia(x,y,R*1.25);else if(T.nodes==="pad")oct(x,y,R*1.08);else if(T.nodes)cx.rect(x-R,y-R,2*R,2*R);else cx.arc(x,y,R,0,6.3)}
+function ringPath(x,y,R){if(T.nodes==="pixel")dia(x,y,R*1.25);else if(T.nodes==="pad")oct(x,y,R*1.08);else cx.arc(x,y,R,0,6.3)}
 function shade(col,f){var k="sh"+col+Math.round(f*8);if(tcache[k])return tcache[k];var v=parseInt(col.slice(1),16);   /* f>0 toward white, f<0 toward black */
   return tcache[k]="rgb("+[v>>16&255,v>>8&255,v&255].map(function(x){return Math.round(f>0?x+(255-x)*f*.55:x*(1+f*.6))}).join(",")+")"}
 function octE(x,y,qx,qy){var ax=qx*.4142,ay=qy*.4142;cx.moveTo(x-ax,y-qy);cx.lineTo(x+ax,y-qy);cx.lineTo(x+qx,y-ay);cx.lineTo(x+qx,y+ay);cx.lineTo(x+ax,y+qy);cx.lineTo(x-ax,y+qy);cx.lineTo(x-qx,y+ay);cx.lineTo(x-qx,y-ay);cx.closePath()}
@@ -495,10 +495,58 @@ function glassPad(n,x,y,r,col){   /* Amber terminal: a glass disc with eight sid
   cx.globalAlpha=ga*.9;cx.strokeStyle="rgba(255,255,255,.8)";cx.lineWidth=1.3;cx.beginPath();cx.moveTo(g1[0]+(mx-g1[0])*.12,g1[1]+(my-g1[1])*.12);cx.lineTo(g2[0]+(mx-g2[0])*.12,g2[1]+(my-g2[1])*.12);cx.stroke();
   cx.globalAlpha=ga;
 }
+/* ---------- particles ----------
+   One small system for three effects: powder orbiting a Mycelium hub, spores puffing out of a Mycelium note a spike reaches, and
+   air bubbles rising from Deep sea hubs and from a Deep sea note a spike reaches. A burst is a handful of dots that drift and fade
+   in under a second; the orbits and the rising bubbles around hubs are worked out from the time, so they cost no state. Bursts do
+   not happen with reduced motion, and the hub particles stand still. */
+var parts=[];
+function burst(n,amt,now){
+  if(reduce||(T.hit!=="spores"&&T.hit!=="bubbles"))return;var b=T.hit==="bubbles",k=Math.round((b?4:7)*amt);
+  for(var i=0;i<k;i++){var a=Math.random()*6.28,sp=b?.008+Math.random()*.01:.02+Math.random()*.025;
+    parts.push({n:n,dx:0,dy:0,vx:b?(Math.random()-.5)*.012:Math.cos(a)*sp,vy:b?-(.025+Math.random()*.02):Math.sin(a)*sp,t0:now,life:b?900+Math.random()*300:500+Math.random()*200,sz:b?1.2+Math.random()*1.4:.7+Math.random()*.7,w:Math.random()*6.28,b:b})}
+  if(parts.length>160)parts.splice(0,parts.length-160);
+}
+function drawParts(now){
+  parts=parts.filter(function(p){var a=(now-p.t0)/p.life;if(a>=1||!p.n.vis)return false;var dt=now-p.t0,x=p.n.px+p.vx*dt+(p.b?Math.sin(p.w+dt*.008)*2:0),y=p.n.py+p.vy*dt,
+    col=p.n.due?T.wilt:gcol(p.n.g);cx.globalAlpha=(1-a)*(p.b?.7:.75);
+    if(p.b){cx.strokeStyle=shade(col,.55);cx.lineWidth=.9;cx.beginPath();cx.arc(x,y,p.sz*(1+a*.6),0,6.3);cx.stroke()}else{cx.fillStyle=shade(col,.3);cx.beginPath();cx.arc(x,y,p.sz,0,6.3);cx.fill()}
+    return true});
+  cx.globalAlpha=1;
+}
+function hubParticles(n,x,y,r,col,t,ra){   /* powder orbiting a hub on tilted rings, or bubbles rising from it */
+  var tt=reduce?0:t,ga=cx.globalAlpha;
+  if(T.rings==="powder"){cx.fillStyle=shade(col,.35);cx.beginPath();
+    for(var k=0;k<13;k++){var h1=hash(n.i*13+k),h2=hash(n.i*7+k+3),w=(.00025+h1*.0005)*(k%2?1:-1),a=h1*6.28+tt*w,R=r*(1.5+h2*1.1),tl=.5+h2*.25,
+      px=x+Math.cos(a)*R,py=y+Math.sin(a)*R*tl,sz=.6+hash(n.i+k*5)*.8;cx.moveTo(px+sz,py);cx.arc(px,py,sz,0,6.3)}
+    cx.globalAlpha=ra*.55;cx.fill()}
+  else if(T.rings==="ink"){cx.strokeStyle=shade(col,-.35);cx.lineWidth=.9;cx.globalAlpha=ra*.6;   /* a circle drawn twice by hand, slightly off */
+    for(k=0;k<2;k++){var o=hash(n.i+k*4)*6.28;cx.beginPath();cx.ellipse(x+Math.cos(o)*.8,y+Math.sin(o)*.8,r*(1.55+k*.12),r*(1.48+k*.14),o,0,6.1);cx.stroke()}}
+  else if(T.rings==="bubbles"){cx.strokeStyle=shade(col,.55);cx.lineWidth=.9;
+    for(k=0;k<5;k++){var ph=((tt*.00022*(.7+hash(n.i+k)*.6))+hash(n.i*3+k))%1,bx=x+(hash(n.i+k*9)-.5)*r*1.6+Math.sin(ph*9+k)*r*.25,by=y-r*.6-ph*r*4.5;
+      cx.globalAlpha=ra*(1-ph)*.65;cx.beginPath();cx.arc(bx,by,.9+ph*1.8,0,6.3);cx.stroke()}}
+  cx.globalAlpha=ga;
+}
+function berry(n,x,y,r,col){   /* Fruit: a glossy berry with a little green calyx; a hub is a cluster of drupelets, like a raspberry */
+  var dark=shade(col,-.35),lite=shade(col,.75),parts=n.hub?[[0,0,.55]].concat([0,1,2,3,4,5].map(function(k){var a=k*1.047+.3;return [Math.cos(a)*r*.62,Math.sin(a)*r*.58,.48]})):[[0,0,1]];
+  parts.sort(function(a,b){return a[1]-b[1]}).forEach(function(p){var px=x+p[0],py=y+p[1],rr=r*p[2]*1.05;
+    cx.fillStyle=dark;cx.beginPath();cx.ellipse(px,py+rr*.06,rr,rr*.93,0,0,6.3);cx.fill();
+    cx.fillStyle=col;cx.beginPath();cx.ellipse(px-rr*.06,py-rr*.04,rr*.86,rr*.8,0,0,6.3);cx.fill();
+    cx.fillStyle=lite;cx.globalAlpha*=.85;cx.beginPath();cx.ellipse(px-rr*.35,py-rr*.38,rr*.28,rr*.18,-.6,0,6.3);cx.fill();cx.globalAlpha/=.85});
+  var ty=y-r*(n.hub?1.05:.88);cx.strokeStyle="#3f8a2e";cx.lineWidth=Math.max(.8,r*.16);cx.beginPath();
+  for(var k=0;k<5;k++){var a=-1.57+(k-2)*.55;cx.moveTo(x,ty);cx.lineTo(x+Math.cos(a)*r*.45,ty+Math.sin(a)*r*.3+r*.18)}cx.stroke();
+}
+function inkNote(n,x,y,r,col){   /* Paper: a watercolour wash inside an ink outline drawn a little unevenly */
+  cx.fillStyle=col;var ga=cx.globalAlpha;cx.globalAlpha=ga*.38;cx.beginPath();cx.arc(x+.4,y+.3,r*1.02,0,6.3);cx.fill();cx.globalAlpha=ga;
+  cx.strokeStyle=shade(col,-.45);cx.lineWidth=Math.max(.9,r*.18);var o=hash(n.i)*6.28;cx.beginPath();cx.ellipse(x,y,r,r*.94,o,.15,6.2);cx.stroke();
+  cx.lineWidth=Math.max(.6,r*.1);cx.beginPath();cx.ellipse(x+.5,y-.3,r*.96,r,o+.8,3.4,5.6);cx.stroke();
+}
 function digiNode(n,x,y,r,col){
-  if(n.spore){cx.strokeStyle=col;cx.lineWidth=1.2;var q=Math.max(1.5,r*.75);cx.beginPath();if(T.nodes==="pixel")dia(x,y,q*1.25);else if(T.nodes==="pad")oct(x,y,q*1.08);else cx.rect(x-q,y-q,2*q,2*q);cx.stroke();return}
+  if(n.spore){cx.strokeStyle=col;cx.lineWidth=1.2;var q=Math.max(1.5,r*.75);cx.beginPath();if(T.nodes==="pixel")dia(x,y,q*1.25);else if(T.nodes==="pad")oct(x,y,q*1.08);else cx.arc(x,y,q,0,6.3);cx.stroke();return}
   cx.fillStyle=col;
   if(T.nodes==="pad")return glassPad(n,x,y,r,col);
+  if(T.nodes==="berry")return berry(n,x,y,r,col);
+  if(T.nodes==="ink")return inkNote(n,x,y,r,col);
   crystal(n,x,y,r,col);
 }
 function budRGB(n){
@@ -507,11 +555,11 @@ function budRGB(n){
     shades[k]=(T.dark?[r*.72,g*.72,b*.72]:[r+(255-r)*.3,g+(255-g)*.3,b+(255-b)*.3]).map(Math.round).join(",")}
   return shades[k];
 }
-function twigOK(){return !busyNow&&cam.k>(cam.fk||cam.k)*.7}   /* no side branches while the reader moves the view, or zoomed far out */
+function twigOK(){return T.style!=="smooth"&&!busyNow&&cam.k>(cam.fk||cam.k)*.7}   /* no side branches while the reader moves the view, or zoomed far out */
 function twigs(e,w,col){var ga=cx.globalAlpha;cx.strokeStyle=col;cx.lineWidth=Math.max(.5,w*.35);cx.globalAlpha=ga*.5;cx.beginPath();twigPath(e);cx.stroke();cx.globalAlpha=ga}
 function twigPath(e){   /* faint side branches on long threads: decoration only (on a circuit: a short stub at a corner) */
   if(!e.W||e.L*cam.k<150)return;
-  if(T.style!=="organic"){if(!e.cs||!e.cs.length)return;var c=e.cs[Math.floor(hash(e.k)*e.cs.length)],l=6+6*hash(e.k+1),hz=hash(e.k+2)<.5;cx.moveTo(c[0],c[1]);cx.lineTo(c[0]+(hz?l:0),c[1]+(hz?0:l));return}var nb=e.L*cam.k>260?2:1;
+  if((T.style==="circuit"||T.style==="fractal")){if(!e.cs||!e.cs.length)return;var c=e.cs[Math.floor(hash(e.k)*e.cs.length)],l=6+6*hash(e.k+1),hz=hash(e.k+2)<.5;cx.moveTo(c[0],c[1]);cx.lineTo(c[0]+(hz?l:0),c[1]+(hz?0:l));return}var nb=e.L*cam.k>260?2:1;
   for(var b=0;b<nb;b++){var t=.3+.4*hash(e.k+b*3.3),i=Math.round(t*(e.W.length-1)),p0=e.W[i],p1=e.W[Math.min(e.W.length-1,i+1)],
     tx=p1[0]-p0[0],ty=p1[1]-p0[1],tl=Math.hypot(tx,ty)||1,sg=hash(e.k+b*5.1)<.5?-1:1,an=sg*(.5+.4*hash(e.k+b)),
     c=Math.cos(an),sn=Math.sin(an),vx=(tx*c-ty*sn)/tl,vy=(tx*sn+ty*c)/tl,len=e.L*(.1+.08*hash(e.k+b*2.2)),f=frac(e.k*9.1+b,8);
@@ -524,7 +572,7 @@ function threadRGB(n){var c=n.due?T.wilt:gcol(n.g),k=T.id+c;if(!tcache[k]){var v
 function threadFill(e,P,al){if(e.dir!==0)return "rgba("+threadRGB(e.dir>0?e.a:e.b)+","+al+")";
   var g=cx.createLinearGradient(P[0][0],P[0][1],P[P.length-1][0],P[P.length-1][1]);g.addColorStop(0,"rgba("+threadRGB(e.a)+","+al+")");g.addColorStop(1,"rgba("+threadRGB(e.b)+","+al+")");return g}
 function along(e,t){
-  if(T.style!=="organic"&&e.SP&&e.SP.length>1){var S=e.SP,d=t*(e.SPL||plen(S)),acc=0,i=1;for(;i<S.length-1;i++){var sl=Math.hypot(S[i][0]-S[i-1][0],S[i][1]-S[i-1][1]);if(acc+sl>=d)break;acc+=sl}
+  if((T.style==="circuit"||T.style==="fractal")&&e.SP&&e.SP.length>1){var S=e.SP,d=t*(e.SPL||plen(S)),acc=0,i=1;for(;i<S.length-1;i++){var sl=Math.hypot(S[i][0]-S[i-1][0],S[i][1]-S[i-1][1]);if(acc+sl>=d)break;acc+=sl}
     var A=S[i-1],B=S[i],u=Math.max(0,Math.min(1,(d-acc)/(Math.hypot(B[0]-A[0],B[1]-A[1])||1)));return [A[0]+(B[0]-A[0])*u,A[1]+(B[1]-A[1])*u,(e.a.ps+e.b.ps)/2]}
   var W=e.W;if(!W||W.length<2){var p=curve(e,t);return proj(p.x,p.y,e.a.z+(e.b.z-e.a.z)*t)}   /* a point on the wavy thread, 0 at a, 1 at b */
   var f=t*(W.length-1),i=Math.min(W.length-2,Math.floor(f)),u=f-i,A=W[i],B=W[i+1];return proj(A[0]+(B[0]-A[0])*u,A[1]+(B[1]-A[1])*u,A[2]+(B[2]-A[2])*u)}
@@ -532,14 +580,14 @@ function hypha(e,w,grow,al,tipA){
   var P=hyphaPath(e);if(P.length<2)return;var col=threadFill(e,P,al);if(grow>=1&&twigOK())twigs(e,w,col);
   var tot=0,i;for(i=1;i<P.length;i++)tot+=Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1]);
   if(tot<2)return;
-  var tr=.9+w*.9;cx.fillStyle=col;if(T.style!=="organic")return digiHypha(e,P,w,grow,col,tipA,tot,tr);
+  var tr=.9+w*.9;cx.fillStyle=col;if((T.style==="circuit"||T.style==="fractal"))return digiHypha(e,P,w,grow,col,tipA,tot,tr);
   if(e.dir===0){   /* each side grows half the way; the two meet in the middle */
     var R=P.slice().reverse(),h=w*.5;
     strand(P,tot*grow/2+.5,h,h);var q=strand(R,tot*grow/2+.5,h,h);
     var bud=function(n){cx.fillStyle="rgba("+budRGB(n)+","+tipA+")"};   /* the bud on b's rim comes from a, and the other way round */
     if(grow<1){if(q){bud(e.b);tip(q,tr*.8)}}else{bud(e.a);tip(P[P.length-1],tr);bud(e.b);tip(P[0],tr)}
   }else{
-    var ci=T.style!=="organic",S=e.dir>0?P:P.slice().reverse(),end=strand(S,tot*grow,ci?w*.7:w*1.15,ci?w*.7:w*.12);if(ci&&grow>=1){cx.beginPath();pads(e,w);cx.fill()}
+    var ci=(T.style==="circuit"||T.style==="fractal"),S=e.dir>0?P:P.slice().reverse(),end=strand(S,tot*grow,ci?w*.7:w*1.15,ci?w*.7:w*.12);if(ci&&grow>=1){cx.beginPath();pads(e,w);cx.fill()}
     if(end){cx.fillStyle="rgba("+budRGB(e.dir>0?e.a:e.b)+","+tipA+")";tip(end,tr)}
   }
 }
@@ -563,10 +611,10 @@ function passOn(s,tn,now){   /* a chain reaction: the note a spike reached may f
   for(var i=0;i<opts.length;i++){r-=ws[i];if(r<=0){var e=opts[i].e;launch(e,s.amb,now,e.a===tn?1:-1,s.hop+1);return}}
 }
 function drawSpikes(now){
-  var ci=T.style!=="organic";
+  var ci=(T.style==="circuit"||T.style==="fractal");
   spOld=spikes;spikes=[];   /* spikes passed on while these are drawn land in the new list */
   var kept=spOld.filter(function(s){var p=(now-s.t0)/s.dur;if(!edgeVis(s.e))return false;
-    if(p>=1){var tn=s.d>0?s.e.b:s.e.a;tn.fl=now;tn.flA=s.amb?.6:.7;passOn(s,tn,now);return false}
+    if(p>=1){var tn=s.d>0?s.e.b:s.e.a;tn.fl=now;tn.flA=s.amb?.6:.7;burst(tn,s.amb?.6:1,now);passOn(s,tn,now);return false}
     if(!s.e.W)hyphaPath(s.e);var rgb=threadRGB(s.d>0?s.e.a:s.e.b),al=s.amb?.85:.95,gx=ci&&Math.random()<.05?(Math.random()-.5)*6:0,nk=s.amb?7:5;
     for(var k=0;k<nk;k++){var pp=p-k*.03;if(pp<0)break;var q=along(s.e,s.d>0?pp:1-pp),r=(s.amb?2.1:2.2)*q[2]*(1-k*.12);
       cx.fillStyle="rgba("+rgb+","+(al*(1-k*.14)).toFixed(3)+")";cx.beginPath();if(ci)cx.rect(q[0]+gx-r,q[1]-r,2*r,2*r);else cx.arc(q[0],q[1],r,0,6.3);cx.fill()}
@@ -575,7 +623,7 @@ function drawSpikes(now){
 }
 function quietThreads(list){   /* into the cache: one fill per colour (the theme's glow, the thread, the buds), fused threads with their fade */
   var keep=cx;cx=tcx;cx.setTransform(1,0,0,1,0,0);cx.clearRect(0,0,tc.width,tc.height);cx.setTransform(DPR,0,0,DPR,0,0);
-  var tw=twigOK(),groups={},fused=[],dig=T.style!=="organic";
+  var tw=twigOK(),groups={},fused=[],dig=(T.style==="circuit"||T.style==="fractal");
   list.forEach(function(e){var a=Math.min(e.a.ap,e.b.ap),d=Math.min(dim(e.a),dim(e.b)),w=Math.min(2.6,.6+Math.sqrt(e.w)*.45)*Math.min(1.4,cam.k+.3),al=.26*Math.min(1,a*2)*Math.max(d,.35);
     var ef=(fogOf(e.a)+fogOf(e.b))/2;w*=(e.a.ps+e.b.ps)/2;al*=1-.7*ef;
     if(e.dir===0){fused.push([e,w,a,al]);return}
@@ -583,8 +631,8 @@ function quietThreads(list){   /* into the cache: one fill per colour (the theme
     (groups[k]||(groups[k]={rgb:threadRGB(src),bud:budRGB(src),al:ab,w:wb,it:[]})).it.push([e.dir>0?P:P.slice().reverse(),w,a,e])});
   cx=gcx;cx.setTransform(1,0,0,1,0,0);cx.clearRect(0,0,gc.width,gc.height);cx.setTransform(DPR/2,0,0,DPR/2,0,0);   /* a soft glow in the theme's thread colour, drawn small and scaled up */
   Object.keys(groups).forEach(function(k){var g=groups[k];
-    if(dig){cx.strokeStyle="rgba("+T.hypha+","+(g.al*.4).toFixed(3)+")";cx.lineWidth=Math.max(1.5,g.w*3);cx.lineJoin="miter";cx.beginPath();g.it.forEach(function(x){if(x[2]<1)return;var P=x[0],e=x[3];var cs=e.cs||[];linePath([P[0]].concat(e.dir<0?cs.slice().reverse():cs,[P[P.length-1]]))});cx.stroke();return}   /* the glow follows the trace's main route only: a blur needs no zigzag */
-    cx.fillStyle="rgba("+T.hypha+","+(g.al*.4).toFixed(3)+")";cx.beginPath();g.it.forEach(function(x){strandPath(x[0],plen(x[0])*x[2],x[1]*2.2,x[1]*.6)});cx.fill()});
+    if(dig){cx.strokeStyle="rgba("+T.hypha+","+(g.al*.4*T.glow).toFixed(3)+")";cx.lineWidth=Math.max(1.5,g.w*3);cx.lineJoin="miter";cx.beginPath();g.it.forEach(function(x){if(x[2]<1)return;var P=x[0],e=x[3];var cs=e.cs||[];linePath([P[0]].concat(e.dir<0?cs.slice().reverse():cs,[P[P.length-1]]))});cx.stroke();return}   /* the glow follows the trace's main route only: a blur needs no zigzag */
+    cx.fillStyle="rgba("+T.hypha+","+(g.al*.4*T.glow).toFixed(3)+")";cx.beginPath();g.it.forEach(function(x){strandPath(x[0],plen(x[0])*x[2],x[1]*2.2,x[1]*.6)});cx.fill()});
   cx=tcx;cx.setTransform(1,0,0,1,0,0);cx.drawImage(gc,0,0,tc.width,tc.height);cx.setTransform(DPR,0,0,DPR,0,0);
   Object.keys(groups).forEach(function(k){var g=groups[k],ends=[];
     if(dig){cx.strokeStyle="rgba("+g.rgb+","+g.al+")";cx.lineWidth=Math.max(.8,g.w*1.4);cx.lineJoin="miter";cx.beginPath();
@@ -593,7 +641,7 @@ function quietThreads(list){   /* into the cache: one fill per colour (the theme
       cx.fillStyle="rgba("+g.bud+","+Math.min(1,g.al*3).toFixed(3)+")";cx.beginPath();ends.forEach(function(t){var r=t[1];cx.rect(t[0][0]-r,t[0][1]-r,2*r,2*r)});cx.fill();
       if(tw){cx.strokeStyle="rgba("+g.rgb+","+(g.al*.5).toFixed(3)+")";cx.lineWidth=.6;cx.beginPath();g.it.forEach(function(x){twigPath(x[3])});cx.stroke()}
       return}
-    var ci=T.style!=="organic";cx.fillStyle="rgba("+g.rgb+","+g.al+")";cx.beginPath();g.it.forEach(function(x){var end=strandPath(x[0],plen(x[0])*x[2],ci?x[1]*.7:x[1]*1.15,ci?x[1]*.7:x[1]*.12);if(end)ends.push([end,.9+x[1]*.9]);if(ci&&x[2]>=1)pads(x[3],x[1])});cx.fill();
+    var ci=(T.style==="circuit"||T.style==="fractal");cx.fillStyle="rgba("+g.rgb+","+g.al+")";cx.beginPath();g.it.forEach(function(x){var end=strandPath(x[0],plen(x[0])*x[2],ci?x[1]*.7:x[1]*1.15,ci?x[1]*.7:x[1]*.12);if(end)ends.push([end,.9+x[1]*.9]);if(ci&&x[2]>=1)pads(x[3],x[1])});cx.fill();
     cx.fillStyle="rgba("+g.bud+","+Math.min(1,g.al*3).toFixed(3)+")";cx.beginPath();ends.forEach(function(t){var r=t[1];if(ci)cx.rect(t[0][0]-r,t[0][1]-r,2*r,2*r);else{cx.moveTo(t[0][0]+r,t[0][1]);cx.arc(t[0][0],t[0][1],r,0,6.3)}});cx.fill();
     if(tw){cx.strokeStyle="rgba("+g.rgb+","+(g.al*.5).toFixed(3)+")";cx.lineWidth=.6;cx.beginPath();g.it.forEach(function(x){twigPath(x[3])});cx.stroke()}
   });
@@ -676,13 +724,14 @@ function draw(now){
   order.forEach(function(n){
     var rec=recency(n),pulse=reduce||playing?1:1+.1*Math.sin(t/650+n.i)*rec,d=dim(n),sc=ease(n.ap),r=n.pr*sc*pulse,x=n.px,y=n.py,fz=fogOf(n),fog=1-.68*fz;   /* further back: fainter, a softer wider glow, no shine */
     var col=n.due?T.wilt:gcol(n.g);
-    cx.globalAlpha=Math.min(1,n.ap)*d*(n.hist?.55:1)*(.14+.6*rec+(n.hub?.2:0)+.12*fz)*(1-.3*fz);
+    cx.globalAlpha=Math.min(1,n.ap)*d*(n.hist?.55:1)*(.14+.6*rec+(n.hub?.2:0)+.12*fz)*(1-.3*fz)*T.glow;
     var gs=r*(n.hub?3.4:2.8)*(1+.25*fz),gm=Math.max(r*1.6,(n.nn||1e9)*(n.hub?1.3:1.15));if(gs>gm){cx.globalAlpha*=.25+.75*gm/gs;gs=gm}   /* crowded: a smaller, fainter glow */
-    if(!n.spore)cx.drawImage(T.nodes&&T.nodes!=="pad"?sqSprite(col):sprite(col),x-gs,y-gs,gs*2,gs*2);   /* a spore (no link at all) has no glow */
-    if(n.fl&&t-n.fl<500){var fa=(t-n.fl)/500;cx.globalAlpha=(1-fa)*n.flA;if(T.nodes==="chip"||T.nodes==="pad"){var fq=r*(1.3+fa*2);cx.strokeStyle=col;cx.lineWidth=1.5;cx.beginPath();if(T.nodes==="pad")oct(x,y,fq);else cx.rect(x-fq,y-fq,2*fq,2*fq);cx.stroke()}else{var fs=r*5;cx.drawImage(T.nodes&&T.nodes!=="pad"?sqSprite(col):sprite(col),x-fs,y-fs,fs*2,fs*2)}}   /* a spike just arrived */
+    if(!n.spore)cx.drawImage(T.nodes==="pixel"?sqSprite(col):sprite(col),x-gs,y-gs,gs*2,gs*2);   /* a spore (no link at all) has no glow */
+    if(n.fl&&t-n.fl<500&&T.hit!=="spores"&&T.hit!=="bubbles"){var fa=(t-n.fl)/500;cx.globalAlpha=(1-fa)*n.flA*Math.max(.4,T.glow);if(T.hit==="ink"){cx.fillStyle=col;cx.globalAlpha*=.35;cx.beginPath();cx.arc(x,y,r*(1.2+fa*1.6),0,6.3);cx.fill()}else if(T.nodes==="chip"||T.nodes==="pad"){var fq=r*(1.3+fa*2);cx.strokeStyle=col;cx.lineWidth=1.5;cx.beginPath();if(T.nodes==="pad")oct(x,y,fq);else cx.rect(x-fq,y-fq,2*fq,2*fq);cx.stroke()}else{var fs=r*5;cx.drawImage(T.nodes==="pixel"?sqSprite(col):sprite(col),x-fs,y-fs,fs*2,fs*2)}}   /* a spike just arrived */
     cx.globalAlpha=Math.min(1,n.ap)*d*(n.hist?.6:1)*fog;
     if(T.nodes)digiNode(n,x,y,r,col);else{if(n.spore){cx.strokeStyle=col;cx.lineWidth=1.3;cx.beginPath();cx.arc(x,y,Math.max(1.5,r*.8),0,6.3);cx.stroke();cx.globalAlpha=0}else{cx.fillStyle=col;cx.beginPath();cx.arc(x,y,r,0,6.3);cx.fill()}cx.globalAlpha*=1-fz;cx.fillStyle="rgba(255,255,255,"+(T.dark?.28:.4)+")";cx.beginPath();cx.arc(x-r*.28,y-r*.3,r*.38,0,6.3);cx.fill();}cx.globalAlpha=Math.min(1,n.ap)*d*(n.hist?.6:1)*fog;
-    if(n.hub){   /* a hub (one of the most-mentioned notes of this project) carries two soft rings, like a fruiting body pushing up through the network */
+    if(n.hub&&T.rings!=="rings"){var ra0=Math.min(1,n.ap)*d*fog;hubParticles(n,x,y,r,col,t,ra0)}
+    else if(n.hub){   /* a hub (one of the most-mentioned notes of this project) carries two soft rings, like a fruiting body pushing up through the network */
       var ra=Math.min(1,n.ap)*d*fog;cx.strokeStyle=col;cx.lineWidth=1.4;
       cx.globalAlpha=ra*.55;cx.beginPath();ringPath(x,y,Math.max(0,r*1.55+(reduce||playing?0:1.2*Math.sin(t/900+n.i))));cx.stroke();
       cx.globalAlpha=ra*.25;cx.beginPath();ringPath(x,y,r*2.1);cx.stroke();
@@ -692,12 +741,13 @@ function draw(now){
     cx.globalAlpha=1;
     if(n.la>.01&&d>.5){var la=n.la*n.la*(3-2*n.la);label(n.name.replace(/\.md$/,""),x,y+r*(n.hub?2.1:1)+14+(1-la)*5,n.hub||n.i===sel,la*(forced(n)?1:1-.4*fz))}   /* a name rises a few pixels as it fades in */
   });
-  /* ripples: a new or changed note lets out a ring */
+  drawParts(t);
+  /* ripples: a new or changed note lets out a ring, in the theme's own shape (a circle, a diamond, an octagon) */
   ripples=ripples.filter(function(rp){return t-rp.t<1100});
   ripples.forEach(function(rp){
-    var n=NODES[rp.i];if(!n.vis)return;var p=(t-rp.t)/1100,x=n.px,y=n.py;
+    var n=NODES[rp.i];if(!n.vis)return;if(T.hit==="spores"||T.hit==="bubbles"){if(!rp.b){rp.b=1;burst(n,rp.born?1.4:1,t)}return}var p=(t-rp.t)/1100,x=n.px,y=n.py;
     cx.strokeStyle=gcol(n.g);cx.globalAlpha=(1-p)*(rp.born?.9:.55);cx.lineWidth=rp.born?2.4:1.4;
-    cx.beginPath();cx.arc(x,y,(n.r*Math.max(.7,cam.k)+8+p*(rp.born?46:26))*n.ps,0,6.3);cx.stroke();cx.globalAlpha=1;
+    cx.beginPath();ringPath(x,y,(n.r*Math.max(.7,cam.k)+8+p*(rp.born?46:26))*n.ps);cx.stroke();cx.globalAlpha=1;   /* in the shape of the theme's notes */
   });
 }
 
