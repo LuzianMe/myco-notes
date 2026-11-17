@@ -48,8 +48,8 @@ input[type=search]:focus-visible,button:focus-visible,a:focus-visible,input[type
 #time #tfold{min-width:0;width:24px;padding:0;border-color:transparent}#time #tfold:hover{border-color:var(--accent)}
 #time.fold #slide,#time.fold #what,#time.fold #speedl{display:none}
 .saver #left,.saver #panel,.saver #hint{display:none!important}
-.saver #tools>*:not(#saver){display:none}.saver #tools{background:transparent;border-color:transparent;backdrop-filter:none}
-.saver #saver{opacity:.4}.saver #saver:hover,.saver #saver:focus-visible{opacity:1}
+.saver #find,.saver #tools>a{display:none!important}.saver #tools{background:transparent;border-color:transparent;backdrop-filter:none}
+.saver #tools>*{opacity:.45;transition:opacity .3s}.saver #tools>*:hover,.saver #tools>*:focus-within,.saver #tools:active>*{opacity:1}
 #time[hidden]{display:none}
 #hint{position:fixed;left:50%;bottom:18px;transform:translate(-50%,6px);width:max-content;max-width:calc(100vw - 32px);box-sizing:border-box;padding:6px 14px;border-radius:16px;background:var(--panel);border:1px solid var(--line);color:var(--muted);font-size:12.5px;text-align:center;pointer-events:none;opacity:0;transition:opacity .6s,transform .6s}
 #hint.on{opacity:1;transform:translate(-50%,0)}
@@ -70,12 +70,13 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 #left>#head{position:fixed}#fold{display:none}
 #head{top:12px;left:12px;width:calc(100vw - 24px);padding:8px 12px}
 #head h1{font-size:15px;margin:0;padding-right:var(--barw,280px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.stackbar #head{padding-top:39px}.stackbar #head h1{padding-right:0}   /* too narrow for the title beside the buttons: the buttons get a row of their own */
+.stackbar #head{padding-top:var(--barh,39px)}.stackbar #head h1{padding-right:0}   /* too narrow for the title beside the buttons: the buttons get a row of their own */
 #head p{margin:0;font-size:11.5px}
 #head:not(.open) #q,#head:not(.open) #legend{display:none}
 #head.open #q{margin-top:8px}#legend{max-height:96px;overflow:auto}
-#tools{top:17px;right:20px;padding:0;background:none;border:0;backdrop-filter:none;gap:5px}
-#tools a,#tools button{padding:3px 8px;font-size:12px}#find{display:inline-block}
+#tools{top:17px;right:20px;max-width:calc(100vw - 40px);flex-wrap:wrap;justify-content:flex-end;padding:0;background:none;border:0;backdrop-filter:none;gap:5px}
+#tools a,#tools button{padding:3px 8px;font-size:12px}.theme-pick select{max-width:104px;font-size:12px}
+.saver #tools{top:12px;right:12px}#find{display:inline-block}
 #find[aria-expanded=true]{border-color:var(--accent)}
 /* replay: one row of controls and one line of text */
 #time{bottom:12px;left:12px;right:12px;padding:6px 36px 6px 10px;gap:3px 8px;grid-template-columns:auto 1fr auto;grid-template-areas:"p s v" "w x x";align-items:center}
@@ -85,6 +86,8 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 #what.full{white-space:normal}
 #panel{top:auto;right:12px;left:12px;bottom:92px;width:auto;max-height:34vh;padding:10px 14px}
 .notime #panel{bottom:12px}
+#time.fold{grid-template-columns:auto 1fr;grid-template-areas:"p w";padding:5px 36px 5px 8px}#time.fold #when{justify-self:start}#time.fold #tfold{top:5px}
+.tfolded #panel{bottom:56px}.tfolded #hint{bottom:60px}
 }
 </style>
 %%THEME_HEAD%%
@@ -766,7 +769,7 @@ function draw(now){
 function fitBar(){   /* phone: the title leaves room for the buttons beside it, measured (their number and the font vary) */
   var tl=document.getElementById("tools"),hd=document.getElementById("head");
   if(W>640){root.classList.remove("stackbar");return}
-  var h1=hd.querySelector("h1"),hr=h1.getBoundingClientRect(),tw=Math.max(0,hr.right-tl.getBoundingClientRect().left+10);root.style.setProperty("--barw",tw+"px");
+  var h1=hd.querySelector("h1"),hr=h1.getBoundingClientRect(),tw=Math.max(0,hr.right-tl.getBoundingClientRect().left+10);root.style.setProperty("--barw",tw+"px");root.style.setProperty("--barh",(tl.getBoundingClientRect().height+12)+"px");
   var rg=document.createRange();rg.selectNodeContents(h1);var need=rg.getBoundingClientRect().width,room=hr.width-tw;
   root.classList.toggle("stackbar",need>room&&room<150);   /* a long title is shortened with an ellipsis while there is reasonable room */
 }
@@ -892,7 +895,7 @@ function togglePanel(){setPanelFull(!panelFull);pref("panel",panelFull?"full":"m
 function setFold(f){var h=document.getElementById("head"),b=document.getElementById("fold");h.classList.toggle("fold",f);b.innerHTML=f?"+":"&minus;";b.setAttribute("aria-expanded",f?"false":"true");b.title=f?"Show the search and the legend":"Hide the search and the legend"}
 document.getElementById("fold").addEventListener("click",function(){var f=!document.getElementById("head").classList.contains("fold");setFold(f);pref("head",f?"fold":"open")});
 setFold(pref("head")==="fold");
-function setTFold(f){var tm=document.getElementById("time"),b=document.getElementById("tfold");tm.classList.toggle("fold",f);b.innerHTML=f?"+":"&minus;";b.setAttribute("aria-expanded",f?"false":"true");b.title=f?"Show the timeline":"Hide the timeline"}
+function setTFold(f){var tm=document.getElementById("time"),b=document.getElementById("tfold");tm.classList.toggle("fold",f);root.classList.toggle("tfolded",f);b.innerHTML=f?"+":"&minus;";b.setAttribute("aria-expanded",f?"false":"true");b.title=f?"Show the timeline":"Hide the timeline"}
 document.getElementById("tfold").addEventListener("click",function(){var f=!document.getElementById("time").classList.contains("fold");setTFold(f);pref("time",f?"fold":"open")});
 setTFold(pref("time")==="fold");
 /* Screensaver: the panels go, the network is centred at the current zoom, labels are off, and it turns by itself; dragging and
