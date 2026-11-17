@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.35.4
+- **The view's buttons fit on a phone**: on a narrow screen they wrap onto a second line instead of running off the left edge, so Find is always there, and the theme list is a little narrower.
+- **A folded replay panel is one slim line on a phone** (Replay and the date), giving its space back to the network.
+- **The screensaver keeps the view's buttons**: Fit, Depth, hold still, the screensaver button and the theme picker stay, dimmed until touched; only Find and Map go with the panels.
+
 ## 0.35.3
 - **Hold still**: a new &#10074;&#10074; button among the view's buttons stops the network turning by itself (and the standby spikes with it), to look at one place for as long as you like; dragging still turns it by hand, and pressing it again lets it turn. The screensaver lets go of the hold.
 - **Amber terminal threads read more clearly**: their glow is at 35%.
