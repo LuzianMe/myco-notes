@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.33.0
+- **Matrix notes are crystals**: each diamond is drawn as a small octahedron whose four faces take a light, two mid and a dark tone of the note's colour; the light turns with the view, so as the network spins the crystals seem to turn in place. Busy notes are clusters of small crystals.
+- **Amber terminal notes are thick pads**: each octagon has a dark rim and side below its top face, the top face and drill hole squash with the camera's tilt so the pad lies in space, and a lit upper edge suggests light from above.
+- **Closer looks**: in these two themes notes keep growing when zoomed in (up to about 60% further than before), so the facets and pads can be seen. Plain filled shapes only: drawing cost is unchanged.
+
 ## 0.32.1
 - **Matrix traces that only move forward**: the fractal staircases of 0.31.0 and 0.32.0 stepped out and back and read as noise, and they were slow. A Matrix thread is now built on screen from its two ends: the way is split into the two pi/6 lattice directions either side of it and walked in 1 to 4 alternating steps whose lengths come from three fixed ratios, so the same staircase shapes recur and nothing doubles back; small diamond pads sit at some bends. A handful of points per thread: Matrix now draws as fast as Amber terminal (about 38 ms against 49 ms per frame on a real notes repository, in a browser without a graphics card).
 

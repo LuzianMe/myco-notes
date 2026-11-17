@@ -267,7 +267,7 @@ function project(now,dt){
   var zs=Math.max(240,2*RM*(rt>0?Math.max(.8,Math.min(1.6,ra/rt)):1));ZS=ZS?ZS+(zs-ZS)*.05:zs;
   if(x0<x1||y0<y1){var cx1=(x0+x1)/2,cy1=(y0+y1)/2;if(!C)C={x:cx1,y:cy1};else{C.x+=(cx1-C.x)*.1;C.y+=(cy1-C.y)*.1}}
   if(C){var pt=pivotTarget();if(!P)P={x:pt.x,y:pt.y,z:pt.z};else if(pt!==P){var pe=reduce?1:Math.min(1,dt/450);P.x+=(pt.x-P.x)*pe;P.y+=(pt.y-P.y)*pe;P.z+=(pt.z-P.z)*pe}}
-  var kk=Math.max(.7,Math.min(1.6,cam.k)),lo=1e9,hi=-1e9;
+  var kk=Math.max(.7,Math.min(T.nodes?2.6:1.6,cam.k)),   /* the digital themes' notes grow further when zoomed in, so their facets and pads can be seen */lo=1e9,hi=-1e9;
   NODES.forEach(function(n){var q=proj(n.x,n.y,n.z);n.px=q[0];n.py=q[1];n.ps=q[2];n.pz=q[3];n.wx=q[4];n.wy=q[5];n.pr=n.r*kk*q[2];
     if(n.vis){lo=Math.min(lo,n.pz);hi=Math.max(hi,n.pz)}});
   NODES.forEach(function(n){n.fz=hi>lo?depthAmt*(n.pz-lo)/(hi-lo):0});   /* fog by the distance from the viewer, not by age, so it stays right from any side */
@@ -460,15 +460,25 @@ function sqSprite(color){var dm=T.nodes==="pixel",k=(dm?"dm":"sq")+color;if(spri
 function dia(x,y,q){cx.moveTo(x,y-q);cx.lineTo(x+q,y);cx.lineTo(x,y+q);cx.lineTo(x-q,y);cx.closePath()}   /* Matrix: a diamond (a square turned by 45 degrees) */
 function oct(x,y,q){var a=q*.4142;cx.moveTo(x-a,y-q);cx.lineTo(x+a,y-q);cx.lineTo(x+q,y-a);cx.lineTo(x+q,y+a);cx.lineTo(x+a,y+q);cx.lineTo(x-a,y+q);cx.lineTo(x-q,y+a);cx.lineTo(x-q,y-a);cx.closePath()}   /* Amber terminal: an octagon */
 function ringPath(x,y,R){if(T.nodes==="pixel")dia(x,y,R*1.25);else if(T.nodes==="pad")oct(x,y,R*1.08);else if(T.nodes)cx.rect(x-R,y-R,2*R,2*R);else cx.arc(x,y,R,0,6.3)}
+function shade(col,f){var k="sh"+col+Math.round(f*8);if(tcache[k])return tcache[k];var v=parseInt(col.slice(1),16);   /* f>0 toward white, f<0 toward black */
+  return tcache[k]="rgb("+[v>>16&255,v>>8&255,v&255].map(function(x){return Math.round(f>0?x+(255-x)*f*.55:x*(1+f*.6))}).join(",")+")"}
+function octE(x,y,qx,qy){var ax=qx*.4142,ay=qy*.4142;cx.moveTo(x-ax,y-qy);cx.lineTo(x+ax,y-qy);cx.lineTo(x+qx,y-ay);cx.lineTo(x+qx,y+ay);cx.lineTo(x+ax,y+qy);cx.lineTo(x-ax,y+qy);cx.lineTo(x-qx,y+ay);cx.lineTo(x-qx,y-ay);cx.closePath()}
 function digiNode(n,x,y,r,col){
   if(n.spore){cx.strokeStyle=col;cx.lineWidth=1.2;var q=Math.max(1.5,r*.75);cx.beginPath();if(T.nodes==="pixel")dia(x,y,q*1.25);else if(T.nodes==="pad")oct(x,y,q*1.08);else cx.rect(x-q,y-q,2*q,2*q);cx.stroke();return}
   cx.fillStyle=col;
-  if(T.nodes==="pad"){cx.beginPath();oct(x,y,r*1.05);cx.fill();cx.fillStyle=T.halo;cx.beginPath();oct(x,y,Math.max(.7,r*.42));cx.fill();return}   /* a pad with its drill hole, like the vias a trace ends on */
-  var g=r<4?1:r<6.5?2:3,b=2*r/g,h=Math.max(.8,b*.7071-.5),ga=cx.globalAlpha;   /* Matrix: a diamond of diamonds, the brighter and the dimmer ones each in one fill */
-  for(var pass=0;pass<2;pass++){cx.globalAlpha=ga*(pass?1:.62);cx.beginPath();
-    for(var i=0;i<g;i++)for(var j=0;j<g;j++){if((hash(n.i*9+i*3+j)<.5)===!pass)continue;var ox=(i-(g-1)/2)*b,oy=(j-(g-1)/2)*b;dia(x+(ox-oy)*.7071,y+(ox+oy)*.7071,h)}
-    cx.fill()}
-  cx.globalAlpha=ga;
+  if(T.nodes==="pad"){   /* a thick pad seen from slightly above: a darker rim below the top face, the top squashed by the camera's tilt, a lit upper edge, the drill hole */
+    var q=r*1.05,sy=Math.max(.45,Math.min(1,cpt*1.05)),th=Math.max(1.5,r*.6)*(1.25-sy*.5);
+    cx.fillStyle=shade(col,-.72);cx.beginPath();octE(x,y+th,q,q*sy);cx.fill();cx.beginPath();cx.rect(x-q,y,2*q,th);cx.fill();
+    cx.fillStyle=col;cx.beginPath();octE(x,y,q,q*sy);cx.fill();
+    var ax=q*.4142,ay=q*sy*.4142;cx.strokeStyle=shade(col,.85);cx.lineWidth=1.5;cx.beginPath();cx.moveTo(x-q,y-ay);cx.lineTo(x-ax,y-q*sy);cx.lineTo(x+ax,y-q*sy);cx.lineTo(x+q,y-ay);cx.stroke();
+    cx.fillStyle=T.halo;cx.beginPath();octE(x,y,Math.max(.7,q*.4),Math.max(.5,q*.4*sy));cx.fill();return}
+  /* Matrix: a crystal (an octahedron seen from the front) or a cluster of small crystals; its four faces take a light, two mid and a dark
+     tone, and the light turns with the view, so the crystals seem to turn in place. One fill per face orientation for the whole cluster. */
+  var g=r<4?1:r<6.5?2:3,b=2*r/g,h=g===1?r*1.15:Math.max(.8,b*.7071-.3),L=-2.36+rot.y*1.3,cs=[];
+  for(var i=0;i<g;i++)for(var j=0;j<g;j++){var ox=(i-(g-1)/2)*b,oy=(j-(g-1)/2)*b;cs.push([x+(ox-oy)*.7071,y+(ox+oy)*.7071])}
+  [[-2.36,0,-1,-1,0],[-.79,0,-1,1,0],[.79,1,0,0,1],[2.36,-1,0,0,1]].forEach(function(f){   /* face normal, then the two outer corners as (dx,dy) */
+    cx.fillStyle=shade(col,Math.cos(f[0]-L)*.9);cx.beginPath();
+    cs.forEach(function(c){cx.moveTo(c[0],c[1]);cx.lineTo(c[0]+f[1]*h,c[1]+f[2]*h);cx.lineTo(c[0]+f[3]*h,c[1]+f[4]*h);cx.closePath()});cx.fill()});
 }
 function budRGB(n){
   var c=n.due?T.wilt:gcol(n.g),k=T.id+c;
