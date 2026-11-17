@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.35.6
+- **A leaner README**: stale facts fixed (the first-run questions, what the commit hook checks), the mycelium view in a section of its own, repeated material merged, and the reference tables moved out.
+- **`docs/REFERENCE.md`**: the tools, the layout of a notes repository and what happens to new root folders, in one page that every notes repository now gets with its docs.
+
 ## 0.35.5
 - **Matrix crystals stand upright**: each octahedron's axis is the colony's vertical, and it turns about it.
 - **The view turns freely up and down too**: no more stop at about 70 degrees; you can turn it right over, and Fit brings it back to the front. Upside down, a sideways drag still moves the near side the way your finger goes.
