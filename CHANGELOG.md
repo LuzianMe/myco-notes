@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.28.0
+- **Threads in the colour of their note**: a thread takes the colour of the note it comes from, mixed toward the theme's thread colour, over a soft glow in the theme's colour; a thread between two notes that mention each other fades from one note's colour to the other's.
+- **The travelling sap follows the thread**: on the threads of a selected or hovered note, the dots now travel along the wavy hypha instead of the old smooth curve.
+- **Faster drawing**: the quiet threads are drawn into a second canvas and reused until the view, the layout, the focus or the theme changes; while the network turns by itself they are redrawn every third frame, and threads of one colour are filled together. The glow is drawn at half resolution. Side branches are left out while the view is being moved and when zoomed far out. In a browser without a graphics card the view drew about 2.3 times faster when still and about 10% faster while turning, with the new colours included.
+
 ## 0.27.0
 - **Threads like hyphae**: every thread is bent by midpoint displacement (a fractal: slow bends with smaller wiggles on them, sideways and in depth), from its own fixed seed, so it never flickers. Long threads carry one or two faint side branches that lead nowhere: decoration, not links. Short threads on screen use fewer points, so drawing stays light.
 - **Spores stay inside the colony**: notes no link reaches now sit in the outer third of the ball instead of beyond it, drawn as small hollow circles without a glow, and no note drifts past the colony's edge. The fit no longer shrinks for a few far-out notes (about 10% larger on a real notes repository).
