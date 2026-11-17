@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.35.0
+Each theme now picks its own threads, notes, hub rings, hit effect and glow strength from one table in `map_themes.py`.
+- **The original threads for the classic themes**: Light, Dark, High contrast and Paper draw the smooth curve the map had before hyphae (no waves, no side branches).
+- **High contrast and Paper are calmer**: their glows (notes and threads) run at 35% and 40%.
+- **Mycelium**: fine powder orbits the hubs instead of rings, and a note a spike reaches (or the replay touches) lets out a little puff of spores instead of a glow.
+- **Deep sea**: small air bubbles rise from the hubs, and a hit sends up a few bubbles.
+- **Fruit**: notes are glossy berries with a green calyx; hubs are drupelet clusters, like raspberries.
+- **Paper**: notes are a watercolour wash inside an uneven ink outline, hubs get a circle drawn twice by hand, a hit spreads a soft ink blot.
+- **Matrix**: two Mystery Data violets join the palette.
+- **The replay's ring takes the theme's shape** (a circle, a diamond, an octagon), or the theme's own effect.
+- Particles are a few dozen dots at most; none move with reduced motion.
+
 ## 0.34.0
 - **Real 3D notes in the digital themes**: the shaded shapes of 0.33.0 always faced the viewer, so turning the network did little to them. Now they are small 3D objects turned by the same view as the network:
   - **Matrix: crystals.** Each note is an octahedron; only the faces turned toward the viewer are drawn, each shaded by how it faces a light from the upper left, and each crystal also turns slowly on its own (not with reduced motion). Busy notes are bigger crystals.
