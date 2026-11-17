@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.31.0
+- **Digital notes for the digital themes**: in Amber terminal a note is a chip (a square with a pin on each side, a square glow, square frames on hubs, an outline that expands when a spike arrives); in Matrix a note is a diamond, or a diamond-shaped cluster of small diamonds of uneven brightness for busier notes, with a diamond glow, diamond frames on hubs and diamond spores. Neither has the round shine of the organic themes.
+- **Fractal circuits in Matrix**: Matrix's threads are staircases of steps with smaller steps on the long ones (a digital fractal), about a third of them stepping at 60 or 120 degrees, so they look less like a grid; Amber terminal keeps its clean traces at 45 and 90 degrees. Each theme carries its node and thread style in `map_themes.py`.
+
 ## 0.30.0
 - **Chain reactions**: when a spike reaches a note, there is a 1 in 3 chance that the note fires on along one of its own threads (more often toward notes it mentions, never straight back), and the next note rolls again, so a signal sometimes travels on for a few notes before it dies out. At most 6 spikes run at once and a chain stops after 8 hops; the chance is one number (`CHAIN`) at the top of the spike code.
 - **Calmer firing on a selected note**: about 2 to 3 spikes a second in all, however many threads the note has, with rarer bursts (a hub fired about 10 a second before).

@@ -40,11 +40,11 @@ THEMES = [
          page=dict(bg="#fff4e8", bg2="#fffaf3", panel="#ffffff", fg="#2b1c2a", muted="#6c5266", line="#f0d6c8", accent="#a8174f", code="#fdebe0"),
          pal=["#b0185a", "#4c8a0d", "#c05a00", "#3a4fc0", "#7b3fa0", "#1f7a3a", "#b04020", "#5b3aa8", "#a01836", "#00756a", "#8a6a00", "#c2185b"],
          quiet=["#7d6c70", "#7a6c5c", "#6c6680", "#7d6670", "#5f7180", "#6c7a5c"], hypha="176,70,110", wilt="#9a5b20", text="#2b1c2a"),
-    dict(id="matrix", label="Matrix", dark=True, font=MONO, style="circuit",
+    dict(id="matrix", label="Matrix", dark=True, font=MONO, style="fractal", nodes="pixel",
          page=dict(bg="#020805", bg2="#07150c", panel="#06110a", fg="#a8ffbb", muted="#6fd486", line="#1c3d25", accent="#4dff7c", code="#051009"),
          pal=["#39ff6a", "#b6ff4d", "#00e0a0", "#7dffd6", "#d6ffa8", "#4dd2ff", "#e6ff5c", "#00ff9c", "#9effa0", "#5fd9b0", "#a8e000", "#66ffcc"],
          quiet=["#4f9a60", "#62904e", "#4c927e", "#6c966c", "#548a7c", "#7c975e"], hypha="80,255,120", wilt="#d8b02e", text="#a8ffbb"),
-    dict(id="amber", label="Amber terminal", dark=True, font=MONO, style="circuit",
+    dict(id="amber", label="Amber terminal", dark=True, font=MONO, style="circuit", nodes="chip",
          page=dict(bg="#1a1007", bg2="#26180a", panel="#22150a", fg="#ffc66b", muted="#dca357", line="#4a3317", accent="#ffdc94", code="#24170b"),
          pal=["#ffb000", "#ffd27a", "#ff8c1a", "#ffe9a8", "#e0a050", "#ffc04d", "#f7b267", "#ff9f43", "#ffdf80", "#dca441", "#ffcf66", "#f4a259"],
          quiet=["#a8896a", "#a08e72", "#988066", "#a89474", "#94826e", "#a69472"], hypha="255,176,0", wilt="#ff6e40", text="#ffc66b"),
@@ -108,7 +108,7 @@ def graph_css():
 def graph_data():
     """The view's colours per theme, for its script: {id: {dark, pal, quiet, hypha, wilt, text, halo, font}}."""
     return {t["id"]: dict(dark=t["dark"], pal=t["pal"], quiet=t["quiet"], hypha=t["hypha"], wilt=t["wilt"], text=t["text"],
-                          halo=t.get("halo") or graph_vars(t)["halo"], font=t.get("graph_font", t["font"]), style=t.get("style", "organic")) for t in THEMES}
+                          halo=t.get("halo") or graph_vars(t)["halo"], font=t.get("graph_font", t["font"]), style=t.get("style", "organic"), nodes=t.get("nodes", "")) for t in THEMES}
 
 
 def head_script():
