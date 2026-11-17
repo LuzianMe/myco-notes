@@ -706,9 +706,9 @@ function embedLabels(){   /* embed: no names on a small frame, zoomed out past t
   return d.length<2||d[d.length>>1]>=18;
 }
 function updateLabels(now,dt){
-  var fresh0=sel!==spotFor,eL=!EMBED||embedLabels();
+  var fresh0=sel!==spotFor,eL=!EMBED||sel>=0||embedLabels();
   if(fresh0){spotFor=sel;NODES.forEach(function(n){n.ls=-1e9});lastAdd=-1e9}   /* a new focus: every note may be named again, and the names come quicker */
-  var pool=NODES.filter(function(n){return eL&&n.name&&(!EMBED||n.nn>=18)&&n.vis&&n.ap>=1&&n.i!==sel&&(sel<0||adj[sel].some(function(m){return m.n===n}))&&dim(n)>.5});
+  var pool=NODES.filter(function(n){return eL&&n.name&&(!EMBED||sel>=0||n.nn>=18)&&n.vis&&n.ap>=1&&n.i!==sel&&(sel<0||adj[sel].some(function(m){return m.n===n}))&&dim(n)>.5});
   var ui=[];document.querySelectorAll(".box").forEach(function(el){   /* names stay clear of the search, timeline, tools and detail panel */
     if(el.hidden)return;var r=el.getBoundingClientRect();if(r.width&&r.height)ui.push([r.left,r.top,r.right,r.bottom])});
   var S=slotCount(pool.filter(onScreen).length),keep=pool.length<=S,on=0;
@@ -827,7 +827,7 @@ function step(now){
   }
   NODES.forEach(function(n){if(n.vis&&n.ap<1)n.ap=Math.min(1,n.ap+dt/650);if(!n.vis)n.ap=0});
   if(alpha>0){tick();if(!playing)tick()}
-  if(!spin.on&&!held&&!drag&&!pinch&&depthOn&&!reduce&&now-spin.last>(saverOn?1200:IDLE)){spin.on=true;if(sel>=0)autoFit=false;else if(!autoFit)spin.node=nearMiddle()}
+  if(!spin.on&&!held&&!drag&&!pinch&&depthOn&&!reduce&&!(EMBED&&sel>=0)&&now-spin.last>(saverOn?1200:IDLE)){spin.on=true;if(sel>=0)autoFit=false;else if(!autoFit)spin.node=nearMiddle()}
   fitTarget.dt=dt;if(autoFit)fitTarget(playing);   /* the fit glides with the turning picture; during a replay small changes are ignored */
   else if(spin.on&&P&&(sel>=0||spin.node>=0)){cam.tx=P.x;cam.ty=P.y}   /* turning about a note: keep it in the middle */
   else if(!drag&&!pinch)leash();
@@ -871,7 +871,7 @@ onCv("pointerdown",function(ev){
     drag=null;if(!EMBED)autoFit=false;var s=pinchState();pinch={d:s.d,k:cam.tk,z:EZ,w:world(s.mx,s.my),mx:s.mx,my:s.my,ry:rot.y,rx:rot.x};return;
   }
   var i=EMBED||ev.button===2?-1:pick(ev.clientX,ev.clientY);   /* the right button always turns (with depth), even over a note */
-  drag={id:i,sx:ev.clientX,sy:ev.clientY,lx:ev.clientX,ly:ev.clientY,cx:cam.tx,cy:cam.ty,moved:false,turn:depthOn&&(EMBED||ev.button===2||i<0&&ev.shiftKey),ry:rot.y,rx:rot.x,nx:i>=0?NODES[i].x:0,ny:i>=0?NODES[i].y:0};
+  drag={pk:EMBED&&ev.button!==2?pick(ev.clientX,ev.clientY):-1,id:i,sx:ev.clientX,sy:ev.clientY,lx:ev.clientX,ly:ev.clientY,cx:cam.tx,cy:cam.ty,moved:false,turn:depthOn&&(EMBED||ev.button===2||i<0&&ev.shiftKey),ry:rot.y,rx:rot.x,nx:i>=0?NODES[i].x:0,ny:i>=0?NODES[i].y:0};
   if(i>=0){NODES[i].fixed=true}
   cv.classList.add("drag");
 });
@@ -908,7 +908,7 @@ onCv("pointerup",function(ev){
   if(!drag)return;
   if(drag.id>=0)NODES[drag.id].fixed=false;
   if(drag.turn&&drag.moved)release();
-  if(!drag.moved&&ev.button!==2&&!EMBED){if(drag.id>=0)select(drag.id);else select(-1)}
+  if(!drag.moved&&ev.button!==2){if(EMBED)select(drag.pk>=0&&drag.pk!==sel?drag.pk:-1);else if(drag.id>=0)select(drag.id);else select(-1)}   /* embed: a tap selects a note, a tap on it again or on empty space clears */
   drag=null;
 });
 onCv("wheel",function(ev){
@@ -962,7 +962,8 @@ function setSaver(on){saverOn=on;root.classList.toggle("saver",on);var b=documen
 document.getElementById("saver").addEventListener("click",function(ev){ev.stopPropagation();setSaver(!saverOn)});
 function setPanelFull(f){panelFull=f;panel.classList.toggle("min",!f);var m=document.getElementById("more");if(m){m.textContent=f?"Less":"More";m.setAttribute("aria-expanded",f?"true":"false")}}
 function select(i){
-  sel=i;poke();
+  var was=sel;sel=i;poke();
+  if(EMBED){if(i!==was)tell("myco-select",{selected:i>=0,label:i>=0&&NODES[i].name||null});return}   /* embed: the highlight only, no panel; the host hears the label (a public graph: an approved label or null) */
   if(i<0){panel.hidden=true;return}
   var n=NODES[i],g=D.groups[n.g];panel.hidden=false;panel.textContent="";
   var x=el("button",null,"×");x.id="close";x.setAttribute("aria-label","Close");x.addEventListener("click",function(){select(-1)});panel.appendChild(x);
@@ -1020,7 +1021,7 @@ slide.max=NC;
 slide.addEventListener("input",function(){stopPlay();setStep(parseInt(slide.value,10),false)});
 playBtn.addEventListener("click",function(){playing?stopPlay():startPlay()});
 document.addEventListener("keydown",function(ev){
-  if(EMBED)return;
+  if(EMBED){if(ev.key==="Escape"&&INTER)select(-1);return}
   poke();if(ev.target===q)return;
   if(ev.key===" "&&NC>1){ev.preventDefault();playing?stopPlay():startPlay()}
   if(ev.key==="Escape"){if(saverOn)setSaver(false);else select(-1)}
