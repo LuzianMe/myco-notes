@@ -99,6 +99,9 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 "use strict";
 var D=JSON.parse(document.getElementById("data").textContent);
 var cv=document.getElementById("c"),cx=cv.getContext("2d");
+/* the quiet threads are drawn into this second canvas and reused until something changes (the view, the layout, the focus, the
+   theme); while the network turns by itself they are redrawn about 20 times a second, the notes on top every frame */
+var tc=document.createElement("canvas"),tcx=tc.getContext("2d"),gc=document.createElement("canvas"),gcx=gc.getContext("2d"),tKey="",tLast=0,busyNow=false,tcache={};   /* gc: the threads' glow at half resolution (soft, and a quarter of the pixels) */
 var reduce=window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches;
 var NODES=D.nodes,NN=NODES.length,NC=D.commits.length;
 var root=document.documentElement;
@@ -117,7 +120,7 @@ function readTheme(){
   if(!TH[id])id=window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches?"light":"dark";
   var x=TH[id];
   T={id:id,dark:x.dark,pal:x.pal,quiet:x.quiet,hypha:x.hypha,wilt:x.wilt,halo:x.halo,text:x.text,font:x.font};
-  sprites={};shades={};
+  sprites={};shades={};tcache={};tKey="";
   paintLegend();
 }
 var sprites={};
@@ -394,7 +397,9 @@ function clipEnd(P,r){   /* drop the points inside the circle of radius r around
   var p=P[k-1],q=P[k],dp=Math.hypot(p[0]-c[0],p[1]-c[1]),dq=Math.hypot(q[0]-c[0],q[1]-c[1]),f=dp-dq>1e-6?(dp-r)/(dp-dq):1;
   return P.slice(0,k).concat([[p[0]+(q[0]-p[0])*f,p[1]+(q[1]-p[1])*f]]);
 }
-function strand(P,upto,w0,w1){   /* fill the path P up to the length `upto`, half-width going from w0 to w1 over the whole length; returns the end point */
+function plen(P){var t=0;for(var i=1;i<P.length;i++)t+=Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1]);return t}
+function strand(P,upto,w0,w1){cx.beginPath();var e=strandPath(P,upto,w0,w1);cx.fill();return e}
+function strandPath(P,upto,w0,w1){   /* add the path P up to the length `upto` to the current path, half-width going from w0 to w1; returns the end point */
   var L=[0],i;for(i=1;i<P.length;i++)L.push(L[i-1]+Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1]));
   var tot=L[L.length-1]||1,Q=[P[0]];
   for(i=1;i<P.length;i++){if(L[i]<upto){Q.push(P[i]);continue}var f=(upto-L[i-1])/((L[i]-L[i-1])||1);Q.push([P[i-1][0]+(P[i][0]-P[i-1][0])*f,P[i-1][1]+(P[i][1]-P[i-1][1])*f]);break}
@@ -405,10 +410,10 @@ function strand(P,upto,w0,w1){   /* fill the path P up to the length `upto`, hal
     if(i)d+=Math.hypot(Q[i][0]-Q[i-1][0],Q[i][1]-Q[i-1][1]);
     var hw=w0+(w1-w0)*Math.min(1,d/tot);lft.push([Q[i][0]-dy/m*hw,Q[i][1]+dx/m*hw]);rgt.push([Q[i][0]+dy/m*hw,Q[i][1]-dx/m*hw]);
   }
-  cx.beginPath();cx.moveTo(lft[0][0],lft[0][1]);
+  cx.moveTo(lft[0][0],lft[0][1]);
   for(i=1;i<lft.length;i++)cx.lineTo(lft[i][0],lft[i][1]);
   for(i=rgt.length-1;i>=0;i--)cx.lineTo(rgt[i][0],rgt[i][1]);
-  cx.closePath();cx.fill();
+  cx.closePath();
   return Q[Q.length-1];
 }
 function tip(p,r){cx.beginPath();cx.arc(p[0],p[1],r,0,6.3);cx.fill()}
@@ -421,17 +426,25 @@ function budRGB(n){
     shades[k]=(T.dark?[r*.72,g*.72,b*.72]:[r+(255-r)*.3,g+(255-g)*.3,b+(255-b)*.3]).map(Math.round).join(",")}
   return shades[k];
 }
-function twigs(e,w,col){   /* faint side branches on long threads: decoration only */
-  if(!e.W||e.L*cam.k<150)return;var nb=e.L*cam.k>260?2:1,ga=cx.globalAlpha;cx.strokeStyle=col;cx.lineWidth=Math.max(.5,w*.35);cx.globalAlpha=ga*.5;
+function twigOK(){return !busyNow&&cam.k>(cam.fk||cam.k)*.7}   /* no side branches while the reader moves the view, or zoomed far out */
+function twigs(e,w,col){var ga=cx.globalAlpha;cx.strokeStyle=col;cx.lineWidth=Math.max(.5,w*.35);cx.globalAlpha=ga*.5;cx.beginPath();twigPath(e);cx.stroke();cx.globalAlpha=ga}
+function twigPath(e){   /* faint side branches on long threads: decoration only */
+  if(!e.W||e.L*cam.k<150)return;var nb=e.L*cam.k>260?2:1;
   for(var b=0;b<nb;b++){var t=.3+.4*hash(e.k+b*3.3),i=Math.round(t*(e.W.length-1)),p0=e.W[i],p1=e.W[Math.min(e.W.length-1,i+1)],
     tx=p1[0]-p0[0],ty=p1[1]-p0[1],tl=Math.hypot(tx,ty)||1,sg=hash(e.k+b*5.1)<.5?-1:1,an=sg*(.5+.4*hash(e.k+b)),
     c=Math.cos(an),sn=Math.sin(an),vx=(tx*c-ty*sn)/tl,vy=(tx*sn+ty*c)/tl,len=e.L*(.1+.08*hash(e.k+b*2.2)),f=frac(e.k*9.1+b,8);
-    cx.beginPath();for(var j=0;j<=8;j++){var u=j/8,o=f[j]*len*.25,q=proj(p0[0]+vx*len*u-vy*o,p0[1]+vy*len*u+vx*o,p0[2]);if(j)cx.lineTo(q[0],q[1]);else cx.moveTo(q[0],q[1])}
-    cx.stroke()}
-  cx.globalAlpha=ga;
+    for(var j=0;j<=8;j++){var u=j/8,o=f[j]*len*.25,q=proj(p0[0]+vx*len*u-vy*o,p0[1]+vy*len*u+vx*o,p0[2]);if(j)cx.lineTo(q[0],q[1]);else cx.moveTo(q[0],q[1])}}
 }
-function hypha(e,w,grow,col,tipA){
-  var P=hyphaPath(e);if(P.length<2)return;if(grow>=1)twigs(e,w,col);
+/* A thread has the colour of the note it comes from, mixed toward the theme's thread colour; two notes that mention each other
+   are joined by a thread that fades from one note's colour to the other's. */
+function threadRGB(n){var c=n.due?T.wilt:gcol(n.g),k=T.id+c;if(!tcache[k]){var v=parseInt(c.slice(1),16),h=T.hypha.split(",").map(Number),m=.42;
+  tcache[k]=[v>>16&255,v>>8&255,v&255].map(function(x,i){return Math.round(x*(1-m)+h[i]*m)}).join(",")}return tcache[k]}
+function threadFill(e,P,al){if(e.dir!==0)return "rgba("+threadRGB(e.dir>0?e.a:e.b)+","+al+")";
+  var g=cx.createLinearGradient(P[0][0],P[0][1],P[P.length-1][0],P[P.length-1][1]);g.addColorStop(0,"rgba("+threadRGB(e.a)+","+al+")");g.addColorStop(1,"rgba("+threadRGB(e.b)+","+al+")");return g}
+function along(e,t){var W=e.W;if(!W||W.length<2){var p=curve(e,t);return proj(p.x,p.y,e.a.z+(e.b.z-e.a.z)*t)}   /* a point on the wavy thread, 0 at a, 1 at b */
+  var f=t*(W.length-1),i=Math.min(W.length-2,Math.floor(f)),u=f-i,A=W[i],B=W[i+1];return proj(A[0]+(B[0]-A[0])*u,A[1]+(B[1]-A[1])*u,A[2]+(B[2]-A[2])*u)}
+function hypha(e,w,grow,al,tipA){
+  var P=hyphaPath(e);if(P.length<2)return;var col=threadFill(e,P,al);if(grow>=1&&twigOK())twigs(e,w,col);
   var tot=0,i;for(i=1;i<P.length;i++)tot+=Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1]);
   if(tot<2)return;
   var tr=.9+w*.9;cx.fillStyle=col;
@@ -444,6 +457,25 @@ function hypha(e,w,grow,col,tipA){
     var S=e.dir>0?P:P.slice().reverse(),end=strand(S,tot*grow,w*1.15,w*.12);
     if(end){cx.fillStyle="rgba("+budRGB(e.dir>0?e.a:e.b)+","+tipA+")";tip(end,tr)}
   }
+}
+function quietThreads(list){   /* into the cache: one fill per colour (the theme's glow, the thread, the buds), fused threads with their fade */
+  var keep=cx;cx=tcx;cx.setTransform(1,0,0,1,0,0);cx.clearRect(0,0,tc.width,tc.height);cx.setTransform(DPR,0,0,DPR,0,0);
+  var tw=twigOK(),groups={},fused=[];
+  list.forEach(function(e){var a=Math.min(e.a.ap,e.b.ap),d=Math.min(dim(e.a),dim(e.b)),w=Math.min(2.6,.6+Math.sqrt(e.w)*.45)*Math.min(1.4,cam.k+.3),al=.26*Math.min(1,a*2)*Math.max(d,.35);
+    var ef=(fogOf(e.a)+fogOf(e.b))/2;w*=(e.a.ps+e.b.ps)/2;al*=1-.7*ef;
+    if(e.dir===0){fused.push([e,w,a,al]);return}
+    var P=hyphaPath(e);if(P.length<2)return;var src=e.dir>0?e.a:e.b,ab=Math.round(al*25)/25,k=threadRGB(src)+"|"+ab;
+    (groups[k]||(groups[k]={rgb:threadRGB(src),bud:budRGB(src),al:ab,it:[]})).it.push([e.dir>0?P:P.slice().reverse(),w,a,e])});
+  cx=gcx;cx.setTransform(1,0,0,1,0,0);cx.clearRect(0,0,gc.width,gc.height);cx.setTransform(DPR/2,0,0,DPR/2,0,0);   /* a soft glow in the theme's thread colour, drawn small and scaled up */
+  Object.keys(groups).forEach(function(k){var g=groups[k];cx.fillStyle="rgba("+T.hypha+","+(g.al*.4).toFixed(3)+")";cx.beginPath();g.it.forEach(function(x){strandPath(x[0],plen(x[0])*x[2],x[1]*2.2,x[1]*.6)});cx.fill()});
+  cx=tcx;cx.setTransform(1,0,0,1,0,0);cx.drawImage(gc,0,0,tc.width,tc.height);cx.setTransform(DPR,0,0,DPR,0,0);
+  Object.keys(groups).forEach(function(k){var g=groups[k],ends=[];
+    cx.fillStyle="rgba("+g.rgb+","+g.al+")";cx.beginPath();g.it.forEach(function(x){var end=strandPath(x[0],plen(x[0])*x[2],x[1]*1.15,x[1]*.12);if(end)ends.push([end,.9+x[1]*.9])});cx.fill();
+    cx.fillStyle="rgba("+g.bud+","+Math.min(1,g.al*3).toFixed(3)+")";cx.beginPath();ends.forEach(function(t){cx.moveTo(t[0][0]+t[1],t[0][1]);cx.arc(t[0][0],t[0][1],t[1],0,6.3)});cx.fill();
+    if(tw){cx.strokeStyle="rgba("+g.rgb+","+(g.al*.5).toFixed(3)+")";cx.lineWidth=.6;cx.beginPath();g.it.forEach(function(x){twigPath(x[3])});cx.stroke()}
+  });
+  fused.forEach(function(f){hypha(f[0],f[1],f[2],f[3].toFixed(3),Math.min(1,f[3]*3).toFixed(3))});
+  cx=keep;
 }
 function label(txt,x,y,bold,a){
   cx.globalAlpha=a;cx.font=(bold?"600 ":"")+"12px "+T.font;cx.textAlign="center";cx.lineWidth=3.5;cx.strokeStyle=T.halo;cx.fillStyle=T.text;
@@ -497,17 +529,22 @@ function updateLabels(now,dt){
 function draw(now){
   cx.setTransform(DPR,0,0,DPR,0,0);cx.clearRect(0,0,W,H);
   var focus=sel>=0?sel:hov,t=now;
-  /* hyphae */
-  var es=E.filter(edgeVis);
-  if(depthAmt>0)es.sort(function(p,q){return (q.a.pz+q.b.pz)-(p.a.pz+p.b.pz)});
-  es.forEach(function(e){
-    var a=Math.min(e.a.ap,e.b.ap);if(a<=0)return;
-    var hot=focus>=0&&(e.a.i===focus||e.b.i===focus),d=Math.min(dim(e.a),dim(e.b));
-    var w=Math.min(2.6,.6+Math.sqrt(e.w)*.45)*(hot?1.5:1)*Math.min(1.4,cam.k+.3),al=(hot?.85:.26)*Math.min(1,a*2)*(hot?1:Math.max(d,.35));
+  /* hyphae: the quiet ones from the cache, the ones of the focused note live on top */
+  var hotE=[],coldE=[];
+  E.forEach(function(e){if(!edgeVis(e)||Math.min(e.a.ap,e.b.ap)<=0)return;(focus>=0&&(e.a.i===focus||e.b.i===focus)?hotE:coldE).push(e)});
+  busyNow=!!(drag||pinch)||now-spin.last<400;
+  var mk=match?Object.keys(match).length+":"+Object.keys(match)[0]:"",settling=alpha>0||NODES.some(function(n){return n.vis&&(n.ap<1||Math.abs(n.zt-n.z)>.003)});
+  var key=[W,H,DPR,cam.x.toFixed(2),cam.y.toFixed(2),cam.k.toFixed(4),cyw.toFixed(4),syw.toFixed(4),cpt.toFixed(4),depthAmt.toFixed(3),focus,mk,T.id,cur,coldE.length,twigOK(),settling?now:0].join("|");
+  tLast++;if(key!==tKey&&!(spin.on&&!playing&&!busyNow&&tLast<3)){tKey=key;tLast=0;quietThreads(coldE)}   /* turning by itself: every third frame */
+  cx.setTransform(1,0,0,1,0,0);cx.drawImage(tc,0,0);cx.setTransform(DPR,0,0,DPR,0,0);
+  if(depthAmt>0)hotE.sort(function(p,q){return (q.a.pz+q.b.pz)-(p.a.pz+p.b.pz)});
+  hotE.forEach(function(e){
+    var a=Math.min(e.a.ap,e.b.ap),w=Math.min(2.6,.6+Math.sqrt(e.w)*.45)*1.5*Math.min(1.4,cam.k+.3),al=.85*Math.min(1,a*2);
     var ef=(fogOf(e.a)+fogOf(e.b))/2;w*=(e.a.ps+e.b.ps)/2;al*=1-.7*ef;
-    hypha(e,w,a,"rgba("+T.hypha+","+al.toFixed(3)+")",Math.min(1,al*3).toFixed(3));
-    /* on a lit thread, sap flows from the note that mentions to the note it names (both ways on a fused thread) */
-    if(hot&&!reduce&&a>=1){for(var s=0;s<2;s++){var u=((t*.00035+e.k*.37+s*.5)%1),back=e.dir<0||(e.dir===0&&s===1),tu=back?1-u:u,p=curve(e,tu),q=proj(p.x,p.y,e.a.z+(e.b.z-e.a.z)*tu);cx.fillStyle="rgba("+T.hypha+",.95)";cx.beginPath();cx.arc(q[0],q[1],2.1*q[2],0,6.3);cx.fill()}}
+    hypha(e,w,a,al.toFixed(3),Math.min(1,al*3).toFixed(3));
+    /* on a lit thread, sap flows along the thread from the note that mentions to the note it names (both ways on a fused thread) */
+    if(!reduce&&a>=1){for(var s=0;s<2;s++){var u=((t*.00035+e.k*.37+s*.5)%1),back=e.dir<0||(e.dir===0&&s===1),tu=back?1-u:u,q=along(e,tu);
+      cx.fillStyle="rgba("+threadRGB(back?e.b:e.a)+",.95)";cx.beginPath();cx.arc(q[0],q[1],2.1*q[2],0,6.3);cx.fill()}}
   });
   /* notes */
   var order=NODES.filter(function(n){return n.vis&&n.ap>0}).sort(function(a,b){return depthAmt>0?b.pz-a.pz:(a.hub?1:0)-(b.hub?1:0)});   /* with depth: back to front */
@@ -548,7 +585,7 @@ function fitBar(){   /* phone: the title leaves room for the buttons beside it, 
 }
 function resize(){
   DPR=Math.min(2,window.devicePixelRatio||1);W=innerWidth;H=innerHeight;VS=W>700?1:Math.max(1,Math.min(1.7,(H-176)/(W-32)*.9));   /* tall phone screen: the picture is stretched vertically (positions only, nodes stay round) so the network fills the height */
-  cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);fitBar();
+  cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);tc.width=cv.width;tc.height=cv.height;gc.width=Math.ceil(cv.width/2);gc.height=Math.ceil(cv.height/2);tKey="";fitBar();
 }
 function frame(now){
   var dt=Math.min(64,now-(lastT||now));lastT=now;
