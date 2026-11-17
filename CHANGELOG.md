@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.35.2
+- **Matrix threads read more clearly**: their glow is at 30% (a theme can now set the threads' glow apart from the notes').
+- **Mycelium's spores are easier to see**: a note a spike reaches gives a quick bright puff and then about twice as many spores, bigger and flying further.
+
 ## 0.35.1
 - **The replay panel folds**: like the search panel, it has a small fold button; folded it shows only Replay and the date, on a computer and on a phone, and the choice is kept in the browser.
 - **Screensaver mode**: a small moon button among the view's buttons hides the panels, centres the network at the current zoom, turns the labels off and lets it turn by itself. Dragging and zooming still work and it starts turning again a moment later; the same button (or Escape) brings everything back.
