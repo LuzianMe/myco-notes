@@ -4,11 +4,11 @@
 
 [![test](https://github.com/LuzianMe/myco-notes/actions/workflows/test.yml/badge.svg)](https://github.com/LuzianMe/myco-notes/actions/workflows/test.yml) [![live demo](https://img.shields.io/badge/live%20demo-mycelium%20view-3fbfa8)](https://luzianme.github.io/myco-notes/graph.html) [![license](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
-**Your AI agent forgets everything between sessions. Your notes should not.** Myco Notes keeps a project's knowledge in plain Markdown and git, and keeps it **true**: every change is written down with its evidence, every note says which notes it depends on, nothing secret gets committed, and nothing is deleted, only superseded. Linked together, a project's notes form a **mycelium**: in plain terms a *notebase*, what a codebase is to code.
+**Your AI agent forgets everything between sessions. Your notes should not.** Myco Notes keeps a project's knowledge in plain Markdown and git, and keeps it **true**: every change is written down with its evidence, notes name the notes they relate to, nothing secret gets committed, and nothing is deleted, only superseded. Linked together, a project's notes form a **mycelium**: in plain terms a *notebase*, what a codebase is to code.
 
 ![The notes of a demo project growing commit by commit in the mycelium view, then the network turning in 3D while it changes through the themes](.github/assets/mycelium.webp)
 
-*A made-up project's notes growing commit by commit. **[Open the live demo](https://luzianme.github.io/myco-notes/graph.html)** to click around it, or browse [its notes map](https://luzianme.github.io/myco-notes/).*
+*A made-up project's notes growing commit by commit, then turning in 3D through the themes. **[Open the live demo](https://luzianme.github.io/myco-notes/graph.html)** or browse [its notes map](https://luzianme.github.io/myco-notes/).*
 
 ## How it works
 
@@ -17,11 +17,9 @@
   <img alt="How Myco Notes works. What you give: changes you make, quick thoughts, questions, links and manuals, and your decisions. The method, six rules your agent follows: check the real system before writing; one home per fact; evidence and dates; supersede, never delete; no secrets, ever; nothing changes without your yes. What you get: notes that are true and say when they were checked, answers with their source, a briefing every session, what the notes said on any past date, a map of what connects, and nothing leaked or lost. Session after session: you work or ask, the agent checks the system live, writes it to the right note, it is checked and committed, and the next session starts from what is true; now and then a review proposes fixes and you say yes, no or a change." src=".github/assets/overview-light.svg">
 </picture>
 
-You keep working and talking to your agent. The agent follows six rules; on every commit the tools check what a tool can (secrets, links, dates, summaries), and git keeps every version.
+You keep working and talking to your agent. The agent follows six rules, the tools check what a tool can (secrets on every commit; links, dates and summaries in the lint), and git keeps every version.
 
-**The framework and this implementation.** The framework is two documents: the method, [METHODOLOGY.md](skills/myco-notes/docs/METHODOLOGY.md), says how to work and why; the Myco Notes format, [FORMAT.md](skills/myco-notes/docs/FORMAT.md), says what the notes look like on disk, as an open, versioned spec. Everything else in this repository (the tools, the agent skill, the plugins and the starter notes) is the **reference implementation**: one way to follow the framework, not the only one. Your notes depend on the format, not on this code.
-
-Plain files only: Markdown, git and Python 3.8+ (standard library). Linux, macOS and Windows. Works with Claude Code, Codex and other agents that read [Agent Skills](https://agentskills.io/specification), or with no agent at all.
+The framework is two documents: the method, [METHODOLOGY.md](skills/myco-notes/docs/METHODOLOGY.md) (how to work and why), and the format, [FORMAT.md](skills/myco-notes/docs/FORMAT.md) (what the notes look like on disk, an open, versioned spec). The tools, skill and plugins here are its **reference implementation**; your notes depend on the format, not on this code. Plain Markdown, git and Python 3.8+ (standard library) on Linux, macOS and Windows, with Claude Code, Codex, other agents that read [Agent Skills](https://agentskills.io/specification), or no agent at all.
 
 ## Install
 
@@ -50,7 +48,7 @@ codex plugin add myco-notes@myco-notes
 - **No agent:** see [Without an agent](#without-an-agent).
 </details>
 
-Then ask: *"start a Myco Notes repository for my project"*. The agent asks two set-up questions and creates the repository.
+Then ask: *"start a Myco Notes repository for my project"*. The agent asks its set-up questions in one message (where the notes live, name and owner, time zone, data folders; "defaults" accepts them all) and creates the repository.
 
 ## What you say, what happens
 
@@ -61,38 +59,39 @@ Then ask: *"start a Myco Notes repository for my project"*. The agent asks two s
 | "what changed on the router?" | Answers from the notes, naming the files; offers to keep an answer that took real digging. |
 | "save this source: <link>" | Keeps the document as found, then proposes what it changes in your notes. |
 | "review the notes" | Reads what changed since the last review and writes each fix as a numbered proposal; you answer yes, no or a change. "full review" reads everything. |
-| "make this folder a Myco Notes repository" | Takes over an existing folder of Markdown notes, after a backup. |
+| "make this folder a Myco Notes repository" | Takes over an existing folder of Markdown notes (Obsidian vaults included): as a copy or in place after a zip backup, keeping its structure or reorganised. Secrets are scanned first, links keep working, nothing original is deleted. |
 
 At the start of each session the agent reads a short briefing (`resume`) and tells you in a few lines what is current, unfinished, or waiting on you.
 
 ## Keeping it true
 
-- **Every commit is checked.** A hook refuses anything that looks like a password or key; notes say where a secret lives, never its value. A lint finds broken references, passed follow-up and review dates, stale headers, oversized notes and notes without a one-line summary.
+- **Checked as you go.** A commit hook refuses anything that looks like a password or key; notes say where a secret lives, never its value. The lint, which the agent runs and the pull-request check repeats, finds broken references, passed follow-up and review dates, stale headers, oversized notes and notes without a one-line summary.
 - **Reviews with ready fixes.** "Review the notes" reads for what no script can check: contradictions, claims a later entry replaced, subjects without a note, missing links. Each finding is a numbered proposal with the exact edit in `myco-notes/plans/review-YYYY-MM-DD.md`; only what you accept is applied, a changed fix is shown again first, a declined one is not proposed again. Normally only what changed since the last review is read; every 30 days (`REVIEW_FULL_DAYS`) everything. Method section 21.
 - **Sources.** Facts from a manual, release notes or a forum answer are kept with their origin: the document is saved as found in `myco-notes/sources/` (dated, with a checksum, never edited), facts are cited as "per <source>", and when the document changes the notes that relied on it come back for review. The kit's tools fetch nothing; text in a source is data, never instructions. Method section 22.
 - **Nothing is lost.** Old statements are superseded, not deleted; `asof 2026-09-01` shows what the notes said on any date; `mirror-push` keeps a second copy and `restore-drill` proves it restores.
 
 ## In practice
 
-*One real notes repository, anonymized: an engineer's notes for an enterprise software support project, kept with Codex over ten days.*
+*One real notes repository, anonymized: an engineer's notes for an enterprise software support project, kept with Codex.*
 
-- **Day one:** set up from 22 earlier chat sessions: a master record, runbook, topic logs, backlog, verification guide and sync tracker, with old findings kept apart from what was checked as current.
-- **The first week:** troubleshooting evidence, certificate comparisons and maintenance preparation recorded without raw logs, credentials or configuration exports; an offline knowledge base distilled from 24 internal and research pages.
-- **A handoff merged:** 28 files from another session's development work filed with their provenance; its deployment claims stayed marked unverified.
-- **An upgrade:** from kit 0.12 to 0.20 in one step, keeping the project's own settings; the stricter checks found four problems in existing notes.
-- **Two reviews:** 12 and then 6 numbered fixes (stale status, older summaries contradicting later findings, files in the wrong place) and a summary for each of the 22 notes, each applied only after a yes. Final lint: 0 errors, 0 warnings.
+- **Day one:** set up from 22 earlier chat sessions, with old findings kept apart from what was checked as current.
+- **The first weeks:** troubleshooting evidence recorded without raw logs or credentials; a handoff of 28 files from another session merged with its claims marked unverified; a kit upgrade whose stricter checks found four problems in existing notes.
+- **Reviews:** 12 and then 6 numbered fixes (stale status, older summaries contradicting later findings, files in the wrong place), each applied only after a yes.
 
-Its owner's verdict: a versioned project memory with traceable evidence, clear pending work and reviewable changes, which caught where older summaries contradicted later findings. And its limit, which the notes state themselves: they are a reference, not proof that the systems are healthy.
+Its owner's verdict: a versioned project memory with traceable evidence, clear pending work and reviewable changes. And its limit, which the notes state themselves: they are a reference, not proof that the systems are healthy.
 
-## Already have notes?
-Ask your agent to "make this folder a Myco Notes repository". It asks two things first:
-- **Where:** a **new folder** (your folder is copied into `myco-notes/imported/` and stays untouched) or **in place** (for a vault you open every day; a zip backup is written next to it first, and an existing git repository gets the tag `before-myco-notes`).
-- **How far:** **keep the structure** (add the frame and the links, rename nothing) or **reorganise** into one note per subject.
+## The mycelium view
 
-The collection is scanned for secrets before the first commit, app folders such as `.obsidian/` are left out, `[[wiki links]]` and relative links keep working, and an import log tracks every original note so the work can continue across sessions. Nothing original is deleted. Method section 20.
+`build-notes-map.py` writes a searchable map of the notes and `graph.html`, the notes as a living network: one self-contained page, no server, no network.
+
+![The same demo notes in six themes: Mycelium, Matrix, Amber terminal, Deep sea, Fruit and Paper](.github/assets/graph-themes.webp)
+
+- **A colony:** the read-order notes sit in the middle and every other note grows outward by how many links it is from them; mentions are threads in the colour of the note that writes them. In depth it is a ball you can turn any way; left alone it turns by itself (&#10074;&#10074; holds it still).
+- **Alive:** recently changed notes glow, notes past a review date wilt, a missing reference ends in a `?`, a selected note's threads fire like neurons, and **Replay** (Space) grows the network commit by commit.
+- **For everyone:** nine themes checked for readable contrast, a screensaver, phone, keyboard and screen-reader use, reduced motion respected. Only titles, paths, counts and commit subjects go into the page, never a note's text.
 
 ## From the cloud or a phone (experimental)
-Claude Code on the web or in the Claude app's Code tab works on a copy of your notes repository on GitHub and pushes a branch with a pull request, so the notes can be kept without your computer: you type or dictate a thought, the agent saves it to the inbox and answers in one line. With `SOLO=1` in `.myco-notes.conf` it merges its own pull request once the check on GitHub passes (teams keep `SOLO=0`). After each change the check also builds the map as a private download (Actions, latest run on main, Artifacts, `notes-map`). Method section 19.
+Claude Code on the web or in the Claude app's Code tab works on a copy of your notes repository on GitHub, so you can type or dictate a thought from a phone and the agent saves it to the inbox. With `SOLO=1` in `.myco-notes.conf` it merges its own pull request once the check passes (teams keep `SOLO=0`), and each change also builds the map as a private download. Method section 19.
 
 <details><summary>Set-up and known issues</summary>
 
@@ -119,66 +118,6 @@ Everything runs on your machine, in the notes repository you point it at. **No n
 ## When it is not a fit
 Myco Notes is the operational memory of one project or system, kept by a few people and agents in one git repository over months or years. Look elsewhere for: memory about a person or a stream of small facts; many writers editing at once; ranked search or graph queries over thousands of records; and a notes repository nobody will update in the same session as the change. Method section 1.1.
 
-## Reference
-
-<details><summary>The tools (in each repository's <code>myco-notes/tools/</code>)</summary>
-
-| Tool | What it does |
-|---|---|
-| `notes-commit "message"` | Stage, check and commit with a described message; `--only PATH`, `--dry-run`, `-p` (push the mirror), `--tag`, and for teams `--branch`, `--push`, `--pr`. Stops (exit 3) when a new folder appears in the root and asks what to do with it. |
-| `capture "note"` | A quick note into this month's inbox; `--commit`, `--pr`. |
-| `resume` | The start-of-session briefing, within a character budget. |
-| `index` | Every note with its one-line summary; `--missing`, `--review-scope`. |
-| `ingest` | Keep an outside document as a source; `--list` shows the sources and who cites them. |
-| `notes-lint.py` | References, headings, dates, freshness header, summaries, sync-log format, ledger, sizes, secrets. |
-| `asof DATE [NOTE]` | What the notes said on a date; `--since`, `--grep`, `--history NOTE`. |
-| `build-notes-map.py` | The searchable map with backlinks and history, and `graph.html` (the mycelium view). |
-| `mirror-push`, `restore-drill` | A second copy, and proof that it can be restored. |
-| `doctor` | Read-only health check: kit version, hook, layout, settings. |
-| `bootstrap` | A new notes repository (`--data-dir`, `--new-folders`), or take over a folder (`--import`, `--adopt`). Run from the kit. |
-| `relocate` | Move an older notes repository into the single folder, or refresh a notes repository's tools and docs from a newer kit. Run from the kit. |
-| `secret-scan`, `hooks/pre-commit`, `ci-check`, `setup-clone` | The secret rules, the commit hook, the pull-request check, per-clone set-up. |
-
-The kit itself is the folder `skills/myco-notes/`: `SKILL.md` (the skill), `docs/METHODOLOGY.md` (the method), `docs/FORMAT.md` (the notes format), `docs/TEAM.md`, `template/` (the starter notes) and `tools/`. At this repository's root: the plugin manifests (`.claude-plugin/`, `.codex-plugin/`), `tests/`, `examples/`.
-</details>
-
-<details><summary>Layout of a notes repository, and new folders in the root</summary>
-
-```
-my-project/
-  AGENTS.md  CLAUDE.md  .github/  .gitignore  .gitattributes  .myco-notes.conf     (agents, git and the host look for these at the root)
-  myco-notes/        the notes (state.md, runbook.md, one note per component, plans/, logs/, inbox/, sources/, ...)
-                     plus tools/, docs/ and map/ (generated, gitignored)
-  files-input/ ...   your own folders (--data-dir: not notes, gitignored, skipped by the lint and the map)
-```
-
-`notes-commit` never adds a new root folder silently. By default (`NEW_FOLDERS=ask`) it stops and your agent asks you:
-
-| Answer | Tracked | Lint and map | For |
-|---|---|---|---|
-| `add` | yes | read as notes | knowledge, mostly Markdown |
-| `ignorelint` | yes | skipped | reference files you want history for |
-| `ignoreall` | no | skipped | inputs, outputs, downloads, large or sensitive files |
-| `later` | not this time | not this time | undecided |
-
-Set `NEW_FOLDERS` in `.myco-notes.conf` to apply one answer every time. Repositories from 0.5.x or earlier (`notes/`, `tools/`, `docs/` at the root) keep working; `python3 <kit>/tools/relocate.py --root <repository>` shows the move, `--apply` does it.
-</details>
-
-<details><summary>The mycelium view</summary>
-
-`build-notes-map.py` also writes `myco-notes/map/graph.html`: one self-contained page (no server, no network) that draws the notes as a mycelium. Try the [live demo](https://luzianme.github.io/myco-notes/graph.html).
-
-![The same demo notes in six themes: Mycelium, Matrix, Amber terminal, Deep sea, Fruit and Paper](.github/assets/graph-themes.webp)
-
-- **A colony:** the read-order notes sit in the middle and every other note grows outward by how many links it is from them; mentions are threads in the colour of the note that writes them. In depth it is a ball that turns by itself when left alone (the &#10074;&#10074; button holds it still).
-- **Alive:** recently changed notes glow and reach further out, notes past a review date wilt, a missing reference ends in a `?`, and a selected note's threads fire like neurons.
-- **Replay** (Space) grows the network commit by commit; the slider jumps anywhere in the history.
-- **Explore:** hover, click, search, zoom, turn the view, a screensaver, and nine themes each checked for readable contrast. It works on a phone, with a keyboard or a screen reader, and respects reduced motion.
-- Only titles, paths, counts and commit subjects go into the page, never a note's text.
-
-*Made-up demo notes from `examples/demo/build_demo.py`; `.github/assets/record_media.py` records these pictures.*
-</details>
-
 ## Without an agent
 
 ```bash
@@ -194,19 +133,19 @@ python3 myco-notes/tools/build-notes-map.py    # open myco-notes/map/index.html 
 
 In cmd or PowerShell write `myco-notes\tools\notes-commit` (a `.cmd` launcher) or `python myco-notes\tools\notes_commit.py`. The map is nicer with `pip install markdown` but works without it. Existing notes: `tools/bootstrap ~/notes --name "My notes" --import ~/old-notes`, or `--adopt` to keep them in place.
 
-## Background
-It started as the operational memory of a long-running, AI-operated engineering project, where the notes had to work for an operator that forgets everything between sessions. If they are good enough for that operator, they are good enough for a new teammate, an auditor, or you next year.
+## Reference
 
-The name: mycelium is the underground network of threads that connects the trees of a forest and breaks down what has died. Here the notes are the threads, the references between them the network, and old statements are superseded and kept, not thrown away.
+The tools, the layout of a notes repository and what happens to new folders: [REFERENCE.md](skills/myco-notes/docs/REFERENCE.md). The method: [METHODOLOGY.md](skills/myco-notes/docs/METHODOLOGY.md). The format: [FORMAT.md](skills/myco-notes/docs/FORMAT.md). Teams: [TEAM.md](skills/myco-notes/docs/TEAM.md).
 
-## Credits
+## Background and credits
 
-Built from scratch by a person and an AI agent on a real project. Later we compared it with other work and borrowed from:
+It started as the operational memory of a long-running, AI-operated engineering project, where the notes had to work for an operator that forgets everything between sessions; if they are good enough for that operator, they are good enough for a new teammate, an auditor, or you next year. The name: mycelium is the underground network of threads that connects the trees of a forest and breaks down what has died. Here the notes are the threads, the references between them the network, and old statements are superseded and kept, not thrown away.
 
-- **[LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)** (Andrej Karpathy): a note on having an AI build and maintain a personal wiki from raw documents. We took the source layer (documents kept as found), keeping answers worth keeping, and a one-line summary per note. The difference: there the AI edits the wiki; here every change is a proposal the owner approves.
-- **[Obsidian](https://obsidian.md)**: a Markdown note-taking app. Its `[[wiki links]]` and vault folders are why existing collections can be adopted as they are.
-- **[AGENTS.md](https://agents.md)** and **[Agent Skills](https://agentskills.io/specification)**: open conventions for the file an AI agent reads first and for packaging agent skills. Following them makes the notes and the skill work with any agent.
-- **[RFC 2119](https://www.rfc-editor.org/rfc/rfc2119)**: the standard meaning of MUST and SHOULD, used in the format spec.
+Built from scratch by a person and an AI agent on a real project, then compared with other work and borrowing from:
+
+- **[LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)** (Andrej Karpathy): having an AI build and maintain a wiki from raw documents. We took the source layer (documents kept as found), keeping answers worth keeping, and a one-line summary per note; here every change is a proposal the owner approves.
+- **[Obsidian](https://obsidian.md)**: its `[[wiki links]]` and vault folders are why existing collections can be adopted as they are.
+- **[AGENTS.md](https://agents.md)** and **[Agent Skills](https://agentskills.io/specification)**: following these open conventions makes the notes and the skill work with any agent.
 
 ## Tests, contributing, license
 `python3 tests/native.py` (Linux, macOS, Windows) and `bash tests/smoke.sh` (Linux, macOS) run on every push in GitHub Actions. They copy only the skill folder, bootstrap a notes repository from it and exercise every tool. Contributing: see [AGENTS.md](AGENTS.md). License: Apache 2.0, see [LICENSE](LICENSE) and [NOTICE](NOTICE).
