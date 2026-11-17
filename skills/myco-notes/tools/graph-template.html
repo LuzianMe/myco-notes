@@ -474,21 +474,33 @@ function hypha(e,w,grow,al,tipA){
 }
 /* ---------- spikes ----------
    A spike leaves the note that writes the mention and runs to the note it names (either way on a fused thread), fast, with a
-   short tail; the note it reaches flashes. A lit thread fires at random moments, sometimes in a quick burst. In standby a
-   faint spike runs along a random thread every two to four seconds, at most two at a time, busy and fresh notes more often.
+   short tail; the note it reaches flashes, and may fire on along one of its own threads (a chain reaction, see passOn). A
+   selected note fires about 2 to 3 spikes a second in all, at random moments, now and then in a quick burst. In standby a
+   spike runs along a thread on screen every one to two seconds, nearer the middle of the view more often.
    On the digital themes a spike is a square packet that glitches now and then. None of this with reduced motion. */
-function launch(e,amb,now){if(!e)return;spikes.push({e:e,d:e.dir>0?1:e.dir<0?-1:(Math.random()<.5?1:-1),t0:now,dur:(amb?950:650)+Math.random()*350,amb:amb})}
-function fire(e,now,fm){if(!e.nf)e.nf=now+Math.random()*600*fm;if(now<e.nf)return;launch(e,false,now);e.nf=now+(Math.random()<.35?90+Math.random()*90:(600+Math.random()*2000)*fm)}   /* fm: a note with many threads fires each one less often */
-function pickEdge(list){var ws=list.map(function(e){return 1+(e.a.in+e.b.in)*.2+2*(recency(e.a)+recency(e.b))}),sum=ws.reduce(function(a,b){return a+b},0),r=Math.random()*sum;
-  for(var i=0;i<list.length;i++){r-=ws[i];if(r<=0)return list[i]}return list[list.length-1]}
+var CHAIN=1/3,MAXFLY=6,MAXHOP=8,spOld=null;
+function flying(){return spikes.length+(spOld?spOld.length:0)}   /* the chance that a note a spike reaches fires on; at most 6 spikes at once, a chain stops after 8 hops */
+function launch(e,amb,now,d,hop){if(!e)return;spikes.push({e:e,d:d||(e.dir>0?1:e.dir<0?-1:(Math.random()<.5?1:-1)),t0:now,dur:(amb?950:650)+Math.random()*350,amb:amb,hop:hop||0})}
+function fire(e,now,fm){if(!e.nf)e.nf=now+Math.random()*1600*fm;if(now<e.nf)return;if(flying()<MAXFLY)launch(e,false,now);e.nf=now+(Math.random()<.15?100+Math.random()*120:(600+Math.random()*2000)*fm)}   /* fm: a selected note fires about 2 to 3 spikes a second in all, however many threads it has */
+function pickEdge(list){   /* standby: a thread on screen, near the middle of the view more often, busy and fresh notes more often */
+  var m=W>700?350:0,cxs=(W+m)/2,on=list.filter(function(e){return e.a.px>m&&e.a.px<W&&e.a.py>0&&e.a.py<H&&e.b.px>m&&e.b.px<W&&e.b.py>0&&e.b.py<H});if(!on.length)return null;
+  var ws=on.map(function(e){var d=Math.hypot((e.a.px+e.b.px)/2-cxs,(e.a.py+e.b.py)/2-H/2);return (1+(e.a.in+e.b.in)*.2+2*(recency(e.a)+recency(e.b)))/(1+d/250)}),sum=ws.reduce(function(a,b){return a+b},0),r=Math.random()*sum;
+  for(var i=0;i<on.length;i++){r-=ws[i];if(r<=0)return on[i]}return on[on.length-1]}
+function passOn(s,tn,now){   /* a chain reaction: the note a spike reached may fire on along one of its own threads, not straight back */
+  if(reduce||s.hop+1>=MAXHOP||flying()>=MAXFLY||Math.random()>=CHAIN)return;
+  var opts=adj[tn.i].filter(function(a){return a.e!==s.e&&a.n.vis&&a.n.ap>.5}),ws=opts.map(function(a){return a.out?2:1}),sum=ws.reduce(function(a,b){return a+b},0),r=Math.random()*sum;
+  for(var i=0;i<opts.length;i++){r-=ws[i];if(r<=0){var e=opts[i].e;launch(e,s.amb,now,e.a===tn?1:-1,s.hop+1);return}}
+}
 function drawSpikes(now){
   var ci=T.style==="circuit";
-  spikes=spikes.filter(function(s){var p=(now-s.t0)/s.dur;if(!edgeVis(s.e))return false;
-    if(p>=1){var tn=s.d>0?s.e.b:s.e.a;tn.fl=now;tn.flA=s.amb?.35:.7;return false}
-    if(!s.e.W)hyphaPath(s.e);var rgb=threadRGB(s.d>0?s.e.a:s.e.b),al=s.amb?.6:.95,gx=ci&&Math.random()<.05?(Math.random()-.5)*6:0;
-    for(var k=0;k<5;k++){var pp=p-k*.035;if(pp<0)break;var q=along(s.e,s.d>0?pp:1-pp),r=(s.amb?1.6:2.2)*q[2]*(1-k*.16);
-      cx.fillStyle="rgba("+rgb+","+(al*(1-k*.22)).toFixed(3)+")";cx.beginPath();if(ci)cx.rect(q[0]+gx-r,q[1]-r,2*r,2*r);else cx.arc(q[0],q[1],r,0,6.3);cx.fill()}
+  spOld=spikes;spikes=[];   /* spikes passed on while these are drawn land in the new list */
+  var kept=spOld.filter(function(s){var p=(now-s.t0)/s.dur;if(!edgeVis(s.e))return false;
+    if(p>=1){var tn=s.d>0?s.e.b:s.e.a;tn.fl=now;tn.flA=s.amb?.6:.7;passOn(s,tn,now);return false}
+    if(!s.e.W)hyphaPath(s.e);var rgb=threadRGB(s.d>0?s.e.a:s.e.b),al=s.amb?.85:.95,gx=ci&&Math.random()<.05?(Math.random()-.5)*6:0,nk=s.amb?7:5;
+    for(var k=0;k<nk;k++){var pp=p-k*.03;if(pp<0)break;var q=along(s.e,s.d>0?pp:1-pp),r=(s.amb?2.1:2.2)*q[2]*(1-k*.12);
+      cx.fillStyle="rgba("+rgb+","+(al*(1-k*.14)).toFixed(3)+")";cx.beginPath();if(ci)cx.rect(q[0]+gx-r,q[1]-r,2*r,2*r);else cx.arc(q[0],q[1],r,0,6.3);cx.fill()}
     return true});
+  spikes=kept.concat(spikes);spOld=null;
 }
 function quietThreads(list){   /* into the cache: one fill per colour (the theme's glow, the thread, the buds), fused threads with their fade */
   var keep=cx;cx=tcx;cx.setTransform(1,0,0,1,0,0);cx.clearRect(0,0,tc.width,tc.height);cx.setTransform(DPR,0,0,DPR,0,0);
@@ -574,11 +586,11 @@ function draw(now){
     var a=Math.min(e.a.ap,e.b.ap),w=Math.min(2.6,.6+Math.sqrt(e.w)*.45)*1.5*Math.min(1.4,cam.k+.3),al=.85*Math.min(1,a*2);
     var ef=(fogOf(e.a)+fogOf(e.b))/2;w*=(e.a.ps+e.b.ps)/2;al*=1-.7*ef;
     hypha(e,w,a,al.toFixed(3),Math.min(1,al*3).toFixed(3));
-    if(!reduce&&a>=1)fire(e,t,Math.max(1,hotE.length/6));   /* a lit thread fires now and then, like a neuron */
+    if(!reduce&&a>=1)fire(e,t,Math.max(1,hotE.length/2.5));   /* a lit thread fires now and then, like a neuron */
   });
   /* now and then, in standby, a faint spike runs along a random thread */
   if(!reduce&&sel<0&&hov<0&&spin.on&&!playing&&coldE.length){if(!ambT)ambT=t+1500;
-    if(t>=ambT){if(spikes.filter(function(s){return s.amb}).length<2)launch(pickEdge(coldE),true,t);ambT=t+2000+Math.random()*2000}}else ambT=0;
+    if(t>=ambT){if(spikes.filter(function(s){return s.amb&&!s.hop}).length<2&&spikes.length<MAXFLY)launch(pickEdge(coldE),true,t);ambT=t+1000+Math.random()*1000}}else ambT=0;
   drawSpikes(t);
   /* notes */
   var order=NODES.filter(function(n){return n.vis&&n.ap>0}).sort(function(a,b){return depthAmt>0?b.pz-a.pz:(a.hub?1:0)-(b.hub?1:0)});   /* with depth: back to front */
