@@ -119,7 +119,7 @@ function readTheme(){
   var id=root.getAttribute("data-theme");
   if(!TH[id])id=window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches?"light":"dark";
   var x=TH[id];
-  T={id:id,dark:x.dark,pal:x.pal,quiet:x.quiet,hypha:x.hypha,wilt:x.wilt,halo:x.halo,text:x.text,font:x.font,style:x.style||"organic"};
+  T={id:id,dark:x.dark,pal:x.pal,quiet:x.quiet,hypha:x.hypha,wilt:x.wilt,halo:x.halo,text:x.text,font:x.font,style:x.style||"organic",nodes:x.nodes||""};
   sprites={};shades={};tcache={};tKey="";
   paintLegend();
 }
@@ -389,7 +389,7 @@ function hyphaPath(e){
     W.push([wx,wy,wz]);var q=proj(wx,wy,wz);P.push([q[0],q[1]])}
   e.W=W;e.L=L;
   var C=clipEnd(clipEnd(P,srad(e.b)+1.5).reverse(),srad(e.a)+1.5).reverse();   /* from the rim of a to the rim of b */
-  if(T.style==="circuit")C=circuit(e,C);else e.cs=null;
+  if(T.style==="circuit")C=circuit(e,C);else if(T.style==="fractal")C=stairs(circuit(e,C),e,e.L*cam.k>300?2:1);   /* short threads on screen: one level of steps */else e.cs=null;
   e.SP=C;return C;
 }
 function circuit(e,P){   /* the digital themes: a trace through a few points of the thread, straight runs turning by 45 or 90 degrees */
@@ -398,6 +398,17 @@ function circuit(e,P){   /* the digital themes: a trace through a few points of 
     if(hash(e.k+i*1.7)<.5)M=[A[0]+sx*d,A[1]+sy*d];else M=Math.abs(dx)>Math.abs(dy)?[B[0]-sx*d,A[1]]:[A[0],B[1]-sy*d];
     Q.push(M);cs.push(M);Q.push(B);if(i<ks.length-1)cs.push(B)}
   e.cs=cs;return Q;
+}
+function stairs(P,e,lv){   /* Matrix: every run becomes a staircase of steps, and the steps become smaller staircases (a digital fractal);
+                               about a third of the runs step at 60 or 120 degrees instead of square, so it is not a grid */
+  var out=[P[0]];
+  for(var i=1;i<P.length;i++){var A=P[i-1],B=P[i],dx=B[0]-A[0],dy=B[1]-A[1],L=Math.hypot(dx,dy);
+    if(L<(lv>1?30:18)||out.length>220){out.push(B);continue}
+    var ux=dx/L,uy=dy/L,m=2+Math.floor(hash(e.k+i*3.7+lv)*2),h=L/(m*2.3)*(hash(e.k+i*1.9+lv)<.5?1:-1),ro=hash(e.k+i*5.3+lv)<.33?(hash(e.k+i+lv)<.5?.52:-.52):0,
+      nx=-uy*Math.cos(ro)-ux*Math.sin(ro),ny=-uy*Math.sin(ro)+ux*Math.cos(ro);
+    for(var j=0;j<m;j++){var t0=j/m,t2=(j+1)/m,sg=j%2?0:h,a=[A[0]+dx*t0,A[1]+dy*t0],c=[A[0]+dx*t2,A[1]+dy*t2];
+      if(sg){out.push([a[0]+nx*sg,a[1]+ny*sg]);out.push([c[0]+nx*sg,c[1]+ny*sg])}out.push(c)}}
+  return lv>1?stairs(out,e,lv-1):out;
 }
 function pads(e,w){if(!e.cs)return;var r=Math.max(1.2,w*.9);e.cs.forEach(function(c){cx.rect(c[0]-r,c[1]-r,2*r,2*r)})}
 function clipEnd(P,r){   /* drop the points inside the circle of radius r around the last point, ending exactly on its rim */
@@ -426,10 +437,25 @@ function strandPath(P,upto,w0,w1){   /* add the path P up to the length `upto` t
   cx.closePath();
   return Q[Q.length-1];
 }
-function tip(p,r){cx.beginPath();if(T.style==="circuit")cx.rect(p[0]-r,p[1]-r,2*r,2*r);else cx.arc(p[0],p[1],r,0,6.3);cx.fill()}
+function tip(p,r){cx.beginPath();if(T.style!=="organic")cx.rect(p[0]-r,p[1]-r,2*r,2*r);else cx.arc(p[0],p[1],r,0,6.3);cx.fill()}
 /* A bud has the colour of the note the thread comes from (as that note is drawn: its group, or the wilt colour), a little
    darker on the dark theme and a little lighter on the light one, so it reads as part of the source and still stands out. */
 var shades={};
+/* the digital themes draw notes as chips (Amber terminal: a square with a pin on each side) or as pixels (Matrix: one block, or a
+   2x2 or 3x3 grid of blocks of slightly uneven brightness for busier notes), with a square glow and no shine; hubs get square frames */
+function sqSprite(color){var dm=T.nodes==="pixel",k=(dm?"dm":"sq")+color;if(sprites[k])return sprites[k];var c=document.createElement("canvas");c.width=c.height=96;var g=c.getContext("2d");g.fillStyle=color;
+  for(var i=0;i<12;i++){var q=48-i*3.6;g.globalAlpha=.075;g.beginPath();if(dm){g.moveTo(48,48-q);g.lineTo(48+q,48);g.lineTo(48,48+q);g.lineTo(48-q,48);g.closePath()}else g.rect(48-q,48-q,2*q,2*q);g.fill()}sprites[k]=c;return c}
+function dia(x,y,q){cx.moveTo(x,y-q);cx.lineTo(x+q,y);cx.lineTo(x,y+q);cx.lineTo(x-q,y);cx.closePath()}   /* Matrix: a diamond (a square turned by 45 degrees) */
+function ringPath(x,y,R){if(T.nodes==="pixel")dia(x,y,R*1.25);else if(T.nodes)cx.rect(x-R,y-R,2*R,2*R);else cx.arc(x,y,R,0,6.3)}
+function digiNode(n,x,y,r,col){
+  if(n.spore){cx.strokeStyle=col;cx.lineWidth=1.2;var q=Math.max(1.5,r*.75);cx.beginPath();if(T.nodes==="pixel")dia(x,y,q*1.25);else cx.rect(x-q,y-q,2*q,2*q);cx.stroke();return}
+  cx.fillStyle=col;
+  if(T.nodes==="chip"){var s=r*.9,p=Math.max(1,r*.3);cx.fillRect(x-s,y-s,2*s,2*s);cx.fillRect(x-p/2,y-s-p*1.5,p,p*1.5);cx.fillRect(x-p/2,y+s,p,p*1.5);cx.fillRect(x-s-p*1.5,y-p/2,p*1.5,p);cx.fillRect(x+s,y-p/2,p*1.5,p);return}
+  var g=r<4?1:r<6.5?2:3,b=2*r/g,ga=cx.globalAlpha;   /* Matrix: a diamond of diamonds */
+  for(var i=0;i<g;i++)for(var j=0;j<g;j++){var ox=(i-(g-1)/2)*b,oy=(j-(g-1)/2)*b;cx.globalAlpha=ga*(.6+.4*hash(n.i*9+i*3+j));
+    cx.beginPath();dia(x+(ox-oy)*.7071,y+(ox+oy)*.7071,Math.max(.8,b*.7071-.5));cx.fill()}
+  cx.globalAlpha=ga;
+}
 function budRGB(n){
   var c=n.due?T.wilt:gcol(n.g),k=T.id+c;
   if(!shades[k]){var v=parseInt(c.slice(1),16),r=v>>16&255,g=v>>8&255,b=v&255;
@@ -440,7 +466,7 @@ function twigOK(){return !busyNow&&cam.k>(cam.fk||cam.k)*.7}   /* no side branch
 function twigs(e,w,col){var ga=cx.globalAlpha;cx.strokeStyle=col;cx.lineWidth=Math.max(.5,w*.35);cx.globalAlpha=ga*.5;cx.beginPath();twigPath(e);cx.stroke();cx.globalAlpha=ga}
 function twigPath(e){   /* faint side branches on long threads: decoration only (on a circuit: a short stub at a corner) */
   if(!e.W||e.L*cam.k<150)return;
-  if(T.style==="circuit"){if(!e.cs||!e.cs.length)return;var c=e.cs[Math.floor(hash(e.k)*e.cs.length)],l=6+6*hash(e.k+1),hz=hash(e.k+2)<.5;cx.moveTo(c[0],c[1]);cx.lineTo(c[0]+(hz?l:0),c[1]+(hz?0:l));return}var nb=e.L*cam.k>260?2:1;
+  if(T.style!=="organic"){if(!e.cs||!e.cs.length)return;var c=e.cs[Math.floor(hash(e.k)*e.cs.length)],l=6+6*hash(e.k+1),hz=hash(e.k+2)<.5;cx.moveTo(c[0],c[1]);cx.lineTo(c[0]+(hz?l:0),c[1]+(hz?0:l));return}var nb=e.L*cam.k>260?2:1;
   for(var b=0;b<nb;b++){var t=.3+.4*hash(e.k+b*3.3),i=Math.round(t*(e.W.length-1)),p0=e.W[i],p1=e.W[Math.min(e.W.length-1,i+1)],
     tx=p1[0]-p0[0],ty=p1[1]-p0[1],tl=Math.hypot(tx,ty)||1,sg=hash(e.k+b*5.1)<.5?-1:1,an=sg*(.5+.4*hash(e.k+b)),
     c=Math.cos(an),sn=Math.sin(an),vx=(tx*c-ty*sn)/tl,vy=(tx*sn+ty*c)/tl,len=e.L*(.1+.08*hash(e.k+b*2.2)),f=frac(e.k*9.1+b,8);
@@ -453,7 +479,7 @@ function threadRGB(n){var c=n.due?T.wilt:gcol(n.g),k=T.id+c;if(!tcache[k]){var v
 function threadFill(e,P,al){if(e.dir!==0)return "rgba("+threadRGB(e.dir>0?e.a:e.b)+","+al+")";
   var g=cx.createLinearGradient(P[0][0],P[0][1],P[P.length-1][0],P[P.length-1][1]);g.addColorStop(0,"rgba("+threadRGB(e.a)+","+al+")");g.addColorStop(1,"rgba("+threadRGB(e.b)+","+al+")");return g}
 function along(e,t){
-  if(T.style==="circuit"&&e.SP&&e.SP.length>1){var S=e.SP,d=t*plen(S),acc=0,i=1;for(;i<S.length-1;i++){var sl=Math.hypot(S[i][0]-S[i-1][0],S[i][1]-S[i-1][1]);if(acc+sl>=d)break;acc+=sl}
+  if(T.style!=="organic"&&e.SP&&e.SP.length>1){var S=e.SP,d=t*plen(S),acc=0,i=1;for(;i<S.length-1;i++){var sl=Math.hypot(S[i][0]-S[i-1][0],S[i][1]-S[i-1][1]);if(acc+sl>=d)break;acc+=sl}
     var A=S[i-1],B=S[i],u=Math.max(0,Math.min(1,(d-acc)/(Math.hypot(B[0]-A[0],B[1]-A[1])||1)));return [A[0]+(B[0]-A[0])*u,A[1]+(B[1]-A[1])*u,(e.a.ps+e.b.ps)/2]}
   var W=e.W;if(!W||W.length<2){var p=curve(e,t);return proj(p.x,p.y,e.a.z+(e.b.z-e.a.z)*t)}   /* a point on the wavy thread, 0 at a, 1 at b */
   var f=t*(W.length-1),i=Math.min(W.length-2,Math.floor(f)),u=f-i,A=W[i],B=W[i+1];return proj(A[0]+(B[0]-A[0])*u,A[1]+(B[1]-A[1])*u,A[2]+(B[2]-A[2])*u)}
@@ -468,7 +494,7 @@ function hypha(e,w,grow,al,tipA){
     var bud=function(n){cx.fillStyle="rgba("+budRGB(n)+","+tipA+")"};   /* the bud on b's rim comes from a, and the other way round */
     if(grow<1){if(q){bud(e.b);tip(q,tr*.8)}}else{bud(e.a);tip(P[P.length-1],tr);bud(e.b);tip(P[0],tr)}
   }else{
-    var ci=T.style==="circuit",S=e.dir>0?P:P.slice().reverse(),end=strand(S,tot*grow,ci?w*.7:w*1.15,ci?w*.7:w*.12);if(ci&&grow>=1){cx.beginPath();pads(e,w);cx.fill()}
+    var ci=T.style!=="organic",S=e.dir>0?P:P.slice().reverse(),end=strand(S,tot*grow,ci?w*.7:w*1.15,ci?w*.7:w*.12);if(ci&&grow>=1){cx.beginPath();pads(e,w);cx.fill()}
     if(end){cx.fillStyle="rgba("+budRGB(e.dir>0?e.a:e.b)+","+tipA+")";tip(end,tr)}
   }
 }
@@ -492,7 +518,7 @@ function passOn(s,tn,now){   /* a chain reaction: the note a spike reached may f
   for(var i=0;i<opts.length;i++){r-=ws[i];if(r<=0){var e=opts[i].e;launch(e,s.amb,now,e.a===tn?1:-1,s.hop+1);return}}
 }
 function drawSpikes(now){
-  var ci=T.style==="circuit";
+  var ci=T.style!=="organic";
   spOld=spikes;spikes=[];   /* spikes passed on while these are drawn land in the new list */
   var kept=spOld.filter(function(s){var p=(now-s.t0)/s.dur;if(!edgeVis(s.e))return false;
     if(p>=1){var tn=s.d>0?s.e.b:s.e.a;tn.fl=now;tn.flA=s.amb?.6:.7;passOn(s,tn,now);return false}
@@ -514,7 +540,7 @@ function quietThreads(list){   /* into the cache: one fill per colour (the theme
   Object.keys(groups).forEach(function(k){var g=groups[k];cx.fillStyle="rgba("+T.hypha+","+(g.al*.4).toFixed(3)+")";cx.beginPath();g.it.forEach(function(x){strandPath(x[0],plen(x[0])*x[2],x[1]*2.2,x[1]*.6)});cx.fill()});
   cx=tcx;cx.setTransform(1,0,0,1,0,0);cx.drawImage(gc,0,0,tc.width,tc.height);cx.setTransform(DPR,0,0,DPR,0,0);
   Object.keys(groups).forEach(function(k){var g=groups[k],ends=[];
-    var ci=T.style==="circuit";cx.fillStyle="rgba("+g.rgb+","+g.al+")";cx.beginPath();g.it.forEach(function(x){var end=strandPath(x[0],plen(x[0])*x[2],ci?x[1]*.7:x[1]*1.15,ci?x[1]*.7:x[1]*.12);if(end)ends.push([end,.9+x[1]*.9]);if(ci&&x[2]>=1)pads(x[3],x[1])});cx.fill();
+    var ci=T.style!=="organic";cx.fillStyle="rgba("+g.rgb+","+g.al+")";cx.beginPath();g.it.forEach(function(x){var end=strandPath(x[0],plen(x[0])*x[2],ci?x[1]*.7:x[1]*1.15,ci?x[1]*.7:x[1]*.12);if(end)ends.push([end,.9+x[1]*.9]);if(ci&&x[2]>=1)pads(x[3],x[1])});cx.fill();
     cx.fillStyle="rgba("+g.bud+","+Math.min(1,g.al*3).toFixed(3)+")";cx.beginPath();ends.forEach(function(t){var r=t[1];if(ci)cx.rect(t[0][0]-r,t[0][1]-r,2*r,2*r);else{cx.moveTo(t[0][0]+r,t[0][1]);cx.arc(t[0][0],t[0][1],r,0,6.3)}});cx.fill();
     if(tw){cx.strokeStyle="rgba("+g.rgb+","+(g.al*.5).toFixed(3)+")";cx.lineWidth=.6;cx.beginPath();g.it.forEach(function(x){twigPath(x[3])});cx.stroke()}
   });
@@ -599,14 +625,14 @@ function draw(now){
     var col=n.due?T.wilt:gcol(n.g);
     cx.globalAlpha=Math.min(1,n.ap)*d*(n.hist?.55:1)*(.14+.6*rec+(n.hub?.2:0)+.12*fz)*(1-.3*fz);
     var gs=r*(n.hub?3.4:2.8)*(1+.25*fz),gm=Math.max(r*1.6,(n.nn||1e9)*(n.hub?1.3:1.15));if(gs>gm){cx.globalAlpha*=.25+.75*gm/gs;gs=gm}   /* crowded: a smaller, fainter glow */
-    if(!n.spore)cx.drawImage(sprite(col),x-gs,y-gs,gs*2,gs*2);   /* a spore (no link at all) has no glow */
-    if(n.fl&&t-n.fl<500){cx.globalAlpha=(1-(t-n.fl)/500)*n.flA;var fs=r*5;cx.drawImage(sprite(col),x-fs,y-fs,fs*2,fs*2)}   /* a spike just arrived */
+    if(!n.spore)cx.drawImage(T.nodes?sqSprite(col):sprite(col),x-gs,y-gs,gs*2,gs*2);   /* a spore (no link at all) has no glow */
+    if(n.fl&&t-n.fl<500){var fa=(t-n.fl)/500;cx.globalAlpha=(1-fa)*n.flA;if(T.nodes==="chip"){var fq=r*(1.3+fa*2);cx.strokeStyle=col;cx.lineWidth=1.5;cx.strokeRect(x-fq,y-fq,2*fq,2*fq)}else{var fs=r*5;cx.drawImage(T.nodes?sqSprite(col):sprite(col),x-fs,y-fs,fs*2,fs*2)}}   /* a spike just arrived */
     cx.globalAlpha=Math.min(1,n.ap)*d*(n.hist?.6:1)*fog;
-    if(n.spore){cx.strokeStyle=col;cx.lineWidth=1.3;cx.beginPath();cx.arc(x,y,Math.max(1.5,r*.8),0,6.3);cx.stroke();cx.globalAlpha=0}else{cx.fillStyle=col;cx.beginPath();cx.arc(x,y,r,0,6.3);cx.fill()}cx.globalAlpha*=1-fz;cx.fillStyle="rgba(255,255,255,"+(T.dark?.28:.4)+")";cx.beginPath();cx.arc(x-r*.28,y-r*.3,r*.38,0,6.3);cx.fill();cx.globalAlpha=Math.min(1,n.ap)*d*(n.hist?.6:1)*fog;
+    if(T.nodes)digiNode(n,x,y,r,col);else{if(n.spore){cx.strokeStyle=col;cx.lineWidth=1.3;cx.beginPath();cx.arc(x,y,Math.max(1.5,r*.8),0,6.3);cx.stroke();cx.globalAlpha=0}else{cx.fillStyle=col;cx.beginPath();cx.arc(x,y,r,0,6.3);cx.fill()}cx.globalAlpha*=1-fz;cx.fillStyle="rgba(255,255,255,"+(T.dark?.28:.4)+")";cx.beginPath();cx.arc(x-r*.28,y-r*.3,r*.38,0,6.3);cx.fill();}cx.globalAlpha=Math.min(1,n.ap)*d*(n.hist?.6:1)*fog;
     if(n.hub){   /* a hub (one of the most-mentioned notes of this project) carries two soft rings, like a fruiting body pushing up through the network */
       var ra=Math.min(1,n.ap)*d*fog;cx.strokeStyle=col;cx.lineWidth=1.4;
-      cx.globalAlpha=ra*.55;cx.beginPath();cx.arc(x,y,Math.max(0,r*1.55+(reduce||playing?0:1.2*Math.sin(t/900+n.i))),0,6.3);cx.stroke();
-      cx.globalAlpha=ra*.25;cx.beginPath();cx.arc(x,y,r*2.1,0,6.3);cx.stroke();
+      cx.globalAlpha=ra*.55;cx.beginPath();ringPath(x,y,Math.max(0,r*1.55+(reduce||playing?0:1.2*Math.sin(t/900+n.i))));cx.stroke();
+      cx.globalAlpha=ra*.25;cx.beginPath();ringPath(x,y,r*2.1);cx.stroke();
     }
     if(n.due){cx.setLineDash([2,3]);cx.strokeStyle=T.wilt;cx.lineWidth=1.2;cx.beginPath();cx.arc(x,y,r+3.5,0,6.3);cx.stroke();cx.setLineDash([])}
     if(n.miss&&(cam.k>.7||focus===n.i)){var ang=hash(n.i+9)*6.28,x2=x+Math.cos(ang)*(r+13),y2=y+Math.sin(ang)*(r+13);cx.setLineDash([2,2]);cx.strokeStyle=T.wilt;cx.lineWidth=1;cx.beginPath();cx.moveTo(x+Math.cos(ang)*r,y+Math.sin(ang)*r);cx.lineTo(x2,y2);cx.stroke();cx.setLineDash([]);cx.fillStyle=T.wilt;cx.font="10px system-ui";cx.textAlign="center";cx.fillText("?",x2+Math.cos(ang)*4,y2+Math.sin(ang)*4+3)}
