@@ -115,11 +115,12 @@ def graph_data():
 
 
 def head_script():
-    """Applied in <head> before the first paint: ?theme=, else the stored choice (the older key once, as a fallback)."""
+    """Applied in <head> before the first paint: ?theme=, else the stored choice (the older key once, as a fallback). An embedded mycelium
+    view (data-embed on <html>) takes its theme only from ?theme= or its host page, never from this browser's stored choice."""
     ids = " ".join(i for i, _ in OPTIONS)
     return ("<script>(function(){var r=document.documentElement,ok=' " + ids + " ',t=null;"
             "try{t=new URLSearchParams(location.search).get('theme')}catch(e){}"
-            "if(!t||ok.indexOf(' '+t+' ')<0){t=null;try{t=localStorage.getItem('" + KEY + "');"
+            "if(!t||ok.indexOf(' '+t+' ')<0){t=null;if(!r.hasAttribute('data-embed'))try{t=localStorage.getItem('" + KEY + "');"
             "if(t===null){var o=localStorage.getItem('" + OLD_KEY + "');if(o==='light'||o==='dark'){t=o;localStorage.setItem('" + KEY + "',o)}}}catch(e){t=null}}"
             "if(t&&t!=='auto'&&ok.indexOf(' '+t+' ')>=0)r.setAttribute('data-theme',t)})()</script>")
 
@@ -136,7 +137,7 @@ def picker(label_class=""):
             "if(keep){try{localStorage.setItem('" + KEY + "',t)}catch(e){}}show();"
             "try{document.dispatchEvent(new Event('myco-theme'))}catch(e){}}"
             "show();s.addEventListener('change',function(){set(s.value,true)});"
-            "window.addEventListener('storage',function(e){if(e.key==='" + KEY + "'&&e.newValue&&s.querySelector('option[value=\"'+e.newValue+'\"]'))set(e.newValue,false)})"
+            "window.addEventListener('storage',function(e){if(!r.hasAttribute('data-embed')&&e.key==='" + KEY + "'&&e.newValue&&s.querySelector('option[value=\"'+e.newValue+'\"]'))set(e.newValue,false)})"
             "})()</script>")
 
 

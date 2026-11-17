@@ -2,6 +2,10 @@
 """build-notes-map: generate a navigable static view of the notes (index, one page per note, backlinks, git history).
 
   tools/build-notes-map.py [--root DIR] [--out DIR]        default out: the map folder of .myco-notes.conf (myco-notes/map, or notes-map in older repositories; gitignored, rebuilt on demand)
+  tools/build-notes-map.py --public [--labels FILE] [--title TEXT] --out DIR
+                            only DIR/graph.html, a public mycelium view to embed on a website: no note name, title, path, size or commit
+                            subject, only the labels of FILE ({"note-name": "Label shown"}, keyed by the file name without .md); every
+                            other note is an unlabelled dot. It opens in embed mode. Other files in DIR are left alone.
 
 What it produces
   index.html        notes grouped by purpose, live search, the 15 latest commits
@@ -125,14 +129,33 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--root", default=".")
     ap.add_argument("--out", default=None)
+    ap.add_argument("--public", action="store_true", help="write only <out>/graph.html, a public graph for a website (see above)")
+    ap.add_argument("--labels", default=None, help="with --public: the approved labels, a JSON object {\"note-name\": \"Label shown\"}")
+    ap.add_argument("--title", default=None, help="with --public: a title for the page (default: none)")
     a = ap.parse_args()
+    if (a.labels is not None or a.title is not None) and not a.public:
+        ap.error("--labels and --title go with --public")
+    if a.public and not a.out:
+        ap.error("--public needs --out DIR (the folder that gets graph.html)")
+    labels = {}
+    if a.public and a.labels:
+        try:
+            labels = notes_graph.read_labels(a.labels)
+        except (OSError, ValueError) as e:
+            sys.exit(f"REFUSING to build: {e}")
+        for k, v in labels.items():
+            if secret_scan.find(v) or secret_scan.find(k):
+                sys.exit(f"REFUSING to build: a label in {a.labels} looks like it contains a secret (value not shown)")
     root = sh(["git", "rev-parse", "--show-toplevel"], a.root).strip() or os.path.abspath(a.root)
     lay = _myco.layout(root)
     out = os.path.abspath(a.out) if a.out else os.path.join(root, *lay["map"].split("/"))
     rel_out = _myco.overlap(root, out)
-    if rel_out in ("same", "contains"):
+    if a.public:
+        if rel_out == "same" or os.path.isfile(out):
+            sys.exit(f"REFUSING to build: --out {out} must be a folder other than the repository's own root")
+    elif rel_out in ("same", "contains"):
         sys.exit(f"REFUSING to build: --out {out} is the repository or contains it, and the output folder is emptied before each build")
-    if not _myco.owned_or_empty(out, MARKER, lambda d: set(os.listdir(d)) <= MAP_FILES and "index.html" in os.listdir(d)):
+    elif not _myco.owned_or_empty(out, MARKER, lambda d: set(os.listdir(d)) <= MAP_FILES and "index.html" in os.listdir(d)):
         sys.exit(f"REFUSING to build: {out} holds files this tool did not make, and the output folder is emptied before each build; "
                  "choose an empty or new folder")
     skip_rel = {lay["map"], *lay["data"]}
@@ -207,6 +230,16 @@ def main():
                 info[tgt]["inn"][d["id"]] = info[tgt]["inn"].get(d["id"], 0) + 1
                 d["out"][info[tgt]["id"]] = 1
     byid = {d["id"]: d for d in info.values()}
+    if a.public:
+        os.makedirs(out, exist_ok=True)
+        gn, ge, gc = notes_graph.build(root, lay, info, groups, out, a.title or "", sh, datetime.date.today().isoformat(), "", public=labels)
+        stems = {d["name"][:-3] for d in info.values() if d["name"].endswith(".md")}
+        used = sorted(k for k in labels if k in stems)
+        print(f"public graph: {gn} notes ({sum(1 for d in info.values() if d['name'][:-3] in labels)} labelled), {ge} links, {gc} commits -> {os.path.join(out, 'graph.html')}")
+        unknown = sorted(set(labels) - set(used))
+        if unknown:
+            print(f"labels that match no note (not used): {', '.join(unknown)}", file=sys.stderr)
+        return
 
     def log_rows(extra):
         rows = [l.split("\t", 2) for l in sh(["git", "log", *extra], root).splitlines()]

@@ -182,7 +182,7 @@ def main():
         check("hubs are the most-mentioned project notes", MY + "/plans/graph-hub.md" in hubs and hubs == {n["rel"] for n in live[:min(6, max(2, len(g["nodes"]) // 8))]} and not any(n["in"] < 2 for n in g["nodes"] if n["hub"]), str(sorted(hubs)))
         check("the entry and method notes are never hubs, however often they are mentioned", not any(n["hub"] and g["groups"][n["g"]]["id"] in ("start", "docs") for n in g["nodes"]) and any(n["in"] >= 2 and g["groups"][n["g"]]["id"] == "start" for n in g["nodes"]), str([(n["rel"], n["in"]) for n in g["nodes"] if n["in"] >= 2]))
         check("the timeline sits in the left column under the search panel, no mushrooms drawn", h.index('id="left"') < h.index('id="head"') < h.index('id="time"') < h.index('id="panel"') and "mushroom" not in h.lower())
-        check("the page needs no network", not _re.search(r'(src|href)="https?:', h) and "<script src" not in h and h.count("</script>") == 5 and "%%" not in h)   # inline only: theme, picker, data, theme colours, view
+        check("the page needs no network", not _re.search(r'(src|href)="https?:', h) and "<script src" not in h and h.count("</script>") == 6 and "%%" not in h)   # inline only: embed flags, theme, picker, data, theme colours, view
         node = shutil.which("node")
         if node:
             code = _re.search(r"<script>\n\(function.*?</script>", h, _re.S).group(0)[len("<script>\n"):-len("</script>")]
@@ -939,6 +939,57 @@ def main():
         check("search: nothing found exits 1", rc == 1 and "no note mentions" in out, out)
         shutil.rmtree(sdir)
         os.remove(os.path.join(proj, MY, "logs", "old-backup-log.md"))
+
+        print("0.41: a public graph keeps only the approved labels")
+        demo = os.path.join(tmp, "public-demo")
+        rc, out = run([sys.executable, os.path.join(REPO, "examples", "demo", "build_demo.py"), demo], tmp)
+        check("public graph: the demo notes build", rc == 0, out[-400:])
+        labels = os.path.join(tmp, "labels.json")
+        write(labels, '{"sensor-node": "Sensor node", "gateway.md": "LoRa gateway", "no-such-note": "Unused"}\n')
+        pub = os.path.join(tmp, "public-out")
+        os.makedirs(pub)
+        write(os.path.join(pub, "index.html"), "the host site's own page\n")
+        bm = [sys.executable, os.path.join(demo, MY, "tools", "build-notes-map.py"), "--root", demo]
+        rc, out = run(bm + ["--public", "--labels", labels, "--out", pub], demo)
+        check("public graph: built, with the unused label reported", rc == 0 and "2 labelled" in out and "no-such-note" in out, out)
+        check("public graph: only graph.html is written; other files in the folder stay", sorted(os.listdir(pub)) == ["graph.html", "index.html"]
+              and read(os.path.join(pub, "index.html")) == "the host site's own page\n", str(os.listdir(pub)))
+        page = read(os.path.join(pub, "graph.html"))
+        blob = page.split('<script id="data" type="application/json">', 1)[1].split("</script>", 1)[0]
+        rest = page.replace(blob, "")
+        rels = git(demo, "ls-files", "*.md")[1].split()
+        subjects = [s for s in git(demo, "log", "--format=%s")[1].splitlines() if s.strip()]
+        titles = []
+        for rel_ in rels:
+            if os.path.basename(rel_) in ("sensor-node.md", "gateway.md"):
+                continue   # a listed note's own label may well be its title
+            m = re.search(r"(?m)^#\s+(.+)$", read(os.path.join(demo, *rel_.split("/"))))
+            if m:
+                titles.append(re.sub(r"[`*_]", "", m.group(1)).strip())
+        stems = {os.path.basename(r_)[:-3] for r_ in rels} - {"sensor-node", "gateway"}
+        with open(os.path.join(SKILL, "tools", "graph-template.html"), encoding="utf-8") as fh:
+            code = fh.read()   # words the page's own code uses ("state" in pinchState) are not a leak; the data must still not hold them
+        leaks = ([r_ for r_ in rels if r_ in page] + [os.path.basename(r_) for r_ in rels if os.path.basename(r_) in page]
+                 + [s for s in subjects if s in page] + [t for t in titles if len(t) > 3 and t in page]
+                 + [s for s in stems if s in blob or (s in rest and s not in code)])
+        check("public graph: no unlisted note name, title, path or commit subject anywhere in the file", not leaks, str(leaks[:8]))
+        check("public graph: the listed labels are there, and nothing else names a note",
+              '"name":"Sensor node"' in blob and '"name":"LoRa gateway"' in blob and blob.count('"name"') == 2, blob[:300])
+        check("public graph: plain numbers for the notes, no project title, no group names, embed mode built in",
+              '"id":0,' in blob and '"title":""' in blob and '"public":true' in blob and "Greenhouse" not in page
+              and "<title>mycelium</title>" in page and 'if(true||q' in page, blob[:200])
+        rc, out = run(bm + ["--public", "--title", "My homelab", "--out", pub], demo)
+        check("public graph: --title is the only title; without --labels every note is a dot",
+              rc == 0 and "<title>My homelab - mycelium</title>" in read(os.path.join(pub, "graph.html")) and '"name"' not in read(os.path.join(pub, "graph.html")), out)
+        write(labels, '["not", "an object"]\n')
+        rc, out = run(bm + ["--public", "--labels", labels, "--out", pub], demo)
+        check("public graph: a labels file that is not one JSON object is refused", rc != 0 and "JSON object" in out, out)
+        rc, out = run(bm + ["--labels", labels], demo)
+        check("public graph: --labels without --public is a usage error", rc == 2, out)
+        rc, out = run(bm + ["--public"], demo)
+        check("public graph: --public needs --out", rc == 2 and "--out" in out, out)
+        full = read(os.path.join(demo, MY, "map", "graph.html"))
+        check("the full view still names its notes and stays out of embed mode unless asked", "sensor-node" in full and 'if(false||q' in full, "")
     finally:
         def _force(func, path, _exc):
             os.chmod(path, 0o700)

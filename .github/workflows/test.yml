@@ -59,6 +59,20 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/py38" && ln -sf "$(command -v python)" "$RUNNER_TEMP/py38/python3"
           PATH="$RUNNER_TEMP/py38:$PATH" bash tests/smoke.sh
+  browser:
+    # The mycelium view in a real browser (tests/browser.py): a page opened with no size, embed mode, the host page's messages.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Git identity for the demo commits
+        run: |
+          git config --global user.name "CI"
+          git config --global user.email "ci@example.invalid"
+      - run: pip install playwright==1.65.2 && python -m playwright install --with-deps chromium
+      - run: python tests/browser.py
   pyflakes:
     # Unused imports, undefined names and similar mistakes in the tools, the tests and the demo builder.
     runs-on: ubuntu-latest

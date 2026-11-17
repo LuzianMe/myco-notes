@@ -3,6 +3,11 @@
 The view is one self-contained HTML file (no server, no network, no libraries): notes are nodes, mentions between notes are hyphae, the
 most-mentioned notes of the project are its hubs, and a timeline replays the git history so the network grows commit by commit. Only titles, paths, counts
 and commit subjects are written into it, never the text of a note.
+
+A public graph (build-notes-map.py --public) keeps less: only what drawing and the replay need (numbers for the notes, their group
+number, hub and history flags, link counts, the commit a note was born in and last changed in, the links, and per commit its time and
+the notes it touched and added) plus the labels of an approved list. No note name, title, path, size, follow-up, missing reference,
+commit subject, group name or project title is written, and the page always opens in embed mode.
 """
 import json
 import os
@@ -14,6 +19,8 @@ sys.path.insert(0, HERE)
 import _myco  # noqa: E402
 import map_themes  # noqa: E402
 MAX_COMMITS = 2000
+KIT_GROUPS = {"start", "plans", "inbox", "logs", "verify", "artifacts", "archive", "imported", "sources", "docs", "other"}   # the kit's own group ids (no project words)
+LABEL_MAX = 60
 DUE = re.compile(r"\b(after|about|due|review-by|waiting until|on or after)\s+(\d{4}-\d{2}-\d{2})\b")
 ILLUSTRATIVE = " *<>{}$|()[]"
 
@@ -84,8 +91,9 @@ def commit_history(root, rels, sh):
     return commits
 
 
-def build(root, lay, info, groups, out, title, sh, today, built):
-    """Write <out>/graph.html. `info` is the map builder's table of notes (rel -> id, title, group, out, inn, size)."""
+def build(root, lay, info, groups, out, title, sh, today, built, public=None):
+    """Write <out>/graph.html. `info` is the map builder's table of notes (rel -> id, title, group, out, inn, size).
+    public: None for the full view, or the approved labels {note name without .md: label} for a public graph (see the module docstring)."""
     rels = sorted(info)
     index = {rel: i for i, rel in enumerate(rels)}
     commits = commit_history(root, set(rels), sh)
@@ -130,16 +138,56 @@ def build(root, lay, info, groups, out, title, sh, today, built):
     data["groups"] = [{"id": groups[g][0], "name": groups[g][1]} for g in used]
     for n in nodes:
         n["g"] = remap[n["g"]]
+    if public is not None:
+        data = public_data(data, public, title)
     blob = json.dumps(data, ensure_ascii=True, separators=(",", ":")).replace("</", "<\\/").replace("<!--", "<\\!--")
     with open(os.path.join(HERE, "graph-template.html"), encoding="utf-8") as fh:
         page = fh.read()
-    links = "".join(f'<li><a href="p/{n["id"]}.html">{_esc(n["title"])} ({_esc(n["rel"])})</a></li>' for n in nodes)
+    links = "" if public is not None else "".join(f'<li><a href="p/{n["id"]}.html">{_esc(n["title"])} ({_esc(n["rel"])})</a></li>' for n in nodes)
+    page = page.replace("%%PUBLIC%%", "true" if public is not None else "false")
+    if public is not None and not title:
+        page = page.replace("<title>%%TITLE%% - mycelium</title>", "<title>mycelium</title>")
     page = (page.replace("%%THEME_CSS%%", map_themes.graph_css()).replace("%%THEME_HEAD%%", map_themes.head_script())
             .replace("%%THEME_PICKER%%", map_themes.picker("sr")).replace("%%THEMES%%", map_themes.graph_json().replace("</", "<\\/")))
     page = page.replace("%%TITLE%%", _esc(title)).replace("%%LINKS%%", links).replace("%%DATA%%", blob)
     with open(os.path.join(out, "graph.html"), "w", encoding="utf-8", newline="\n") as fh:
         fh.write(page)
     return len(nodes), len(edges), len(commits)
+
+
+def public_data(data, labels, title):
+    """The public subset of the view's data: nothing that names a note or a commit, except the approved labels."""
+    nodes = []
+    for i, n in enumerate(data["nodes"]):
+        p = {"id": i, "g": n["g"], "hub": n["hub"], "hist": n["hist"], "in": n["in"], "out": n["out"], "b": n["b"]}
+        if "l" in n:
+            p["l"] = n["l"]
+        stem = n["name"][:-3] if n["name"].endswith(".md") else n["name"]
+        if stem in labels:
+            p["name"] = labels[stem]
+        nodes.append(p)
+    groups = [{"id": g["id"] if g["id"] in KIT_GROUPS else "g%d" % i} for i, g in enumerate(data["groups"])]
+    commits = [{"t": c["t"], "n": c["n"], "a": c["a"]} for c in data["commits"]]
+    return {"public": True, "title": title, "groups": groups, "nodes": nodes, "edges": data["edges"], "commits": commits}
+
+
+def read_labels(path):
+    """The approved labels file: a JSON object {"note-name": "Label shown"}, keyed by the note's file name without .md
+    (a trailing .md is accepted). Raises ValueError with a message for anything else."""
+    with open(path, encoding="utf-8") as fh:
+        try:
+            raw = json.load(fh)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"{path} is not valid JSON ({e.msg}, line {e.lineno})")
+    if not isinstance(raw, dict):
+        raise ValueError(f'{path} must be one JSON object: {{"note-name": "Label shown", ...}}')
+    out = {}
+    for k, v in raw.items():
+        if not isinstance(v, str) or not v.strip():
+            raise ValueError(f"{path}: the label for {k!r} must be a non-empty string")
+        k = k[:-3] if k.endswith(".md") else k
+        out[k] = " ".join(v.split())[:LABEL_MAX]
+    return out
 
 
 def hub_set(info, hist_prefixes):
