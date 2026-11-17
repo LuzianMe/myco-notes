@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.34.0
+- **Real 3D notes in the digital themes**: the shaded shapes of 0.33.0 always faced the viewer, so turning the network did little to them. Now they are small 3D objects turned by the same view as the network:
+  - **Matrix: crystals.** Each note is an octahedron; only the faces turned toward the viewer are drawn, each shaded by how it faces a light from the upper left, and each crystal also turns slowly on its own (not with reduced motion). Busy notes are bigger crystals.
+  - **Amber terminal: glass pads.** Each note is an eight-sided glass disc with thickness that faces outward from the centre of the colony like a scale: faint see-through faces, bright edges, a soft drill hole and a glint. At the front of the ball a pad shows its face, at the sides it is seen edge-on.
+- A handful of points and faces per note: drawing cost is unchanged.
+
 ## 0.33.0
 - **Matrix notes are crystals**: each diamond is drawn as a small octahedron whose four faces take a light, two mid and a dark tone of the note's colour; the light turns with the view, so as the network spins the crystals seem to turn in place. Busy notes are clusters of small crystals.
 - **Amber terminal notes are thick pads**: each octagon has a dark rim and side below its top face, the top face and drill hole squash with the camera's tilt so the pad lies in space, and a lit upper edge suggests light from above.
