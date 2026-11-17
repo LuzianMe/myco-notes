@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.30.0
+- **Chain reactions**: when a spike reaches a note, there is a 1 in 3 chance that the note fires on along one of its own threads (more often toward notes it mentions, never straight back), and the next note rolls again, so a signal sometimes travels on for a few notes before it dies out. At most 6 spikes run at once and a chain stops after 8 hops; the chance is one number (`CHAIN`) at the top of the spike code.
+- **Calmer firing on a selected note**: about 2 to 3 spikes a second in all, however many threads the note has, with rarer bursts (a hub fired about 10 a second before).
+- **Standby you can see**: a spike every one to two seconds (was two to four), brighter and with a longer tail, a stronger flash where it lands, and it starts on a thread that is on screen, near the middle of the view more often, so zoomed in the action happens where you look.
+
 ## 0.29.0
 - **Threads fire like neurons**: on the threads of a selected or hovered note, the steady sap becomes spikes: each thread fires at random moments, sometimes in a quick burst, a spike runs about three times faster with a short tail, and the note it reaches flashes. A note with many threads fires each of them less often, so a hub stays readable.
 - **A living network in standby**: while nothing is selected and the network turns by itself, a faint spike runs along a random thread every two to four seconds (at most two at a time; busy and recently changed notes more often), and its target flashes softly.
