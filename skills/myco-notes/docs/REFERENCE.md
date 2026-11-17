@@ -82,13 +82,13 @@ The build refuses, as the full map does, when a note or a label looks like it co
 
 | URL option | Effect |
 |---|---|
-| `?embed=1` | Only the network and its labels: no panels, tool bar, replay panel, Find, hint or note panel, and no clicks that open notes. The page and canvas are transparent (`color-scheme: normal`), so the host page shows through; the theme keeps its node, thread and label colours. At most 1.5 device pixels per pixel. A public graph is always in embed mode. |
+| `?embed=1` | Only the network and its labels: no panels, tool bar, replay panel, Find, hint or note panel, and no clicks that open notes. The page and canvas are transparent (`color-scheme: normal`), so the host page shows through, and the network fades out towards the edges of the frame; the theme keeps its node, thread and label colours. Lighter drawing than the full view (threads as plain lines without their glow, about 30 frames a second while it turns by itself, at most 1.5 device pixels per pixel). Labels show only on a frame of at least 360x240, at the fitted size or closer, and where the notes are not crowded together. A public graph is always in embed mode. |
 | `?theme=<id>` | The theme, as in the full view: `light`, `dark`, `mycelium`, `fruit`, `matrix`, `amber`, `contrast`, `deepsea`, `paper` (or `auto`). Embed mode never uses a choice stored in the browser. |
 | `?interactive=0` | No pointer, wheel or touch handling at all: a preview that only turns by itself, so the host page keeps its own scrolling and swiping. |
 | `?replay=1` | Start with the replay of the history instead of the finished graph. |
 | `?depth=0` | The flat view instead of the ball. |
 
-Interaction in embed mode (unless `interactive=0`): drag with the mouse or one finger to turn the network about its upright axis (the tilt stays at the gentle view from slightly above); scroll, a trackpad pinch or two fingers zoom, from half the fitted size up to a 4x zoom; a double-click fits it again. Left alone it turns slowly by itself; with `prefers-reduced-motion` it does not.
+Interaction in embed mode (unless `interactive=0`): drag with the mouse or one finger to turn the network about its upright axis (the tilt stays at the gentle view from slightly above); scroll, a trackpad pinch or two fingers zoom about the middle of the network, which stays centred, from half the fitted size up to four times it; a double-click fits it again. Left alone it turns slowly by itself; with `prefers-reduced-motion` it does not.
 
 Drawing pauses while the page is hidden (`visibilitychange`) and while the host page asks for it.
 

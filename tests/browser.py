@@ -44,6 +44,8 @@ HOST = """<!doctype html><html><head><meta charset="utf-8"><title>host</title></
 <script>window.got=[];addEventListener("message",function(e){if(e.source===document.getElementById("f").contentWindow)got.push(e.data)})</script></body></html>"""
 COUNT_FRAMES = ("(function(){var r=window.requestAnimationFrame.bind(window);window.__frames=0;"
                 "window.requestAnimationFrame=function(f){window.__frames++;return r(f)}})()")
+CENTROID = ("(function(){var c=document.getElementById('c'),d=c.getContext('2d').getImageData(0,0,c.width,c.height).data,sx=0,sy=0,k=0;"
+            "for(var y=0;y<c.height;y+=2)for(var x=0;x<c.width;x+=2)if(d[(y*c.width+x)*4+3]>40){sx+=x;sy+=y;k++}return [sx/k/c.width,sy/k/c.height]})()")
 PAINTED = ("(function(){var c=document.getElementById('c'),d=c.getContext('2d').getImageData(0,0,c.width,c.height).data,k=0;"
            "for(var i=3;i<d.length;i+=4)if(d[i])k++;return k})()")
 
@@ -117,14 +119,24 @@ def main():
                     st = fr.evaluate("""(function(){var v=function(id){var e=document.getElementById(id);return e?getComputedStyle(e).display:'none'};
                         return {ui:['left','tools','panel','hint','time'].map(v),theme:document.documentElement.getAttribute('data-theme'),
                         bg:[getComputedStyle(document.documentElement).backgroundColor,getComputedStyle(document.body).backgroundColor,getComputedStyle(document.body).backgroundImage],
-                        cs:getComputedStyle(document.documentElement).colorScheme,cw:document.getElementById('c').width,iw:innerWidth}})()""")
+                        cs:getComputedStyle(document.documentElement).colorScheme,mask:getComputedStyle(document.getElementById('c')).maskImage||getComputedStyle(document.getElementById('c')).webkitMaskImage,cw:document.getElementById('c').width,iw:innerWidth}})()""")
                     check(f"{kind} {th}: only the canvas, the theme from ?theme=", st["ui"] == ["none"] * 5 and st["theme"] == th, str(st))
                     check(f"{kind} {th}: a transparent page (color-scheme normal)", st["bg"][:2] == ["rgba(0, 0, 0, 0)"] * 2 and st["bg"][2] == "none"
                           and st["cs"] == "normal", str(st))
                     check(f"{kind} {th}: at most 1.5 device pixels per pixel", st["cw"] == round(st["iw"] * 1.5), str(st))
                     check(f"{kind} {th}: the network is drawn", fr.evaluate(PAINTED) > 1000, "")
+                    check(f"{kind} {th}: the edges fade out (a radial mask on the canvas)", "radial-gradient" in (st["mask"] or ""), str(st["mask"]))
                     if kind == "public" and th == "deepsea":
                         box = pg.locator("#f").bounding_box()
+                        pg.mouse.move(box["x"] + 40, box["y"] + 40)
+                        for k in range(6):
+                            pg.mouse.wheel(0, -200)
+                            pg.wait_for_timeout(60)
+                        pg.wait_for_timeout(1500)
+                        c = fr.evaluate(CENTROID)
+                        check("zoom: scrolling in near a corner keeps the network in the middle", abs(c[0] - .5) < .08 and abs(c[1] - .5) < .08, str(c))
+                        pg.mouse.dblclick(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+                        pg.wait_for_timeout(1500)
                         cx, cy = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
                         pg.mouse.move(cx, cy)
                         pg.mouse.down()
