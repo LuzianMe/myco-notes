@@ -46,6 +46,10 @@ COUNT_FRAMES = ("(function(){var r=window.requestAnimationFrame.bind(window);win
                 "window.requestAnimationFrame=function(f){window.__frames++;return r(f)}})()")
 CENTROID = ("(function(){var c=document.getElementById('c'),d=c.getContext('2d').getImageData(0,0,c.width,c.height).data,sx=0,sy=0,k=0;"
             "for(var y=0;y<c.height;y+=2)for(var x=0;x<c.width;x+=2)if(d[(y*c.width+x)*4+3]>40){sx+=x;sy+=y;k++}return [sx/k/c.width,sy/k/c.height]})()")
+BLOBS = ("(function(){var c=document.getElementById('c'),d=c.getContext('2d').getImageData(0,0,c.width,c.height).data,g={},r=devicePixelRatio>1.5?1.5:devicePixelRatio;"
+         "for(var y=0;y<c.height;y++)for(var x=0;x<c.width;x++)if(d[(y*c.width+x)*4+3]>=250){var k=Math.floor(x/(6*r))+','+Math.floor(y/(6*r));"
+         "var b=g[k]||(g[k]={n:0,x:0,y:0});b.n++;b.x+=x;b.y+=y}"
+         "return Object.keys(g).map(function(k){var b=g[k];return [b.x/b.n/c.width*innerWidth,b.y/b.n/c.height*innerHeight,b.n]}).sort(function(a,b){return b[2]-a[2]})})()")
 PAINTED = ("(function(){var c=document.getElementById('c'),d=c.getContext('2d').getImageData(0,0,c.width,c.height).data,k=0;"
            "for(var i=3;i<d.length;i+=4)if(d[i])k++;return k})()")
 
@@ -71,6 +75,13 @@ def main():
         subprocess.run([sys.executable, os.path.join(demo, "myco-notes", "tools", "build-notes-map.py"), "--root", demo, "--public",
                         "--labels", labels, "--out", os.path.join(site, "pub")], check=True, capture_output=True)
 
+        every = os.path.join(tmp, "every.json")   # every note labelled, so a tap that selects any note reports a label
+        with open(every, "w", encoding="utf-8") as fh:
+            json.dump({os.path.splitext(f)[0]: "Note " + os.path.splitext(f)[0].replace("-", " ") for d, _, fs in os.walk(os.path.join(demo, "myco-notes"))
+                       for f in fs if f.endswith(".md")}, fh)
+        subprocess.run([sys.executable, os.path.join(demo, "myco-notes", "tools", "build-notes-map.py"), "--root", demo, "--public",
+                        "--labels", every, "--out", os.path.join(site, "every")], check=True, capture_output=True)
+
         def host(name, src, style="display:block"):
             with open(os.path.join(site, name), "w", encoding="utf-8") as fh:
                 fh.write(HOST % (style, src))
@@ -79,6 +90,7 @@ def main():
         for th in ("deepsea", "amber"):
             host(f"embed-{th}.html", f"map/graph.html?embed=1&theme={th}")
             host(f"public-{th}.html", f"pub/graph.html?theme={th}")
+        host("select.html", "every/graph.html?theme=deepsea")
         host("still.html", "pub/graph.html?theme=deepsea&interactive=0")
         h = functools.partial(http.server.SimpleHTTPRequestHandler, directory=site)
         h.log_message = lambda *x: None
@@ -163,6 +175,65 @@ def main():
                         check("message: myco-pause stops the drawing, myco-resume starts it again", n1 == n0 and n2 > n1 + 10, f"{n0} {n1} {n2}")
                         check("messages: no error after all of them", not errs, str(errs))
                     pg.close()
+
+            print("selecting a note in embed mode (reduced motion, so the notes stand still)")
+            ctx2 = b.new_context(viewport={"width": 800, "height": 600}, device_scale_factor=2, reduced_motion="reduce")
+            errs = []
+            pg = ctx2.new_page()
+            pg.on("pageerror", lambda e: errs.append("pageerror: " + str(e)[:160]))
+            pg.goto(base + "select.html")
+            pg.wait_for_timeout(4000)
+            fr = pg.frames[1]
+            box = pg.locator("#f").bounding_box()
+            sels = lambda: [m for m in pg.evaluate("got") if m.get("type") == "myco-select"]
+            blobs = fr.evaluate(BLOBS)
+            base_paint = fr.evaluate(PAINTED)
+            picked = None
+            for bx, by, _ in blobs:   # tap note-like spots until one selects a labelled note
+                n0 = len(sels())
+                pg.mouse.click(box["x"] + bx, box["y"] + by)
+                pg.wait_for_timeout(250)
+                new = sels()[n0:]
+                if new and new[-1].get("selected") and new[-1].get("label"):
+                    picked = (bx, by, new[-1]["label"])
+                    break
+            check("a tap on a note selects it and tells the host its approved label", picked is not None and picked[2].startswith("Note "),
+                  str(sels()[-3:]))
+            if picked:
+                pg.mouse.move(box["x"] + 5, box["y"] + 5)
+                pg.wait_for_timeout(1500)
+                dimmed = fr.evaluate(PAINTED)
+                check("the selection stays after the pointer leaves: the other notes stay dimmed", sels()[-1].get("selected") and dimmed < base_paint * .95,
+                      f"{base_paint} {dimmed} {sels()[-1]}")
+                pg.mouse.click(box["x"] + 8, box["y"] + box["height"] - 8)
+                pg.wait_for_timeout(1200)
+                check("a tap on empty space clears it", sels()[-1] == {"type": "myco-select", "selected": False, "label": None}
+                      and fr.evaluate(PAINTED) > dimmed, str(sels()[-1]))
+                pg.mouse.click(box["x"] + picked[0], box["y"] + picked[1])
+                pg.wait_for_timeout(250)
+                pg.keyboard.press("Escape")
+                pg.wait_for_timeout(250)
+                check("Escape clears it too", len(sels()) >= 2 and sels()[-2].get("selected") and not sels()[-1].get("selected"), str(sels()[-2:]))
+                n0 = len(sels())
+                pg.mouse.move(box["x"] + picked[0], box["y"] + picked[1])
+                pg.mouse.down()
+                for k in range(1, 12):
+                    pg.mouse.move(box["x"] + picked[0] + k * 8, box["y"] + picked[1])
+                pg.mouse.up()
+                pg.wait_for_timeout(300)
+                check("a drag that starts on a note turns the view and selects nothing", len(sels()) == n0 and not errs, f"{sels()[n0:]} {errs}")
+            pg.close()
+
+            pg = ctx2.new_page()
+            pg.goto(base + "still.html")
+            pg.wait_for_timeout(3000)
+            box = pg.locator("#f").bounding_box()
+            for bx, by, _ in pg.frames[1].evaluate(BLOBS)[:15]:
+                pg.mouse.click(box["x"] + bx, box["y"] + by)
+            pg.wait_for_timeout(300)
+            check("interactive=0: a tap on a note selects nothing", not [m for m in pg.evaluate("got") if m.get("type") == "myco-select"], "")
+            pg.close()
+            ctx2.close()
 
             print("interactive=0")
             pg, fr, errs = open_host("still.html")

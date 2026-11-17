@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.41.2
+- **Select a note in an embedded graph** (`?embed=1` and every public graph): a click or tap on a note that does not move selects it as in the full view (the note and its neighbours stay lit, the rest dims, their labels show where they have one, and it stays after the pointer leaves); a click or tap on empty space, on the selected note again, or Escape clears it. A drag still turns the view and selects nothing; scroll and pinch still zoom. A selection holds the turning still until it is cleared. Still no note panel and nothing beyond the page's own data; `?interactive=0` is unchanged (no pointer handling at all). Before, embed mode never selected, so a phone (no hover) had no way to highlight a note.
+- **A new message to the host page**: `{type:"myco-select", selected, label}` when the selection changes; `label` is the approved label or `null`. `docs/REFERENCE.md` 6.2.
+- **Tests**: `tests/browser.py` taps a note (it selects and stays selected after the pointer leaves), empty space and Escape (they clear), drags from a note (it turns and selects nothing), and taps with `interactive=0` (nothing).
+
 ## 0.41.1
 - **The embedded graph fades out at its edges** instead of ending at the frame's rectangle, and the fitted network sits a little further inside the frame.
 - **Zooming an embedded graph keeps it centred**: scroll, pinch and double-click zoom about the middle of the network (half to four times the fitted size), wherever the pointer is, so it can no longer drift off screen.
