@@ -47,7 +47,7 @@ THEMES = [
          page=dict(bg="#020805", bg2="#07150c", panel="#06110a", fg="#a8ffbb", muted="#6fd486", line="#1c3d25", accent="#4dff7c", code="#051009"),
          pal=["#39ff6a", "#b6ff4d", "#4de8ff", "#7dffd6", "#d6ffa8", "#7fd8ff", "#b46cff", "#00ff9c", "#5fffe0", "#5fd9b0", "#c88cff", "#3fc8ff"],   # every third an electric cyan; two "Mystery Data" violets
          quiet=["#4f9a60", "#62904e", "#4c927e", "#6c966c", "#548a7c", "#7c975e"], hypha="80,255,120", wilt="#d8b02e", text="#a8ffbb"),
-    dict(id="amber", label="Amber terminal", dark=True, font=MONO, style="circuit", nodes="pad", hit="flash",
+    dict(id="amber", label="Amber terminal", dark=True, font=MONO, style="circuit", nodes="pad", hit="flash", tglow=.35,
          page=dict(bg="#1a1007", bg2="#26180a", panel="#22150a", fg="#ffc66b", muted="#dca357", line="#4a3317", accent="#ffdc94", code="#24170b"),
          pal=["#ffb000", "#ffd27a", "#8cc8ff", "#ffe9a8", "#e0a050", "#a6e0ff", "#f7b267", "#ff9f43", "#7fb0ff", "#dca441", "#ffcf66", "#b8d8ff"],   # every third an ice blue
          quiet=["#a8896a", "#a08e72", "#988066", "#a89474", "#94826e", "#a69472"], hypha="255,176,0", wilt="#ff6e40", text="#ffc66b"),

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.35.3
+- **Hold still**: a new &#10074;&#10074; button among the view's buttons stops the network turning by itself (and the standby spikes with it), to look at one place for as long as you like; dragging still turns it by hand, and pressing it again lets it turn. The screensaver lets go of the hold.
+- **Amber terminal threads read more clearly**: their glow is at 35%.
+- **A bigger demo**: `examples/demo/build_demo.py` adds a second season (58 notes, 172 links), and the README has a new animation (the replay, then the network turning in 3D through the themes) and a theme gallery, both recorded by `.github/assets/record_media.py`.
+
 ## 0.35.2
 - **Matrix threads read more clearly**: their glow is at 30% (a theme can now set the threads' glow apart from the notes').
 - **Mycelium's spores are easier to see**: a note a spike reaches gives a quick bright puff and then about twice as many spores, bigger and flying further.

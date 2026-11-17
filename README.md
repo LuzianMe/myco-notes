@@ -6,7 +6,7 @@
 
 **Your AI agent forgets everything between sessions. Your notes should not.** Myco Notes keeps a project's knowledge in plain Markdown and git, and keeps it **true**: every change is written down with its evidence, every note says which notes it depends on, nothing secret gets committed, and nothing is deleted, only superseded. Linked together, a project's notes form a **mycelium**: in plain terms a *notebase*, what a codebase is to code.
 
-![The notes of a demo project growing commit by commit in the mycelium view: notes appear as glowing nodes and threads grow between the notes that mention each other](.github/assets/mycelium-replay.gif)
+![The notes of a demo project growing commit by commit in the mycelium view, then the network turning in 3D while it changes through the themes](.github/assets/mycelium.webp)
 
 *A made-up project's notes growing commit by commit. **[Open the live demo](https://luzianme.github.io/myco-notes/graph.html)** to click around it, or browse [its notes map](https://luzianme.github.io/myco-notes/).*
 
@@ -166,21 +166,17 @@ Set `NEW_FOLDERS` in `.myco-notes.conf` to apply one answer every time. Reposito
 
 <details><summary>The mycelium view</summary>
 
-`build-notes-map.py` also writes `myco-notes/map/graph.html`: one self-contained page (no server, no network) that draws the notes as a mycelium.
+`build-notes-map.py` also writes `myco-notes/map/graph.html`: one self-contained page (no server, no network) that draws the notes as a mycelium. Try the [live demo](https://luzianme.github.io/myco-notes/graph.html).
 
-![The mycelium view of a demo notes repository in the dark theme, with one note selected: its threads light up and the panel lists what it mentions and what mentions it](.github/assets/graph-dark.webp)
+![The same demo notes in six themes: Mycelium, Matrix, Amber terminal, Deep sea, Fruit and Paper](.github/assets/graph-themes.webp)
 
-| Threads grow from the note that writes the mention and end in a bud on the note it names | Light theme; a wilting note (dashed ring) and a missing reference (`?`) | Halfway through the replay of the git history |
-|---|---|---|
-| ![Close-up of tapered threads ending in small buds on the rim of the notes](.github/assets/graph-hyphae.webp) | ![The same repository in the light theme](.github/assets/graph-light.webp) | ![The network after 12 of 23 commits](.github/assets/graph-replay.webp) |
-
-- **Notes grow like a colony**: the read-order notes sit in the middle, like the food a fungus grows from, and every other note in a ring by how many links it is from them, in the direction of the note that leads to it, so the threads radiate outward. Mentions are threads, bent like hyphae, in the colour of the note that writes the mention and growing to the note it names (two notes that mention each other share a thread that fades between their colours); faint side branches are decoration (Light, Dark, High contrast and Paper keep a plain smooth curve). Some themes add their own touch: powder and spores in Mycelium, bubbles in Deep sea, berries in Fruit, ink in Paper. A selected note's threads fire like neurons, in standby a spike runs along a thread in view every second or two, and a note a spike reaches sometimes fires on, like a chain reaction; in the Amber terminal theme the threads are circuit traces between glass pads, in Matrix stepped traces on a 30-degree lattice between 3D crystals, and both turn with the view. Much-mentioned notes are bigger; each group is a colour.
-- **A ball, and freshness:** in depth the colony fills a ball, growing outward from the read-order notes through the volume; recently changed notes reach a little further out, like a colony growing at its tips, and glow. Left alone, it turns about the vertical axis through its centre of mass, like a planet. Notes past a follow-up or review date wilt; a reference to a missing note ends in a `?`; a note no link reaches is a small hollow spore inside the colony.
+- **A colony:** the read-order notes sit in the middle and every other note grows outward by how many links it is from them; mentions are threads in the colour of the note that writes them. In depth it is a ball that turns by itself when left alone (the &#10074;&#10074; button holds it still).
+- **Alive:** recently changed notes glow and reach further out, notes past a review date wilt, a missing reference ends in a `?`, and a selected note's threads fire like neurons.
 - **Replay** (Space) grows the network commit by commit; the slider jumps anywhere in the history.
-- **Explore:** hover, click for a note's links and history, search, hide groups, zoom, pan, turn the view (left alone it turns slowly by itself, around the selected note if there is one; a swipe keeps its momentum and sets the direction; the view never loses the network); a theme picker on every map page (Auto follows the system; Light, Dark, Mycelium, Fruit, Matrix, Amber terminal, High contrast, Deep sea and Paper, each checked for readable contrast, the choice kept in the browser); it works on a phone and with a keyboard or screen reader, and respects reduced motion.
+- **Explore:** hover, click, search, zoom, turn the view, a screensaver, and nine themes each checked for readable contrast. It works on a phone, with a keyboard or a screen reader, and respects reduced motion.
 - Only titles, paths, counts and commit subjects go into the page, never a note's text.
 
-*Screenshots of the made-up demo notes built by `examples/demo/build_demo.py`, which is also the [live demo](https://luzianme.github.io/myco-notes/graph.html).*
+*Made-up demo notes from `examples/demo/build_demo.py`; `.github/assets/record_media.py` records these pictures.*
 </details>
 
 ## Without an agent
