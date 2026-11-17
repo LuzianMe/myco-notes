@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Cross-platform test (Linux, macOS, Windows) that needs no bash: copies ONLY the skill folder to a temporary place, then
-bootstraps a notes repository from that copy and exercises the real launchers (the .cmd files on Windows). Exit 0 = all passed."""
+bootstraps a notes repository from that copy and exercises the real launchers (the .cmd files on Windows). Exit 0 = all passed.
+--platform: only the checks that can differ between platforms (CI's Windows and macOS jobs); the content checks run on Linux."""
 import os
 import re
 import shutil
@@ -15,6 +16,7 @@ sys.dont_write_bytecode = True   # the test imports _myco from the project under
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SKILL = os.path.join(REPO, "skills", "myco-notes")
 WIN = os.name == "nt"
+PLATFORM = "--platform" in sys.argv[1:]   # only the checks that depend on the platform (launchers, hooks, paths, git); CI on Windows and macOS
 MY = "myco-notes"
 passed = failed = 0
 
@@ -683,313 +685,315 @@ def main():
         rc, out = run(L(kit, "relocate") + ["--root", tmp], tmp)
         check("it refuses a folder that is not a notes project", rc != 0 and ".myco-notes.conf" in out, out)
 
-        print("summaries, the note index, the sync-log format and review proposals")
-        sp = os.path.join(tmp, "sumproj")
-        rc, out = run(L(kit, "bootstrap") + [sp, "--name", "Sums", "--owner", "Tester", "--tz", "UTC"], tmp)
-        slint = [sys.executable, "-B", os.path.join(sp, *T.split("/"), "notes-lint.py")]
-        rc, out = run(slint, sp)
-        check("a new notes repository: the starter notes have summaries and the first sync-log line has the new form", "without a one-line summary" not in out and "sync-log" not in out, out)
-        rc, out = run(L(sp, "index", T), sp)
-        check("index lists a starter note with its summary", rc == 0 and "# sumproj: note index" in out and f"`{MY}/state.md`: Master record: what Sums is" in out and "0 without a summary" in out, out)
-        write(os.path.join(sp, MY, "nas.md"), "# NAS\n\nThe [[state|master]] record names it. Second sentence.\n")
-        write(os.path.join(sp, MY, "long.md"), "---\nsummary: " + "x" * 210 + "\n---\n# Long\n")
-        write(os.path.join(sp, MY, "hash.md"), "---\nsummary: Tools for C# and issue #12  # kept\n---\n# Hash\n")
-        rc, out = run(L(sp, "index", T), sp)
-        check("index marks a first sentence instead of a summary and keeps ' #' in a summary", f"`{MY}/nas.md`: (first line) The master record names it." in out and "Tools for C# and issue #12  # kept" in out, out)
-        rc, out = run(L(sp, "index", T) + ["--missing"], sp)
-        check("index --missing lists only the notes without a summary", rc == 0 and "1 of" in out and "nas.md" in out and "hash.md" not in out, out)
-        rc, out = run(slint, sp)
-        check("lint: one info line for notes without a summary, a warning for a long one", "1 note(s) without a one-line summary" in out and "long.md:2 summary is 210 characters" in out, out)
-        tr = os.path.join(sp, MY, "sync-tracker.md")
-        write(tr, read(tr).replace("## Sync log (newest first)\n", "## Sync log (newest first)\n- 2026-11-12: an old-style line\n"))
-        rc, out = run(slint, sp)
-        check("lint: a newest sync-log line in an old form is reported", "newest sync-log line is not in the form" in out, out)
-        write(tr, read(tr).replace("- 2026-11-12: an old-style line\n", "- **2026-11-12 review (10:00, test):** applied 1\n- 2026-11-11: older lines may differ\n"))
-        rc, out = run(slint, sp)
-        check("lint: the new form passes and older lines are not checked", "sync-log" not in out, out)
-        write(os.path.join(sp, MY, "plans", "review-2026-11-12.md"), "---\nsummary: Review of 2026-11-12\nopen: 2, 3\n---\n# Review 2026-11-12\n\n## 1. Fix one\nKind: gap\nStatus: applied 2026-11-12\n\n## 2. Fix two\nKind: contradiction\nStatus: proposed\n\n## 3. Fix three\nKind: lint\nStatus: proposed (revised 2026-11-12)\n\n## 4. Fix four\nStatus: declined 2026-11-12: not needed\n")
-        rc, out = run(L(sp, "resume", T), sp)
-        check("resume lists the review proposals still waiting, not applied or declined ones", "## Waiting for the owner (review proposals)" in out and "2 proposal(s) waiting for the owner's answer (2, 3)" in out, out)
-        check("resume says how many notes have no summary", "summaries: 1 of" in out, out)
-        rc, out = run(slint, sp)
-        check("lint: a review file whose open line matches its Status lines raises nothing", not any("review-2026-11-12.md" in l and l.startswith("WARN") for l in out.splitlines()), out)
-        rv = os.path.join(sp, MY, "plans", "review-2026-11-12.md")
-        write(rv, read(rv).replace("Status: proposed\n", "Status: applied 2026-11-12\n"))
-        rc, out = run(slint, sp)
-        check("lint: an open line that fell behind the Status lines is reported", "header says open: 2, 3 but the Status lines say 3" in out, out)
-        write(rv, read(rv).replace("open: 2, 3\n", ""))
-        rc, out = run(slint, sp)
-        check("lint: a review file without an open line is reported with the line to add", "review file has no 'open:' line in its header: add 'open: 3'" in out, out)
-        write(rv, read(rv).replace("summary: Review of 2026-11-12\n", "summary: Review of 2026-11-12\nopen: 3\n").replace("Kind: lint\n", "Kind: lint\n```\nnew note `not-yet.md`\n```\n"))
-        rc, out = run(slint, sp)
-        check("lint: a fixed open line passes and a new note's name inside a code block is not a missing reference", not any("review-2026-11-12.md" in l and l.startswith("WARN") for l in out.splitlines()), out)
-        write(rv, read(rv).replace("new note `not-yet.md`\n", "new note `not-yet.md`\nsummary: " + "y" * 205 + "\n"))
-        rc, out = run(slint, sp)
-        check("lint: a proposed summary over 200 characters in a review file is reported", "review-2026-11-12.md:" in out and "proposed summary is 205 characters" in out, out)
+        if not PLATFORM:   # the content checks (summaries, review scope, sources, secret rules, search, the public graph): the same
+                           # on every platform, so CI runs them on Linux only; --platform skips them (Windows and macOS)
+            print("summaries, the note index, the sync-log format and review proposals")
+            sp = os.path.join(tmp, "sumproj")
+            rc, out = run(L(kit, "bootstrap") + [sp, "--name", "Sums", "--owner", "Tester", "--tz", "UTC"], tmp)
+            slint = [sys.executable, "-B", os.path.join(sp, *T.split("/"), "notes-lint.py")]
+            rc, out = run(slint, sp)
+            check("a new notes repository: the starter notes have summaries and the first sync-log line has the new form", "without a one-line summary" not in out and "sync-log" not in out, out)
+            rc, out = run(L(sp, "index", T), sp)
+            check("index lists a starter note with its summary", rc == 0 and "# sumproj: note index" in out and f"`{MY}/state.md`: Master record: what Sums is" in out and "0 without a summary" in out, out)
+            write(os.path.join(sp, MY, "nas.md"), "# NAS\n\nThe [[state|master]] record names it. Second sentence.\n")
+            write(os.path.join(sp, MY, "long.md"), "---\nsummary: " + "x" * 210 + "\n---\n# Long\n")
+            write(os.path.join(sp, MY, "hash.md"), "---\nsummary: Tools for C# and issue #12  # kept\n---\n# Hash\n")
+            rc, out = run(L(sp, "index", T), sp)
+            check("index marks a first sentence instead of a summary and keeps ' #' in a summary", f"`{MY}/nas.md`: (first line) The master record names it." in out and "Tools for C# and issue #12  # kept" in out, out)
+            rc, out = run(L(sp, "index", T) + ["--missing"], sp)
+            check("index --missing lists only the notes without a summary", rc == 0 and "1 of" in out and "nas.md" in out and "hash.md" not in out, out)
+            rc, out = run(slint, sp)
+            check("lint: one info line for notes without a summary, a warning for a long one", "1 note(s) without a one-line summary" in out and "long.md:2 summary is 210 characters" in out, out)
+            tr = os.path.join(sp, MY, "sync-tracker.md")
+            write(tr, read(tr).replace("## Sync log (newest first)\n", "## Sync log (newest first)\n- 2026-11-12: an old-style line\n"))
+            rc, out = run(slint, sp)
+            check("lint: a newest sync-log line in an old form is reported", "newest sync-log line is not in the form" in out, out)
+            write(tr, read(tr).replace("- 2026-11-12: an old-style line\n", "- **2026-11-12 review (10:00, test):** applied 1\n- 2026-11-11: older lines may differ\n"))
+            rc, out = run(slint, sp)
+            check("lint: the new form passes and older lines are not checked", "sync-log" not in out, out)
+            write(os.path.join(sp, MY, "plans", "review-2026-11-12.md"), "---\nsummary: Review of 2026-11-12\nopen: 2, 3\n---\n# Review 2026-11-12\n\n## 1. Fix one\nKind: gap\nStatus: applied 2026-11-12\n\n## 2. Fix two\nKind: contradiction\nStatus: proposed\n\n## 3. Fix three\nKind: lint\nStatus: proposed (revised 2026-11-12)\n\n## 4. Fix four\nStatus: declined 2026-11-12: not needed\n")
+            rc, out = run(L(sp, "resume", T), sp)
+            check("resume lists the review proposals still waiting, not applied or declined ones", "## Waiting for the owner (review proposals)" in out and "2 proposal(s) waiting for the owner's answer (2, 3)" in out, out)
+            check("resume says how many notes have no summary", "summaries: 1 of" in out, out)
+            rc, out = run(slint, sp)
+            check("lint: a review file whose open line matches its Status lines raises nothing", not any("review-2026-11-12.md" in l and l.startswith("WARN") for l in out.splitlines()), out)
+            rv = os.path.join(sp, MY, "plans", "review-2026-11-12.md")
+            write(rv, read(rv).replace("Status: proposed\n", "Status: applied 2026-11-12\n"))
+            rc, out = run(slint, sp)
+            check("lint: an open line that fell behind the Status lines is reported", "header says open: 2, 3 but the Status lines say 3" in out, out)
+            write(rv, read(rv).replace("open: 2, 3\n", ""))
+            rc, out = run(slint, sp)
+            check("lint: a review file without an open line is reported with the line to add", "review file has no 'open:' line in its header: add 'open: 3'" in out, out)
+            write(rv, read(rv).replace("summary: Review of 2026-11-12\n", "summary: Review of 2026-11-12\nopen: 3\n").replace("Kind: lint\n", "Kind: lint\n```\nnew note `not-yet.md`\n```\n"))
+            rc, out = run(slint, sp)
+            check("lint: a fixed open line passes and a new note's name inside a code block is not a missing reference", not any("review-2026-11-12.md" in l and l.startswith("WARN") for l in out.splitlines()), out)
+            write(rv, read(rv).replace("new note `not-yet.md`\n", "new note `not-yet.md`\nsummary: " + "y" * 205 + "\n"))
+            rc, out = run(slint, sp)
+            check("lint: a proposed summary over 200 characters in a review file is reported", "review-2026-11-12.md:" in out and "proposed summary is 205 characters" in out, out)
 
-        print("review scope: changed notes and their links, or a full review")
-        rp = os.path.join(tmp, "scopeproj")
-        run(L(kit, "bootstrap") + [rp, "--name", "Scope", "--owner", "Tester", "--tz", "UTC"], tmp)
-        for n, body in (("alpha", "Alpha."), ("beta", "Beta."), ("gamma", "Gamma."), ("delta", "Delta names `alpha.md`.")):
-            write(os.path.join(rp, MY, n + ".md"), f"---\nsummary: {n}\n---\n# {n}\n\n{body}\n")
-        run([sys.executable, "-B", os.path.join(rp, *T.split("/"), "notes_commit.py"), "Add four notes"], rp)
-        rc, out = run(L(rp, "index", T) + ["--review-scope"], rp)
-        check("review scope: full when there is no earlier review", rc == 0 and "# Review scope: full (no earlier review file)" in out, out)
-        write(os.path.join(rp, MY, "plans", "review-2026-01-01.md"), "---\nsummary: First review\nscope: full\nopen: none\n---\n# Review\n\n## 1. x\nStatus: applied 2026-01-01\n")
-        run([sys.executable, "-B", os.path.join(rp, *T.split("/"), "notes_commit.py"), "Review"], rp)
-        rc, out = run(L(rp, "index", T) + ["--review-scope"], rp)
-        check("review scope: nothing changed since the last review", "Nothing changed in the notes since the last review" in out, out)
-        write(os.path.join(rp, MY, "gamma.md"), "\nFixed by the review.\n", "a")
-        rvf = os.path.join(rp, MY, "plans", "review-2026-01-01.md")
-        write(rvf, read(rvf).replace("summary: First review", "summary: First review, fix applied"))
-        run([sys.executable, "-B", os.path.join(rp, *T.split("/"), "notes_commit.py"), "Apply the review"], rp)
-        rc, out = run(L(rp, "index", T) + ["--review-scope"], rp)
-        check("review scope: the fixes a review applied are not read again by the next one", "Nothing changed in the notes since the last review" in out and "gamma.md" not in out, out)
-        write(os.path.join(rp, MY, "gamma.md"), "\nAn ordinary edit.\n", "a")
-        run([sys.executable, "-B", os.path.join(rp, *T.split("/"), "notes_commit.py"), "Edit gamma"], rp)
-        rc, out = run(L(rp, "index", T) + ["--review-scope"], rp)
-        check("review scope: an edit after the review is listed, with the rule for a review that finds nothing", f"`{MY}/gamma.md`" in out and "Finding nothing still means a short review file" in out, out)
-        write(os.path.join(rp, MY, "plans", "review-2026-01-02.md"), "---\nsummary: Second review: read gamma.md, nothing to propose\nscope: changed since abc1234\nopen: none\n---\n# Review\n\nRead `gamma.md`; nothing to propose.\n")
-        run([sys.executable, "-B", os.path.join(rp, *T.split("/"), "notes_commit.py"), "Review: nothing to propose"], rp)
-        rc, out = run(L(rp, "index", T) + ["--review-scope"], rp)
-        check("review scope: a committed review that found nothing moves the start, so the same edit is not read again", "Nothing changed in the notes since the last review" in out, out)
-        NCr = [sys.executable, "-B", os.path.join(rp, *T.split("/"), "notes_commit.py")]
-        os.remove(os.path.join(rp, MY, "getting-started.md"))   # a repository made before the owner's page existed
-        cf = os.path.join(rp, ".myco-notes.conf")
-        cur = read(cf)
-        write(cf, re.sub(r"(?m)^KIT_VERSION=.*$", "KIT_VERSION=0.20.0", cur))
-        write(os.path.join(rp, "AGENTS.md"), read(os.path.join(rp, "AGENTS.md")).replace(f"`{MY}/getting-started.md`", "the owner's notes"))
-        run(NCr + ["An older repository"], rp)
-        write(os.path.join(rp, MY, "plans", "review-2026-01-03.md"), "---\nsummary: Third review: nothing to propose\nscope: full\nopen: none\n---\n# Review\n\nNothing to propose.\n")
-        run(NCr + ["Review: nothing to propose"], rp)
-        write(cf, cur)
-        run(NCr + ["Kit updated"], rp)
-        rc, out = run(L(rp, "index", T) + ["--review-scope"], rp)
-        check("review scope: after a kit update the starter notes added since are offered once, as upgrade proposals",
-              f"the kit added `{MY}/getting-started.md` in 0.21.0" in out and "only on a yes" in out and "sources/README.md" not in out, out)
-        rc, out = run(L(rp, "index", T) + ["--review-scope", "--full"], rp)
-        check("review scope: a full review offers the missing starter note too", f"`{MY}/getting-started.md`" in out and "upgrade" in out, out)
-        write(os.path.join(rp, MY, "plans", "review-2026-01-04.md"), "---\nsummary: Fourth review: owner's page declined\nscope: full\nopen: none\n---\n# Review\n\n## 1. Owner's page\nStatus: declined 2026-01-04: not wanted\n")
-        run(NCr + ["Review: owner's page declined"], rp)
+            print("review scope: changed notes and their links, or a full review")
+            rp = os.path.join(tmp, "scopeproj")
+            run(L(kit, "bootstrap") + [rp, "--name", "Scope", "--owner", "Tester", "--tz", "UTC"], tmp)
+            for n, body in (("alpha", "Alpha."), ("beta", "Beta."), ("gamma", "Gamma."), ("delta", "Delta names `alpha.md`.")):
+                write(os.path.join(rp, MY, n + ".md"), f"---\nsummary: {n}\n---\n# {n}\n\n{body}\n")
+            run([sys.executable, "-B", os.path.join(rp, *T.split("/"), "notes_commit.py"), "Add four notes"], rp)
+            rc, out = run(L(rp, "index", T) + ["--review-scope"], rp)
+            check("review scope: full when there is no earlier review", rc == 0 and "# Review scope: full (no earlier review file)" in out, out)
+            write(os.path.join(rp, MY, "plans", "review-2026-01-01.md"), "---\nsummary: First review\nscope: full\nopen: none\n---\n# Review\n\n## 1. x\nStatus: applied 2026-01-01\n")
+            run([sys.executable, "-B", os.path.join(rp, *T.split("/"), "notes_commit.py"), "Review"], rp)
+            rc, out = run(L(rp, "index", T) + ["--review-scope"], rp)
+            check("review scope: nothing changed since the last review", "Nothing changed in the notes since the last review" in out, out)
+            write(os.path.join(rp, MY, "gamma.md"), "\nFixed by the review.\n", "a")
+            rvf = os.path.join(rp, MY, "plans", "review-2026-01-01.md")
+            write(rvf, read(rvf).replace("summary: First review", "summary: First review, fix applied"))
+            run([sys.executable, "-B", os.path.join(rp, *T.split("/"), "notes_commit.py"), "Apply the review"], rp)
+            rc, out = run(L(rp, "index", T) + ["--review-scope"], rp)
+            check("review scope: the fixes a review applied are not read again by the next one", "Nothing changed in the notes since the last review" in out and "gamma.md" not in out, out)
+            write(os.path.join(rp, MY, "gamma.md"), "\nAn ordinary edit.\n", "a")
+            run([sys.executable, "-B", os.path.join(rp, *T.split("/"), "notes_commit.py"), "Edit gamma"], rp)
+            rc, out = run(L(rp, "index", T) + ["--review-scope"], rp)
+            check("review scope: an edit after the review is listed, with the rule for a review that finds nothing", f"`{MY}/gamma.md`" in out and "Finding nothing still means a short review file" in out, out)
+            write(os.path.join(rp, MY, "plans", "review-2026-01-02.md"), "---\nsummary: Second review: read gamma.md, nothing to propose\nscope: changed since abc1234\nopen: none\n---\n# Review\n\nRead `gamma.md`; nothing to propose.\n")
+            run([sys.executable, "-B", os.path.join(rp, *T.split("/"), "notes_commit.py"), "Review: nothing to propose"], rp)
+            rc, out = run(L(rp, "index", T) + ["--review-scope"], rp)
+            check("review scope: a committed review that found nothing moves the start, so the same edit is not read again", "Nothing changed in the notes since the last review" in out, out)
+            NCr = [sys.executable, "-B", os.path.join(rp, *T.split("/"), "notes_commit.py")]
+            os.remove(os.path.join(rp, MY, "getting-started.md"))   # a repository made before the owner's page existed
+            cf = os.path.join(rp, ".myco-notes.conf")
+            cur = read(cf)
+            write(cf, re.sub(r"(?m)^KIT_VERSION=.*$", "KIT_VERSION=0.20.0", cur))
+            write(os.path.join(rp, "AGENTS.md"), read(os.path.join(rp, "AGENTS.md")).replace(f"`{MY}/getting-started.md`", "the owner's notes"))
+            run(NCr + ["An older repository"], rp)
+            write(os.path.join(rp, MY, "plans", "review-2026-01-03.md"), "---\nsummary: Third review: nothing to propose\nscope: full\nopen: none\n---\n# Review\n\nNothing to propose.\n")
+            run(NCr + ["Review: nothing to propose"], rp)
+            write(cf, cur)
+            run(NCr + ["Kit updated"], rp)
+            rc, out = run(L(rp, "index", T) + ["--review-scope"], rp)
+            check("review scope: after a kit update the starter notes added since are offered once, as upgrade proposals",
+                  f"the kit added `{MY}/getting-started.md` in 0.21.0" in out and "only on a yes" in out and "sources/README.md" not in out, out)
+            rc, out = run(L(rp, "index", T) + ["--review-scope", "--full"], rp)
+            check("review scope: a full review offers the missing starter note too", f"`{MY}/getting-started.md`" in out and "upgrade" in out, out)
+            write(os.path.join(rp, MY, "plans", "review-2026-01-04.md"), "---\nsummary: Fourth review: owner's page declined\nscope: full\nopen: none\n---\n# Review\n\n## 1. Owner's page\nStatus: declined 2026-01-04: not wanted\n")
+            run(NCr + ["Review: owner's page declined"], rp)
 
-        print("sources: ingest, citations, changed copies")
-        sq = os.path.join(tmp, "srcproj")
-        run(L(kit, "bootstrap") + [sq, "--name", "Src", "--owner", "Tester", "--tz", "UTC"], tmp)
-        NCq = [sys.executable, "-B", os.path.join(sq, *T.split("/"), "notes_commit.py")]
-        lintq = [sys.executable, "-B", os.path.join(sq, *T.split("/"), "notes-lint.py")]
-        check("the starter notes has a sources folder", os.path.isfile(os.path.join(sq, MY, "sources", "README.md")))
-        ing = L(sq, "ingest", T)
-        man = "Relay board manual\n\nThe relay board keeps time for 72 hours without power.\n"
-        rc, out = run(ing + ["--url", "https://example.invalid/relay", "--title", "Relay board manual", "--summary", "The relay board manual: timing, power, wiring", "--kind", "manual", "--date", "2026-03-02", "--commit"], sq, man)
-        sf = os.path.join(sq, MY, "sources", "2026-03-02-relay-board-manual.md")
-        st = read(sf) if os.path.isfile(sf) else ""
-        last = git(sq, "show", "--name-only", "--format=%s", "HEAD")[1]
-        check("ingest saves the source with its header and commits only that file", rc == 0 and "source_url: https://example.invalid/relay" in st and "retrieved: 2026-03-02" in st and "kind: manual" in st and "sha256: " in st and "72 hours" in st and last.startswith("Source: Relay board manual") and last.strip().endswith("2026-03-02-relay-board-manual.md"), out + last)
-        rc, out = run(ing + ["--url", "https://example.invalid/relay", "--title", "Relay board manual", "--summary", "s", "--date", "2026-03-05"], sq, man)
-        check("ingest: the same URL with the same content writes nothing", rc == 0 and "unchanged" in out and len(os.listdir(os.path.join(sq, MY, "sources"))) == 2, out)
-        rc, out = run(ing + ["--url", "https://example.invalid/leak", "--title", "Leak", "--summary", "s"], sq, "text\n" + "-----BEGIN " + "OPENSSH PRIVATE KEY-----\n")
-        check("ingest refuses a text with a secret-looking string and names the line, not the value", rc == 4 and "line(s) 2" in out and not os.path.exists(os.path.join(sq, MY, "sources", "leak.md")), out)
-        rc, out = run(ing + ["--title", "No origin", "--summary", "s"], sq, "x")
-        check("ingest: --url or --original is required", rc == 2, out)
-        write(os.path.join(sq, MY, "relay.md"), "---\nsummary: The relay board\nsources: 2026-03-02-relay-board-manual.md\n---\n# Relay\n\nKeeps time for 72 hours without power, per `2026-03-02-relay-board-manual.md`. See `state.md`.\n")
-        write(os.path.join(sq, MY, "pump.md"), "---\nsummary: The pump\nsources: 2026-01-01-no-such-source.md\n---\n# Pump\n\nSee `relay.md`.\n")
-        rc, out = run(lintq, sq)
-        check("lint: a cited source counts, a missing one is reported, the source itself is a record", "header sources points to a missing source `2026-01-01-no-such-source.md`" in out and "relay.md:" not in "\n".join(l for l in out.splitlines() if l.startswith("WARN")) and "relay-board-manual.md:1 no other note" not in out, out)
-        os.remove(os.path.join(sq, MY, "pump.md"))
-        run(NCq + ["Relay note"], sq)
-        write(os.path.join(sq, MY, "plans", "review-2026-03-03.md"), "---\nsummary: Review\nscope: full\nopen: none\n---\n# Review\n\nNothing to propose.\n")
-        run(NCq + ["Review: nothing to propose"], sq)
-        rc, out = run(ing + ["--url", "https://example.invalid/relay", "--title", "Relay board manual", "--summary", "The relay board manual, revised", "--kind", "manual", "--date", "2026-04-01", "--commit"], sq, man.replace("72 hours", "48 hours"))
-        nf = os.path.join(sq, MY, "sources", "2026-04-01-relay-board-manual.md")
-        check("ingest: changed content gives a new copy that supersedes the old one and names the citing notes", rc == 0 and os.path.isfile(nf) and "supersedes: 2026-03-02-relay-board-manual.md" in read(nf) and f"`{MY}/relay.md`" in out, out)
-        rc, out = run(L(sq, "index", T) + ["--review-scope"], sq)
-        check("review scope: a changed source lists the notes citing the old copy", "source `2026-04-01-relay-board-manual.md` replaces `2026-03-02-relay-board-manual.md`" in out and f"`{MY}/relay.md`" in out, out)
-        rc, out = run(ing + ["--list"], sq)
-        check("ingest --list: every source, the superseded one marked, and who cites it", rc == 0 and "# Sources (2)" in out and "2026-03-02-relay-board-manual.md` (superseded)" in out and f"cited by: `{MY}/relay.md`" in out, out)
-        write(os.path.join(sq, MY, "relay.md"), "\nA note edit after the source came in.\n", "a")
-        run(NCq + ["Edit relay"], sq)
-        write(os.path.join(sq, MY, "plans", "review-2026-04-01-relay.md"), "---\nsummary: Ingest of the new manual\nscope: source 2026-04-01-relay-board-manual.md\nopen: none\n---\n# Review\n\nPer `2026-04-01-relay-board-manual.md`: nothing applies.\n")
-        run(NCq + ["Review of one source"], sq)
-        rc, out = run(L(sq, "index", T) + ["--review-scope"], sq)
-        check("review scope: a review of one source does not hide note edits made before it, and marks that source as taken in",
-              f"`{MY}/relay.md`" in out and "2026-04-01-relay-board-manual.md` replaces" not in out and "new source" not in out, out)
-        rc, out = run(ing + ["--list"], sq)
-        check("ingest --list: review files are not counted as notes citing a source", "review-2026-04-01-relay.md" not in out, out)
-        rc, out = run(ing + ["--url", "https://example.invalid/umlaut", "--title", "Umlaut", "--summary", "s", "--date", "2026-04-02"], sq, "Temperatur über 30 °C → Lüften\n")
-        uf = os.path.join(sq, MY, "sources", "2026-04-02-umlaut.md")
-        check("ingest keeps non-ASCII text intact (read as UTF-8 on every system)", rc == 0 and "Temperatur über 30 °C → Lüften" in read(uf), out)
-        rc, out = run(ing + ["--url", "https://example.invalid/big", "--title", "Big", "--summary", "s", "--date", "2026-04-03"], sq, ("a" * 99 + "\n") * 2500)
-        check("ingest warns about a large text and still saves it", rc == 0 and "warning: the text is 244 KB" in out and os.path.isfile(os.path.join(sq, MY, "sources", "2026-04-03-big.md")), out)
-        rc, out = run(lintq, sq)
-        check("lint: sources saved by ingest match their checksum", "sha256" not in out, out)
-        st_umlaut = read(uf)
-        write(uf, st_umlaut.replace("30 °C", "35 °C"))
-        rc, out = run(lintq, sq)
-        check("lint: a source edited after saving no longer matches its sha256", "2026-04-02-umlaut.md:" in out and "no longer matches its sha256" in out, out)
-        write(uf, st_umlaut)
-        write(os.path.join(sq, MY, "bundle.md"), "---\nsummary: Bundles\n---\n# Bundles\n\nRead `README.md` first; then `sources/README.md`. See `relay.md`.\n")
-        rc, out = run(lintq, sq)
-        warns = "\n".join(l for l in out.splitlines() if l.startswith("WARN"))
-        check("lint: a bare name that several files share is ambiguous; with its folder it is not", "bundle.md:" in warns and "`README.md` is ambiguous" in warns and "`sources/README.md` is ambiguous" not in warns, out)
-        os.remove(os.path.join(sq, MY, "bundle.md"))
-        cpq = os.path.join(sq, ".myco-notes.conf")
-        check("bootstrap records the format version", re.search(r"(?m)^FORMAT_VERSION=1\.1$", read(cpq)) is not None, read(cpq))
-        write(cpq, re.sub(r"(?m)^FORMAT_VERSION=.*\n", "", read(cpq)))
-        git(sq, "add", "-A"); git(sq, "commit", "-qm", "Sources and a notes repository without FORMAT_VERSION")
-        rc, out = run(L(kit, "relocate") + ["--root", sq, "--apply"], sq)
-        cq = read(cpq)
-        check("relocate adds FORMAT_VERSION when it is missing", rc == 0 and re.search(r"(?m)^FORMAT_VERSION=1\.1$", cq) is not None, out)
-        write(cpq, cq.replace("FORMAT_VERSION=1.1", "FORMAT_VERSION=2.0"))
-        git(sq, "add", "-A"); git(sq, "commit", "-qm", "Format 2.0")
-        run(L(kit, "relocate") + ["--root", sq, "--apply"], sq)
-        check("relocate keeps a format version the repository already states", "FORMAT_VERSION=2.0" in read(cpq), read(cpq))
-        import datetime as _dt2
-        rc, out = run(ing + ["--url", "https://example.invalid/today", "--title", "Today", "--summary", "s"], sq, "today\n")
-        check("ingest dates a source by the notes' time zone (TIMEZONE=UTC here)", f"sources/{_dt2.datetime.now(_dt2.timezone.utc).strftime('%Y-%m-%d')}-today.md" in out, out)
-        rc, out = run([sys.executable, "-B", os.path.join(rp, *T.split("/"), "notes-lint.py")], rp)
-        check("lint: a review file without proposals raises no review warning", "review-2026-01-02.md" not in "\n".join(l for l in out.splitlines() if l.startswith("WARN")), out)
-        write(os.path.join(rp, MY, "alpha.md"), "\nNow also see `beta.md`.\n", "a")
-        rc, out = run(L(rp, "index", T) + ["--review-scope"], rp)
-        check("review scope: a changed note, the note its new line names and a note pointing to it; not the others",
-              "# Review scope: changed" in out and f"`{MY}/alpha.md`" in out and f"`{MY}/beta.md`" in out and f"`{MY}/delta.md`" in out and "gamma.md" not in out and "scope: changed since" in out, out)
-        rc, out = run(L(rp, "index", T) + ["--review-scope", "--full"], rp)
-        check("review scope: --full asks for every note", "# Review scope: full (asked for a full review)" in out, out)
-        check("review scope: a full review also checks AGENTS.md against the template", "## Also check" in out and "template/AGENTS.md" in out, out)
-        rc, out = run(L(rp, "index", T) + ["--review-scope"], rp)
-        check("review scope: no entry-point item while the kit and AGENTS.md are unchanged", "Also check" not in out, out)
-        cp0 = os.path.join(rp, ".myco-notes.conf")
-        write(cp0, re.sub(r"(?m)^KIT_VERSION=.*$", "KIT_VERSION=9.9.9", read(cp0)))
-        rc, out = run(L(rp, "index", T) + ["--review-scope"], rp)
-        check("review scope: a kit update since the last review adds the AGENTS.md comparison", "## Also check" in out and "the kit was updated since the last review" in out and "to 9.9.9" in out, out)
-        cp = os.path.join(rp, ".myco-notes.conf")
-        write(cp, "\nREVIEW_FULL_DAYS=-1\n", "a")
-        rc, out = run(L(rp, "index", T) + ["--review-scope"], rp)
-        check("review scope: full when the last full review is older than REVIEW_FULL_DAYS", "# Review scope: full (the last full review" in out and "REVIEW_FULL_DAYS=-1" in out, out)
-        write(os.path.join(sp, MY, "lonely.md"), "---\nsummary: A note only a log still names\n---\n# Lonely\n")
-        write(os.path.join(sp, MY, "logs", "moved-changelog.md"), "---\nsummary: Old changelog\n---\n# Moved\n- 2026-11-09: wrote `lonely.md`\n")
-        rc, out = run(slint, sp)
-        check("lint: an orphan that only a record mentions names that record", f"lonely.md:1 no other note mentions this file by name (only records do: {MY}/logs/moved-changelog.md" in out, out)
+            print("sources: ingest, citations, changed copies")
+            sq = os.path.join(tmp, "srcproj")
+            run(L(kit, "bootstrap") + [sq, "--name", "Src", "--owner", "Tester", "--tz", "UTC"], tmp)
+            NCq = [sys.executable, "-B", os.path.join(sq, *T.split("/"), "notes_commit.py")]
+            lintq = [sys.executable, "-B", os.path.join(sq, *T.split("/"), "notes-lint.py")]
+            check("the starter notes has a sources folder", os.path.isfile(os.path.join(sq, MY, "sources", "README.md")))
+            ing = L(sq, "ingest", T)
+            man = "Relay board manual\n\nThe relay board keeps time for 72 hours without power.\n"
+            rc, out = run(ing + ["--url", "https://example.invalid/relay", "--title", "Relay board manual", "--summary", "The relay board manual: timing, power, wiring", "--kind", "manual", "--date", "2026-03-02", "--commit"], sq, man)
+            sf = os.path.join(sq, MY, "sources", "2026-03-02-relay-board-manual.md")
+            st = read(sf) if os.path.isfile(sf) else ""
+            last = git(sq, "show", "--name-only", "--format=%s", "HEAD")[1]
+            check("ingest saves the source with its header and commits only that file", rc == 0 and "source_url: https://example.invalid/relay" in st and "retrieved: 2026-03-02" in st and "kind: manual" in st and "sha256: " in st and "72 hours" in st and last.startswith("Source: Relay board manual") and last.strip().endswith("2026-03-02-relay-board-manual.md"), out + last)
+            rc, out = run(ing + ["--url", "https://example.invalid/relay", "--title", "Relay board manual", "--summary", "s", "--date", "2026-03-05"], sq, man)
+            check("ingest: the same URL with the same content writes nothing", rc == 0 and "unchanged" in out and len(os.listdir(os.path.join(sq, MY, "sources"))) == 2, out)
+            rc, out = run(ing + ["--url", "https://example.invalid/leak", "--title", "Leak", "--summary", "s"], sq, "text\n" + "-----BEGIN " + "OPENSSH PRIVATE KEY-----\n")
+            check("ingest refuses a text with a secret-looking string and names the line, not the value", rc == 4 and "line(s) 2" in out and not os.path.exists(os.path.join(sq, MY, "sources", "leak.md")), out)
+            rc, out = run(ing + ["--title", "No origin", "--summary", "s"], sq, "x")
+            check("ingest: --url or --original is required", rc == 2, out)
+            write(os.path.join(sq, MY, "relay.md"), "---\nsummary: The relay board\nsources: 2026-03-02-relay-board-manual.md\n---\n# Relay\n\nKeeps time for 72 hours without power, per `2026-03-02-relay-board-manual.md`. See `state.md`.\n")
+            write(os.path.join(sq, MY, "pump.md"), "---\nsummary: The pump\nsources: 2026-01-01-no-such-source.md\n---\n# Pump\n\nSee `relay.md`.\n")
+            rc, out = run(lintq, sq)
+            check("lint: a cited source counts, a missing one is reported, the source itself is a record", "header sources points to a missing source `2026-01-01-no-such-source.md`" in out and "relay.md:" not in "\n".join(l for l in out.splitlines() if l.startswith("WARN")) and "relay-board-manual.md:1 no other note" not in out, out)
+            os.remove(os.path.join(sq, MY, "pump.md"))
+            run(NCq + ["Relay note"], sq)
+            write(os.path.join(sq, MY, "plans", "review-2026-03-03.md"), "---\nsummary: Review\nscope: full\nopen: none\n---\n# Review\n\nNothing to propose.\n")
+            run(NCq + ["Review: nothing to propose"], sq)
+            rc, out = run(ing + ["--url", "https://example.invalid/relay", "--title", "Relay board manual", "--summary", "The relay board manual, revised", "--kind", "manual", "--date", "2026-04-01", "--commit"], sq, man.replace("72 hours", "48 hours"))
+            nf = os.path.join(sq, MY, "sources", "2026-04-01-relay-board-manual.md")
+            check("ingest: changed content gives a new copy that supersedes the old one and names the citing notes", rc == 0 and os.path.isfile(nf) and "supersedes: 2026-03-02-relay-board-manual.md" in read(nf) and f"`{MY}/relay.md`" in out, out)
+            rc, out = run(L(sq, "index", T) + ["--review-scope"], sq)
+            check("review scope: a changed source lists the notes citing the old copy", "source `2026-04-01-relay-board-manual.md` replaces `2026-03-02-relay-board-manual.md`" in out and f"`{MY}/relay.md`" in out, out)
+            rc, out = run(ing + ["--list"], sq)
+            check("ingest --list: every source, the superseded one marked, and who cites it", rc == 0 and "# Sources (2)" in out and "2026-03-02-relay-board-manual.md` (superseded)" in out and f"cited by: `{MY}/relay.md`" in out, out)
+            write(os.path.join(sq, MY, "relay.md"), "\nA note edit after the source came in.\n", "a")
+            run(NCq + ["Edit relay"], sq)
+            write(os.path.join(sq, MY, "plans", "review-2026-04-01-relay.md"), "---\nsummary: Ingest of the new manual\nscope: source 2026-04-01-relay-board-manual.md\nopen: none\n---\n# Review\n\nPer `2026-04-01-relay-board-manual.md`: nothing applies.\n")
+            run(NCq + ["Review of one source"], sq)
+            rc, out = run(L(sq, "index", T) + ["--review-scope"], sq)
+            check("review scope: a review of one source does not hide note edits made before it, and marks that source as taken in",
+                  f"`{MY}/relay.md`" in out and "2026-04-01-relay-board-manual.md` replaces" not in out and "new source" not in out, out)
+            rc, out = run(ing + ["--list"], sq)
+            check("ingest --list: review files are not counted as notes citing a source", "review-2026-04-01-relay.md" not in out, out)
+            rc, out = run(ing + ["--url", "https://example.invalid/umlaut", "--title", "Umlaut", "--summary", "s", "--date", "2026-04-02"], sq, "Temperatur über 30 °C → Lüften\n")
+            uf = os.path.join(sq, MY, "sources", "2026-04-02-umlaut.md")
+            check("ingest keeps non-ASCII text intact (read as UTF-8 on every system)", rc == 0 and "Temperatur über 30 °C → Lüften" in read(uf), out)
+            rc, out = run(ing + ["--url", "https://example.invalid/big", "--title", "Big", "--summary", "s", "--date", "2026-04-03"], sq, ("a" * 99 + "\n") * 2500)
+            check("ingest warns about a large text and still saves it", rc == 0 and "warning: the text is 244 KB" in out and os.path.isfile(os.path.join(sq, MY, "sources", "2026-04-03-big.md")), out)
+            rc, out = run(lintq, sq)
+            check("lint: sources saved by ingest match their checksum", "sha256" not in out, out)
+            st_umlaut = read(uf)
+            write(uf, st_umlaut.replace("30 °C", "35 °C"))
+            rc, out = run(lintq, sq)
+            check("lint: a source edited after saving no longer matches its sha256", "2026-04-02-umlaut.md:" in out and "no longer matches its sha256" in out, out)
+            write(uf, st_umlaut)
+            write(os.path.join(sq, MY, "bundle.md"), "---\nsummary: Bundles\n---\n# Bundles\n\nRead `README.md` first; then `sources/README.md`. See `relay.md`.\n")
+            rc, out = run(lintq, sq)
+            warns = "\n".join(l for l in out.splitlines() if l.startswith("WARN"))
+            check("lint: a bare name that several files share is ambiguous; with its folder it is not", "bundle.md:" in warns and "`README.md` is ambiguous" in warns and "`sources/README.md` is ambiguous" not in warns, out)
+            os.remove(os.path.join(sq, MY, "bundle.md"))
+            cpq = os.path.join(sq, ".myco-notes.conf")
+            check("bootstrap records the format version", re.search(r"(?m)^FORMAT_VERSION=1\.1$", read(cpq)) is not None, read(cpq))
+            write(cpq, re.sub(r"(?m)^FORMAT_VERSION=.*\n", "", read(cpq)))
+            git(sq, "add", "-A"); git(sq, "commit", "-qm", "Sources and a notes repository without FORMAT_VERSION")
+            rc, out = run(L(kit, "relocate") + ["--root", sq, "--apply"], sq)
+            cq = read(cpq)
+            check("relocate adds FORMAT_VERSION when it is missing", rc == 0 and re.search(r"(?m)^FORMAT_VERSION=1\.1$", cq) is not None, out)
+            write(cpq, cq.replace("FORMAT_VERSION=1.1", "FORMAT_VERSION=2.0"))
+            git(sq, "add", "-A"); git(sq, "commit", "-qm", "Format 2.0")
+            run(L(kit, "relocate") + ["--root", sq, "--apply"], sq)
+            check("relocate keeps a format version the repository already states", "FORMAT_VERSION=2.0" in read(cpq), read(cpq))
+            import datetime as _dt2
+            rc, out = run(ing + ["--url", "https://example.invalid/today", "--title", "Today", "--summary", "s"], sq, "today\n")
+            check("ingest dates a source by the notes' time zone (TIMEZONE=UTC here)", f"sources/{_dt2.datetime.now(_dt2.timezone.utc).strftime('%Y-%m-%d')}-today.md" in out, out)
+            rc, out = run([sys.executable, "-B", os.path.join(rp, *T.split("/"), "notes-lint.py")], rp)
+            check("lint: a review file without proposals raises no review warning", "review-2026-01-02.md" not in "\n".join(l for l in out.splitlines() if l.startswith("WARN")), out)
+            write(os.path.join(rp, MY, "alpha.md"), "\nNow also see `beta.md`.\n", "a")
+            rc, out = run(L(rp, "index", T) + ["--review-scope"], rp)
+            check("review scope: a changed note, the note its new line names and a note pointing to it; not the others",
+                  "# Review scope: changed" in out and f"`{MY}/alpha.md`" in out and f"`{MY}/beta.md`" in out and f"`{MY}/delta.md`" in out and "gamma.md" not in out and "scope: changed since" in out, out)
+            rc, out = run(L(rp, "index", T) + ["--review-scope", "--full"], rp)
+            check("review scope: --full asks for every note", "# Review scope: full (asked for a full review)" in out, out)
+            check("review scope: a full review also checks AGENTS.md against the template", "## Also check" in out and "template/AGENTS.md" in out, out)
+            rc, out = run(L(rp, "index", T) + ["--review-scope"], rp)
+            check("review scope: no entry-point item while the kit and AGENTS.md are unchanged", "Also check" not in out, out)
+            cp0 = os.path.join(rp, ".myco-notes.conf")
+            write(cp0, re.sub(r"(?m)^KIT_VERSION=.*$", "KIT_VERSION=9.9.9", read(cp0)))
+            rc, out = run(L(rp, "index", T) + ["--review-scope"], rp)
+            check("review scope: a kit update since the last review adds the AGENTS.md comparison", "## Also check" in out and "the kit was updated since the last review" in out and "to 9.9.9" in out, out)
+            cp = os.path.join(rp, ".myco-notes.conf")
+            write(cp, "\nREVIEW_FULL_DAYS=-1\n", "a")
+            rc, out = run(L(rp, "index", T) + ["--review-scope"], rp)
+            check("review scope: full when the last full review is older than REVIEW_FULL_DAYS", "# Review scope: full (the last full review" in out and "REVIEW_FULL_DAYS=-1" in out, out)
+            write(os.path.join(sp, MY, "lonely.md"), "---\nsummary: A note only a log still names\n---\n# Lonely\n")
+            write(os.path.join(sp, MY, "logs", "moved-changelog.md"), "---\nsummary: Old changelog\n---\n# Moved\n- 2026-11-09: wrote `lonely.md`\n")
+            rc, out = run(slint, sp)
+            check("lint: an orphan that only a record mentions names that record", f"lonely.md:1 no other note mentions this file by name (only records do: {MY}/logs/moved-changelog.md" in out, out)
 
-        print("secret rules (formats an agent's notes are likely to meet; values built at run time, so this file holds none)")
-        sys.path.insert(0, os.path.join(kit, "tools"))
-        import secret_scan as ss
-        sys.path.pop(0)
-        a, d, n = "AbCdEfGhIjKlMnOpQrStUvWx", "0123456789", "Zz9Yy8Xx7"
-        found = {
-            "Anthropic API key": "ANTHROPIC_API_KEY " + "sk-" + "ant-api03-" + a + d,
-            "OpenAI API key": "key: " + "sk-" + "proj-" + a + d,
-            "API key (sk-)": "sk-" + a + d,
-            "Google API key": "maps " + "AI" + "za" + "Sy" + a + d + "a",
-            "GitLab token": "gl" + "pat-" + a,
-            "GitHub token": "gh" + "s_" + a + d,
-            "Stripe key": "sk" + "_live_" + a,
-            "Hugging Face token": "hf" + "_" + a + d,
-            "npm token": "np" + "m_" + a + d + "ab",
-            "AWS access key": "AS" + "IA" + "ABCDEFGHIJKLMNOP",
-            "Slack token": "https://hooks.slack.com/services/" + "T0123/B0123/" + a,
-            "JSON web token": "ey" + "JhbGciOiJIUzI1NiJ9." + "ey" + "JzdWIiOiIxMjM0NTY3ODkwIn0." + a,
-            "bearer token": "Authorization: " + "Bearer " + a + d,
-            "password in a URL": "postgres://admin:" + n + "q@db.internal/app",
-            "password": "pwd" + "=" + n + n,
-            "password (said in words)": "the router admin password is " + n + "Ww6",
-            "secret or token": "aws_secret_" + "access_key = " + a,
-        }
-        for rule, line in found.items():
-            hit = ss.find(line)
-            check(f"secret rules: {rule} is caught", hit is not None and hit[0] == rule.replace(" (said in words)", ""), f"{rule}: {hit}")
-        clean = ["Authorization: Bearer <token>", "Authorization: Bearer ${API_TOKEN}", "https://user:password@example.com/",
-                 "git clone https://github.com/example/notes.git", "ssh://git@host:22/repo", "cd $(pwd) && ls",
-                 "risk-assessment-for-the-new-cluster-rollout-plan-2026", "postgres://admin:changeme123@db/app",
-                 "the API key lives in the password manager, entry 'billing'", "bearer tokens expire after an hour", "the password is in the vault entry router-admin-2026",
-                 "the admin password is stored in the password manager"]
-        for line in clean:
-            hit = ss.find(line)
-            check(f"secret rules: no false alarm on {line[:40]!r}", hit is None, str(hit))
+            print("secret rules (formats an agent's notes are likely to meet; values built at run time, so this file holds none)")
+            sys.path.insert(0, os.path.join(kit, "tools"))
+            import secret_scan as ss
+            sys.path.pop(0)
+            a, d, n = "AbCdEfGhIjKlMnOpQrStUvWx", "0123456789", "Zz9Yy8Xx7"
+            found = {
+                "Anthropic API key": "ANTHROPIC_API_KEY " + "sk-" + "ant-api03-" + a + d,
+                "OpenAI API key": "key: " + "sk-" + "proj-" + a + d,
+                "API key (sk-)": "sk-" + a + d,
+                "Google API key": "maps " + "AI" + "za" + "Sy" + a + d + "a",
+                "GitLab token": "gl" + "pat-" + a,
+                "GitHub token": "gh" + "s_" + a + d,
+                "Stripe key": "sk" + "_live_" + a,
+                "Hugging Face token": "hf" + "_" + a + d,
+                "npm token": "np" + "m_" + a + d + "ab",
+                "AWS access key": "AS" + "IA" + "ABCDEFGHIJKLMNOP",
+                "Slack token": "https://hooks.slack.com/services/" + "T0123/B0123/" + a,
+                "JSON web token": "ey" + "JhbGciOiJIUzI1NiJ9." + "ey" + "JzdWIiOiIxMjM0NTY3ODkwIn0." + a,
+                "bearer token": "Authorization: " + "Bearer " + a + d,
+                "password in a URL": "postgres://admin:" + n + "q@db.internal/app",
+                "password": "pwd" + "=" + n + n,
+                "password (said in words)": "the router admin password is " + n + "Ww6",
+                "secret or token": "aws_secret_" + "access_key = " + a,
+            }
+            for rule, line in found.items():
+                hit = ss.find(line)
+                check(f"secret rules: {rule} is caught", hit is not None and hit[0] == rule.replace(" (said in words)", ""), f"{rule}: {hit}")
+            clean = ["Authorization: Bearer <token>", "Authorization: Bearer ${API_TOKEN}", "https://user:password@example.com/",
+                     "git clone https://github.com/example/notes.git", "ssh://git@host:22/repo", "cd $(pwd) && ls",
+                     "risk-assessment-for-the-new-cluster-rollout-plan-2026", "postgres://admin:changeme123@db/app",
+                     "the API key lives in the password manager, entry 'billing'", "bearer tokens expire after an hour", "the password is in the vault entry router-admin-2026",
+                     "the admin password is stored in the password manager"]
+            for line in clean:
+                hit = ss.find(line)
+                check(f"secret rules: no false alarm on {line[:40]!r}", hit is None, str(hit))
 
-        inbox = os.path.join(proj, MY, "inbox")
-        before = sorted(os.listdir(inbox)) if os.path.isdir(inbox) else []
-        sizes = {f: os.path.getsize(os.path.join(inbox, f)) for f in before}
-        rc, out = run(L(proj, "capture", T) + ["--commit", "router admin password: " + n + n], proj)
-        check("capture refuses a secret before writing anything (exit 4, value not shown)",
-              rc == 4 and n not in out and sorted(os.listdir(inbox) if os.path.isdir(inbox) else []) == before
-              and all(os.path.getsize(os.path.join(inbox, f)) == s for f, s in sizes.items()), out)
+            inbox = os.path.join(proj, MY, "inbox")
+            before = sorted(os.listdir(inbox)) if os.path.isdir(inbox) else []
+            sizes = {f: os.path.getsize(os.path.join(inbox, f)) for f in before}
+            rc, out = run(L(proj, "capture", T) + ["--commit", "router admin password: " + n + n], proj)
+            check("capture refuses a secret before writing anything (exit 4, value not shown)",
+                  rc == 4 and n not in out and sorted(os.listdir(inbox) if os.path.isdir(inbox) else []) == before
+                  and all(os.path.getsize(os.path.join(inbox, f)) == s for f, s in sizes.items()), out)
 
-        print("search: ranked results across the notes")
-        sdir = os.path.join(proj, MY, "search-test")
-        write(os.path.join(sdir, "nas.md"), "---\nsummary: The NAS: disks, shares and the nightly backups\n---\n# NAS\n\n## Backups\nNightly backups go to the offsite bucket.\n")
-        write(os.path.join(sdir, "router.md"), "---\nsummary: The router and its firewall rules\n---\n# Router\n\nIt keeps a backup of its config on the NAS, see `nas.md`.\n")
-        write(os.path.join(sdir, "fans.md"), "---\nsummary: Cooling\n---\n# Fans\n\nThe fan noise started in May.\npassword = " + n + n + "\nfan noise again\n")
-        write(os.path.join(proj, MY, "logs", "old-backup-log.md"), "---\nsummary: Backup log of 2025\n---\n# Old backup log\n\nbackup backup backup nas\n")
-        S = L(proj, "search", T)
-        rc, out = run(S + ["backup", "nas"], proj)
-        order = [l.split("`")[1] for l in out.splitlines() if l.startswith("- `")]
-        check("search: the note whose summary and title hold the words ranks first", rc == 0 and order[:1] == [MY + "/search-test/nas.md"], out)
-        check("search: a word matches longer words (backup finds backups) and records are marked", MY + "/logs/old-backup-log.md` (record)" in out, out)
-        check("search: matching lines are shown with their line numbers", "    7: Nightly backups go to the offsite bucket." in out, out)
-        rc, out = run(S + ["backup", "nas", "--notes-only"], proj)
-        check("search: --notes-only leaves records out", rc == 0 and "old-backup-log" not in out, out)
-        rc, out = run(S + ['"fan noise"'], proj)
-        check("search: a quoted phrase matches as written; a secret-looking line is never shown",
-              rc == 0 and "fans.md" in out and n not in out, out)
-        rc, out = run(S + ["--lines", "5", "password"], proj)
-        check("search: a matching line that looks like a secret is hidden", "line hidden" in out and n not in out, out)
-        rc, out = run(S + ["router", "zzzqqq"], proj)
-        check("search: no note holds every word: best partial matches", rc == 0 and "none holds every word" in out and "router.md" in out, out)
-        rc, out = run(S + ["qqqzzzxx"], proj)
-        check("search: nothing found exits 1", rc == 1 and "no note mentions" in out, out)
-        shutil.rmtree(sdir)
-        os.remove(os.path.join(proj, MY, "logs", "old-backup-log.md"))
+            print("search: ranked results across the notes")
+            sdir = os.path.join(proj, MY, "search-test")
+            write(os.path.join(sdir, "nas.md"), "---\nsummary: The NAS: disks, shares and the nightly backups\n---\n# NAS\n\n## Backups\nNightly backups go to the offsite bucket.\n")
+            write(os.path.join(sdir, "router.md"), "---\nsummary: The router and its firewall rules\n---\n# Router\n\nIt keeps a backup of its config on the NAS, see `nas.md`.\n")
+            write(os.path.join(sdir, "fans.md"), "---\nsummary: Cooling\n---\n# Fans\n\nThe fan noise started in May.\npassword = " + n + n + "\nfan noise again\n")
+            write(os.path.join(proj, MY, "logs", "old-backup-log.md"), "---\nsummary: Backup log of 2025\n---\n# Old backup log\n\nbackup backup backup nas\n")
+            S = L(proj, "search", T)
+            rc, out = run(S + ["backup", "nas"], proj)
+            order = [l.split("`")[1] for l in out.splitlines() if l.startswith("- `")]
+            check("search: the note whose summary and title hold the words ranks first", rc == 0 and order[:1] == [MY + "/search-test/nas.md"], out)
+            check("search: a word matches longer words (backup finds backups) and records are marked", MY + "/logs/old-backup-log.md` (record)" in out, out)
+            check("search: matching lines are shown with their line numbers", "    7: Nightly backups go to the offsite bucket." in out, out)
+            rc, out = run(S + ["backup", "nas", "--notes-only"], proj)
+            check("search: --notes-only leaves records out", rc == 0 and "old-backup-log" not in out, out)
+            rc, out = run(S + ['"fan noise"'], proj)
+            check("search: a quoted phrase matches as written; a secret-looking line is never shown",
+                  rc == 0 and "fans.md" in out and n not in out, out)
+            rc, out = run(S + ["--lines", "5", "password"], proj)
+            check("search: a matching line that looks like a secret is hidden", "line hidden" in out and n not in out, out)
+            rc, out = run(S + ["router", "zzzqqq"], proj)
+            check("search: no note holds every word: best partial matches", rc == 0 and "none holds every word" in out and "router.md" in out, out)
+            rc, out = run(S + ["qqqzzzxx"], proj)
+            check("search: nothing found exits 1", rc == 1 and "no note mentions" in out, out)
+            shutil.rmtree(sdir)
+            os.remove(os.path.join(proj, MY, "logs", "old-backup-log.md"))
 
-        print("0.41: a public graph keeps only the approved labels")
-        demo = os.path.join(tmp, "public-demo")
-        rc, out = run([sys.executable, os.path.join(REPO, "examples", "demo", "build_demo.py"), demo], tmp)
-        check("public graph: the demo notes build", rc == 0, out[-400:])
-        labels = os.path.join(tmp, "labels.json")
-        write(labels, '{"sensor-node": "Sensor node", "gateway.md": "LoRa gateway", "no-such-note": "Unused"}\n')
-        pub = os.path.join(tmp, "public-out")
-        os.makedirs(pub)
-        write(os.path.join(pub, "index.html"), "the host site's own page\n")
-        bm = [sys.executable, os.path.join(demo, MY, "tools", "build-notes-map.py"), "--root", demo]
-        rc, out = run(bm + ["--public", "--labels", labels, "--out", pub], demo)
-        check("public graph: built, with the unused label reported", rc == 0 and "2 labelled" in out and "no-such-note" in out, out)
-        check("public graph: only graph.html is written; other files in the folder stay", sorted(os.listdir(pub)) == ["graph.html", "index.html"]
-              and read(os.path.join(pub, "index.html")) == "the host site's own page\n", str(os.listdir(pub)))
-        page = read(os.path.join(pub, "graph.html"))
-        blob = page.split('<script id="data" type="application/json">', 1)[1].split("</script>", 1)[0]
-        rest = page.replace(blob, "")
-        rels = git(demo, "ls-files", "*.md")[1].split()
-        subjects = [s for s in git(demo, "log", "--format=%s")[1].splitlines() if s.strip()]
-        titles = []
-        for rel_ in rels:
-            if os.path.basename(rel_) in ("sensor-node.md", "gateway.md"):
-                continue   # a listed note's own label may well be its title
-            m = re.search(r"(?m)^#\s+(.+)$", read(os.path.join(demo, *rel_.split("/"))))
-            if m:
-                titles.append(re.sub(r"[`*_]", "", m.group(1)).strip())
-        stems = {os.path.basename(r_)[:-3] for r_ in rels} - {"sensor-node", "gateway"}
-        with open(os.path.join(SKILL, "tools", "graph-template.html"), encoding="utf-8") as fh:
-            code = fh.read()   # words the page's own code uses ("state" in pinchState) are not a leak; the data must still not hold them
-        leaks = ([r_ for r_ in rels if r_ in page] + [os.path.basename(r_) for r_ in rels if os.path.basename(r_) in page]
-                 + [s for s in subjects if s in page] + [t for t in titles if len(t) > 3 and t in page]
-                 + [s for s in stems if s in blob or (s in rest and s not in code)])
-        check("public graph: no unlisted note name, title, path or commit subject anywhere in the file", not leaks, str(leaks[:8]))
-        check("public graph: the listed labels are there, and nothing else names a note",
-              '"name":"Sensor node"' in blob and '"name":"LoRa gateway"' in blob and blob.count('"name"') == 2, blob[:300])
-        check("public graph: plain numbers for the notes, no project title, no group names, embed mode built in",
-              '"id":0,' in blob and '"title":""' in blob and '"public":true' in blob and "Greenhouse" not in page
-              and "<title>mycelium</title>" in page and 'if(true||q' in page, blob[:200])
-        rc, out = run(bm + ["--public", "--title", "My homelab", "--out", pub], demo)
-        check("public graph: --title is the only title; without --labels every note is a dot",
-              rc == 0 and "<title>My homelab - mycelium</title>" in read(os.path.join(pub, "graph.html")) and '"name"' not in read(os.path.join(pub, "graph.html")), out)
-        write(labels, '["not", "an object"]\n')
-        rc, out = run(bm + ["--public", "--labels", labels, "--out", pub], demo)
-        check("public graph: a labels file that is not one JSON object is refused", rc != 0 and "JSON object" in out, out)
-        rc, out = run(bm + ["--labels", labels], demo)
-        check("public graph: --labels without --public is a usage error", rc == 2, out)
-        rc, out = run(bm + ["--public"], demo)
-        check("public graph: --public needs --out", rc == 2 and "--out" in out, out)
-        full = read(os.path.join(demo, MY, "map", "graph.html"))
-        check("the full view still names its notes and stays out of embed mode unless asked", "sensor-node" in full and 'if(false||q' in full, "")
+            print("0.41: a public graph keeps only the approved labels")
+            demo = os.path.join(tmp, "public-demo")
+            rc, out = run([sys.executable, os.path.join(REPO, "examples", "demo", "build_demo.py"), demo], tmp)
+            check("public graph: the demo notes build", rc == 0, out[-400:])
+            labels = os.path.join(tmp, "labels.json")
+            write(labels, '{"sensor-node": "Sensor node", "gateway.md": "LoRa gateway", "no-such-note": "Unused"}\n')
+            pub = os.path.join(tmp, "public-out")
+            os.makedirs(pub)
+            write(os.path.join(pub, "index.html"), "the host site's own page\n")
+            bm = [sys.executable, os.path.join(demo, MY, "tools", "build-notes-map.py"), "--root", demo]
+            rc, out = run(bm + ["--public", "--labels", labels, "--out", pub], demo)
+            check("public graph: built, with the unused label reported", rc == 0 and "2 labelled" in out and "no-such-note" in out, out)
+            check("public graph: only graph.html is written; other files in the folder stay", sorted(os.listdir(pub)) == ["graph.html", "index.html"]
+                  and read(os.path.join(pub, "index.html")) == "the host site's own page\n", str(os.listdir(pub)))
+            page = read(os.path.join(pub, "graph.html"))
+            blob = page.split('<script id="data" type="application/json">', 1)[1].split("</script>", 1)[0]
+            rest = page.replace(blob, "")
+            rels = git(demo, "ls-files", "*.md")[1].split()
+            subjects = [s for s in git(demo, "log", "--format=%s")[1].splitlines() if s.strip()]
+            titles = []
+            for rel_ in rels:
+                if os.path.basename(rel_) in ("sensor-node.md", "gateway.md"):
+                    continue   # a listed note's own label may well be its title
+                m = re.search(r"(?m)^#\s+(.+)$", read(os.path.join(demo, *rel_.split("/"))))
+                if m:
+                    titles.append(re.sub(r"[`*_]", "", m.group(1)).strip())
+            stems = {os.path.basename(r_)[:-3] for r_ in rels} - {"sensor-node", "gateway"}
+            with open(os.path.join(SKILL, "tools", "graph-template.html"), encoding="utf-8") as fh:
+                code = fh.read()   # words the page's own code uses ("state" in pinchState) are not a leak; the data must still not hold them
+            leaks = ([r_ for r_ in rels if r_ in page] + [os.path.basename(r_) for r_ in rels if os.path.basename(r_) in page]
+                     + [s for s in subjects if s in page] + [t for t in titles if len(t) > 3 and t in page]
+                     + [s for s in stems if s in blob or (s in rest and s not in code)])
+            check("public graph: no unlisted note name, title, path or commit subject anywhere in the file", not leaks, str(leaks[:8]))
+            check("public graph: the listed labels are there, and nothing else names a note",
+                  '"name":"Sensor node"' in blob and '"name":"LoRa gateway"' in blob and blob.count('"name"') == 2, blob[:300])
+            check("public graph: plain numbers for the notes, no project title, no group names, embed mode built in",
+                  '"id":0,' in blob and '"title":""' in blob and '"public":true' in blob and "Greenhouse" not in page
+                  and "<title>mycelium</title>" in page and 'if(true||q' in page, blob[:200])
+            rc, out = run(bm + ["--public", "--title", "My homelab", "--out", pub], demo)
+            check("public graph: --title is the only title; without --labels every note is a dot",
+                  rc == 0 and "<title>My homelab - mycelium</title>" in read(os.path.join(pub, "graph.html")) and '"name"' not in read(os.path.join(pub, "graph.html")), out)
+            write(labels, '["not", "an object"]\n')
+            rc, out = run(bm + ["--public", "--labels", labels, "--out", pub], demo)
+            check("public graph: a labels file that is not one JSON object is refused", rc != 0 and "JSON object" in out, out)
+            rc, out = run(bm + ["--labels", labels], demo)
+            check("public graph: --labels without --public is a usage error", rc == 2, out)
+            rc, out = run(bm + ["--public"], demo)
+            check("public graph: --public needs --out", rc == 2 and "--out" in out, out)
+            full = read(os.path.join(demo, MY, "map", "graph.html"))
+            check("the full view still names its notes and stays out of embed mode unless asked", "sensor-node" in full and 'if(false||q' in full, "")
     finally:
         def _force(func, path, _exc):
             os.chmod(path, 0o700)
