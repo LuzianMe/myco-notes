@@ -1,0 +1,7 @@
+{
+  "sensor-node": "Sensor node",
+  "gateway": "Gateway",
+  "timeseries-db": "Time-series database",
+  "irrigation-valve": "Irrigation valve",
+  "greenhouse-a": "Greenhouse A"
+}

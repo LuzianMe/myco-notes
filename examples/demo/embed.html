@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Embedding the mycelium view</title>
+<link rel="icon" href="data:,">
+<style>
+:root{--fg:#f3eefa;--muted:#c9bfdc;--line:#ffffff33;--bg:linear-gradient(135deg,#13213d,#4b2160 55%,#a2522a)}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--bg) fixed;color:var(--fg);font:15px/1.5 system-ui,sans-serif}
+main{max-width:1100px;margin:0 auto;padding:24px 16px 40px}
+h1{font-size:24px;margin:0 0 4px}p{margin:0 0 12px;color:var(--muted);max-width:70ch}
+a{color:#ffd28a}code{font-size:13px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-top:16px}
+figure{margin:0;border:1px dashed var(--line);border-radius:12px;overflow:hidden}
+iframe{display:block;width:100%;height:380px;border:0;color-scheme:normal}
+figcaption{padding:8px 12px;font-size:13px;color:var(--muted);border-top:1px dashed var(--line)}
+.bar{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+button{font:inherit;font-size:13px;padding:4px 12px;border:1px solid var(--line);border-radius:8px;background:#0003;color:var(--fg);cursor:pointer}
+button:hover{border-color:#ffd28a}
+#log{font:12px ui-monospace,Menlo,Consolas,monospace;color:var(--muted);margin-top:8px;min-height:1.5em}
+</style>
+</head>
+<body>
+<main>
+<h1>Embedding the mycelium view</h1>
+<p>Both frames show <code>public/graph.html</code>, a public graph of the made-up demo notes built with
+<code>build-notes-map.py --public --labels labels.json</code>: only the approved labels are in it, every other note is an unlabelled dot.
+The page behind them shows through. See <a href="https://github.com/LuzianMe/myco-notes/blob/main/skills/myco-notes/docs/REFERENCE.md#6-the-mycelium-view-on-a-website">REFERENCE.md, section 6</a>,
+or open the <a href="graph.html">full mycelium view</a>.</p>
+<div class="grid">
+  <figure><iframe id="water" src="public/graph.html?theme=deepsea" title="The demo notes as a network, Deep sea theme"></iframe>
+    <figcaption><code>?theme=deepsea</code>: drag to turn, scroll or pinch to zoom, double-click to fit.</figcaption></figure>
+  <figure><iframe id="fire" src="public/graph.html?theme=amber&amp;interactive=0" title="The demo notes as a network, Amber terminal theme"></iframe>
+    <figcaption><code>?theme=amber&amp;interactive=0</code>: turns by itself; the page scrolls and swipes as usual over it.</figcaption></figure>
+</div>
+<div class="bar">
+  <button type="button" data-msg='{"type":"myco-theme","theme":"amber"}'>Left: Amber</button>
+  <button type="button" data-msg='{"type":"myco-theme","theme":"deepsea"}'>Left: Deep sea</button>
+  <button type="button" data-msg='{"type":"myco-theme","theme":"mycelium"}'>Left: Mycelium</button>
+  <button type="button" data-msg='{"type":"myco-pause"}'>Left: pause</button>
+  <button type="button" data-msg='{"type":"myco-resume"}'>Left: resume</button>
+</div>
+<div id="log" role="status"></div>
+</main>
+<script>
+(function(){
+  var water=document.getElementById("water"),fire=document.getElementById("fire"),log=document.getElementById("log"),seen=[];
+  function say(t){seen.push(t);log.textContent=seen.slice(-4).join("  ·  ")}
+  document.querySelectorAll("button[data-msg]").forEach(function(b){
+    b.addEventListener("click",function(){var m=JSON.parse(b.getAttribute("data-msg"));water.contentWindow.postMessage(m,"*");say("sent "+m.type+(m.theme?" "+m.theme:""))});
+  });
+  addEventListener("message",function(e){
+    var who=e.source===water.contentWindow?"left":e.source===fire.contentWindow?"right":null;
+    if(!who||!e.data||typeof e.data.type!=="string")return;
+    say(who+": "+e.data.type+(e.data.message?" ("+e.data.message+")":""));
+  });
+})();
+</script>
+</body>
+</html>

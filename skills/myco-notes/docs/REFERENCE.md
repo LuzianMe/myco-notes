@@ -18,7 +18,7 @@ They live in each notes repository's `myco-notes/tools/`. Each has a launcher wi
 | `ingest` | Keep an outside document as a source; `--list` shows the sources and who cites them. |
 | `notes-lint.py` | References, headings, dates, freshness header, summaries, sync-log format, ledger, sizes, secrets. |
 | `asof DATE [NOTE]` | What the notes said on a date; `--since`, `--grep`, `--history NOTE`. |
-| `build-notes-map.py` | The searchable map with backlinks and history, and `graph.html` (the mycelium view). |
+| `build-notes-map.py` | The searchable map with backlinks and history, and `graph.html` (the mycelium view); `--public` writes a public graph for a website (section 6). |
 | `mirror-push`, `restore-drill` | A second copy, and proof that it can be restored. |
 | `doctor` | Read-only health check: kit version, hook, layout, settings. |
 | `bootstrap` | A new notes repository (`--data-dir`, `--new-folders`), or take over a folder (`--import`, `--adopt`). Run from the kit. |
@@ -57,3 +57,65 @@ Set `NEW_FOLDERS` in `.myco-notes.conf` to apply one answer every time.
 ## 5. Configuration
 
 `.myco-notes.conf` (shell syntax): the layout (`MYCO_DIR`, `NOTES_DIR`, `TOOLS_DIR`, `DOCS_DIR`, `MAP_DIR`, `DATA_DIRS`, `HISTORY_DIRS`, `STATE_FILE` for a master record not called `state.md`), the lint limits (`MAX_NOTE_KB`, `ENTRY_WARN_KB`, `STALE_DAYS` for the freshness header, `RESUME_BUDGET` for `resume`, `REVIEW_FULL_DAYS` for how often a review reads every note), `AGENT_TRAILER` (co-author line for commits made by an agent), `SYNC_GLOBS`/`SYNC_CMD` (keep the live copy of executed files equal to the committed copy), `TIMEZONE` (IANA name for the times `capture` writes), `SOLO` (1 = one owner: an agent merges its own pull request after the check passes, method 19.2), `NEW_FOLDERS` (`ask` default, `add`, `ignorelint`, `ignoreall`: what `notes-commit` does with a new root folder or loose file; `notes-commit --folder NAME=MODE` answers for one item, `NAME=*` for all, `later` leaves it out of this commit), `CHECK_SH`/`CHECK_PY`, `MIRROR_TARGET`, `POST_PUSH_CMDS`, `SECRET_ALLOW_FILE`. Optional `.myco-notes-map.json` (groups, hints, title) and `.myco-notes-lint-ignore` (regexes of findings to drop).
+
+## 6. The mycelium view on a website
+
+`graph.html` is one self-contained file: no server, no network requests, no libraries. Two things make it safe and easy to show on another site.
+
+### 6.1 A public graph: `build-notes-map.py --public`
+
+```bash
+python3 myco-notes/tools/build-notes-map.py --public --labels labels.json --title "My homelab" --out ../my-site/graph
+```
+
+It writes only `<out>/graph.html` (the folder is created if needed; other files in it are left alone). The file keeps only what drawing and the replay need: a number for each note, its group number, hub and history flags, link counts, the commit it was born in and last changed in, the links, and per commit its time and the notes it touched and added. It drops note names, titles, paths, file names, sizes, follow-ups, missing references, commit subjects, group names and the project title. `--title` is the only title it carries (default: none). The page always opens in embed mode (6.2).
+
+`--labels` is the approved list, one JSON object keyed by the note's file name without `.md`: a note in the list is drawn with that label, every other note is an unlabelled dot whose name appears nowhere in the file. Notes that share a file name in different folders all get the label. A label that matches no note is reported and left out.
+
+```json
+{"frigate": "Cameras", "home-assistant": "Home Assistant", "router": "Network"}
+```
+
+The build refuses, as the full map does, when a note or a label looks like it contains a secret. A public graph is a copy of the notes: record it in the derived-copy ledger (method 9, item 5) and rebuild it when the notes change.
+
+### 6.2 Embed mode and its options
+
+| URL option | Effect |
+|---|---|
+| `?embed=1` | Only the network and its labels: no panels, tool bar, replay panel, Find, hint or note panel, and no clicks that open notes. The page and canvas are transparent (`color-scheme: normal`), so the host page shows through; the theme keeps its node, thread and label colours. At most 1.5 device pixels per pixel. A public graph is always in embed mode. |
+| `?theme=<id>` | The theme, as in the full view: `light`, `dark`, `mycelium`, `fruit`, `matrix`, `amber`, `contrast`, `deepsea`, `paper` (or `auto`). Embed mode never uses a choice stored in the browser. |
+| `?interactive=0` | No pointer, wheel or touch handling at all: a preview that only turns by itself, so the host page keeps its own scrolling and swiping. |
+| `?replay=1` | Start with the replay of the history instead of the finished graph. |
+| `?depth=0` | The flat view instead of the ball. |
+
+Interaction in embed mode (unless `interactive=0`): drag with the mouse or one finger to turn the network about its upright axis (the tilt stays at the gentle view from slightly above); scroll, a trackpad pinch or two fingers zoom, from half the fitted size up to a 4x zoom; a double-click fits it again. Left alone it turns slowly by itself; with `prefers-reduced-motion` it does not.
+
+Drawing pauses while the page is hidden (`visibilitychange`) and while the host page asks for it.
+
+**Messages** (`window.postMessage`). The page accepts these only from its parent window (`event.source === window.parent`) and ignores anything else:
+
+| From the host page | Effect |
+|---|---|
+| `{type: "myco-theme", theme: "<id>"}` | Switch the theme live, without a reload (`"auto"` follows the system). |
+| `{type: "myco-pause"}` | Stop drawing (for a slide that is not showing). |
+| `{type: "myco-resume"}` | Draw again. |
+
+| To the host page | When |
+|---|---|
+| `{type: "myco-ready"}` | Once, when the first frame is drawn (an iframe that starts hidden, with no size, sends it once it is shown). |
+| `{type: "myco-error", message: "..."}` | Once, if something fails; `message` is the browser's error text. |
+
+```html
+<iframe id="notes" src="graph/graph.html?theme=deepsea" title="My notes as a network"
+        style="width:100%;height:480px;border:0" loading="lazy"></iframe>
+<script>
+  const f = document.getElementById("notes");
+  addEventListener("message", e => {
+    if (e.source === f.contentWindow && e.data && e.data.type === "myco-ready") console.log("graph ready");
+  });
+  // a slide that goes out of view: f.contentWindow.postMessage({type: "myco-pause"}, "*")
+  // and back: {type: "myco-resume"}; a theme switch: {type: "myco-theme", theme: "amber"}
+</script>
+```
+
+If the host page sets its own `color-scheme` (for example `dark`), give the iframe `style="color-scheme: normal"`: browsers paint an opaque background behind an iframe whose colour scheme differs from its page's.

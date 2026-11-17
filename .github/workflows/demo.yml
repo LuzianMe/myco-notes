@@ -1,5 +1,6 @@
 name: demo
-# Builds the made-up "Greenhouse Sensors" notes repository with this kit and publishes its map and mycelium view on GitHub Pages.
+# Builds the made-up "Greenhouse Sensors" notes repository with this kit and publishes its map and mycelium view on GitHub Pages,
+# with a public graph (build-notes-map.py --public) and embed.html, an example of a website embedding it.
 on:
   push:
     branches: [main]
@@ -22,10 +23,16 @@ jobs:
           python-version: "3.12"
       - name: Build the demo notes and its map
         run: python examples/demo/build_demo.py "$RUNNER_TEMP/demo"
+      - name: The site, with a public graph and the embedding example (embed.html)
+        run: |
+          cp -r "$RUNNER_TEMP/demo/myco-notes/map" "$RUNNER_TEMP/site"
+          python "$RUNNER_TEMP/demo/myco-notes/tools/build-notes-map.py" --root "$RUNNER_TEMP/demo" --public \
+            --labels examples/demo/public-labels.json --out "$RUNNER_TEMP/site/public"
+          cp examples/demo/embed.html "$RUNNER_TEMP/site/embed.html"
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: ${{ runner.temp }}/demo/myco-notes/map
+          path: ${{ runner.temp }}/site
   deploy:
     needs: build
     runs-on: ubuntu-latest
