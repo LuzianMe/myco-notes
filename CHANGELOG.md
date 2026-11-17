@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.29.0
+- **Threads fire like neurons**: on the threads of a selected or hovered note, the steady sap becomes spikes: each thread fires at random moments, sometimes in a quick burst, a spike runs about three times faster with a short tail, and the note it reaches flashes. A note with many threads fires each of them less often, so a hub stays readable.
+- **A living network in standby**: while nothing is selected and the network turns by itself, a faint spike runs along a random thread every two to four seconds (at most two at a time; busy and recently changed notes more often), and its target flashes softly.
+- **Circuit threads for Matrix and Amber terminal**: in the two digital themes the threads are traces: straight runs turning by 45 or 90 degrees through the thread's own wandering points, even in width, with square pads at the corners, square buds and short stubs instead of side branches; spikes are square packets that glitch now and then. The other themes keep their hyphae; each theme carries its thread style in `map_themes.py`.
+- No spikes or glitches with reduced motion. Drawing cost is unchanged.
+
 ## 0.28.0
 - **Threads in the colour of their note**: a thread takes the colour of the note it comes from, mixed toward the theme's thread colour, over a soft glow in the theme's colour; a thread between two notes that mention each other fades from one note's colour to the other's.
 - **The travelling sap follows the thread**: on the threads of a selected or hovered note, the dots now travel along the wavy hypha instead of the old smooth curve.
