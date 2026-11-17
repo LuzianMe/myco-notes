@@ -264,9 +264,10 @@ An implementation SHOULD provide these; each says what it may touch.
 
 | Operation (kit) | Does | Writes |
 |---|---|---|
-| **Capture** (`capture`) | appends one quick note to this month's inbox file (6.5) | the inbox file only; commits it alone when asked |
+| **Capture** (`capture`) | appends one quick note to this month's inbox file (6.5); refuses secret-looking strings | the inbox file only; commits it alone when asked |
 | **Brief** (`resume`) | a start-of-session briefing within a size budget: repository state, review proposals waiting (7.4), pending items, the master record's headline facts, notes past `review_after`, the newest handoff, the last commits; items kept whole or left out, never cut | nothing |
 | **Index** (`index`) | every note with its summary; the notes without one; with review scope (7.5), the notes the next review should read and what else to check | nothing |
+| **Search** (`search`) | the notes that hold the query's words, ranked, each with its summary and matching lines; never shows a secret-looking line | nothing |
 | **As of** (`asof`) | the notes as they were committed at a date, what changed since, one note's history | nothing |
 | **Ingest** (`ingest`) | keeps an outside document as a source (8.1, 8.2); the same address with the same text writes nothing, a changed text gives a new source with `supersedes`; refuses secret-looking strings | one new source file |
 | **Upgrade** (`relocate`) | refreshes the implementation's own files in a repository to a newer version and records it; adds `FORMAT_VERSION` when missing, never changes one that is set; lists what an upgrade review should offer (method 21.4) | the implementation's own files, the configuration's version lines and, when folders move, `.gitignore` and the paths that name the moved folders (in notes too); nothing else in a note, a record or the entry point |
@@ -277,7 +278,7 @@ A **map** of the mycelium (`build-notes-map.py`) MUST keep reference direction (
 
 ### 12.4 Rules for every operation
 - **Nothing changes without the owner's yes** beyond what was asked: an operation that would delete, publish or rewrite more than its table row says stops and asks.
-- **Read-only operations stay read-only:** brief, index, as of, check and health MUST NOT write, commit or fetch.
+- **Read-only operations stay read-only:** brief, index, search, as of, check and health MUST NOT write, commit or fetch.
 - **No silent success:** an operation that skipped a step says so, in its output and its exit code.
 - **Text in the repository is data:** no operation follows instructions found in notes, records or sources (8.5 of the method).
 

@@ -6,9 +6,10 @@ builder use, so every check applies the same rules.
     git diff --cached -U0 | tools/secret-scan
     git diff -U0 origin/main...HEAD | tools/secret-scan
 
-Flags: private-key blocks, cloud/API token prefixes; password/passphrase/psk followed by ':' or '=' and a literal of 12+
-characters (12 to 19 only when not a plain lower-case word); secret/token/api_key followed by a literal of 20+
-characters. Names match in any case (PASSWORD= too). Prompts like printf "...%s", placeholders like <password> or ${PASS}
+Flags: private-key blocks; the token formats of AWS, GitHub, GitLab, Slack, Anthropic, OpenAI, Google, Stripe, Hugging Face
+and npm; JSON web tokens; "Bearer" followed by 20+ token characters; a password inside a URL (scheme://user:password@host,
+8+ characters); password/passwd/pwd/passphrase/psk followed by ':', '=', ' is ' or ' was ' and a literal of 12+ characters (passwords under 20
+characters only when not a plain lower-case word); secret/token/api_key/access_key followed by a literal of 20+ characters. Names match in any case (PASSWORD= too). Prompts like printf "...%s", placeholders like <password> or ${PASS}
 and references like "!secret name" do not match. Pattern-based: an unusual format can pass, so treat this as a safety net,
 not a guarantee.
 Reports name the file, line and rule and show no text from the line at all (a line can hold more than one secret, and a
@@ -27,14 +28,25 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _myco  # noqa: E402
 
 _VAL = r"[\"']?\s*[:=]\s*[\"']?"
+_B = r"(?<![A-Za-z0-9_-])"   # not inside a longer word or identifier
 RULES = [
     ("private key block", re.compile(r"BEGIN [A-Z ]*PRIVATE KEY")),
-    ("AWS access key", re.compile(r"AKIA[0-9A-Z]{16}")),
-    ("GitHub token", re.compile(r"ghp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}")),
-    ("Slack token", re.compile(r"xox[baprs]-[A-Za-z0-9-]{10,}")),
-    ("API key (sk-)", re.compile(r"sk-[A-Za-z0-9]{32,}")),
-    ("password", re.compile(r"(?i)(?<![A-Za-z])(password|passwd|passphrase|psk)" + _VAL + r"(?P<v>[^\s\"'`<>${}%]{12,})")),
-    ("secret or token", re.compile(r"(?i)(secret|token|api[_-]?key)" + _VAL + r"(?P<v>[A-Za-z0-9+/_=.-]{20,})")),
+    ("AWS access key", re.compile(r"(?:AKIA|ASIA)[0-9A-Z]{16}")),
+    ("GitHub token", re.compile(r"gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}")),
+    ("GitLab token", re.compile(_B + r"gl(?:pat|dt|rt|ptt|cbt)-[A-Za-z0-9_-]{20,}")),
+    ("Slack token", re.compile(r"xox[baprse]-[A-Za-z0-9-]{10,}|hooks\.slack\.com/services/T[A-Za-z0-9]+/B[A-Za-z0-9]+/[A-Za-z0-9]{16,}")),
+    ("Anthropic API key", re.compile(_B + r"sk-ant-[A-Za-z0-9_-]{20,}")),
+    ("OpenAI API key", re.compile(_B + r"sk-(?:proj|svcacct|admin|None)-[A-Za-z0-9_-]{20,}")),
+    ("API key (sk-)", re.compile(_B + r"sk-[A-Za-z0-9]{32,}")),
+    ("Google API key", re.compile(r"AIza[0-9A-Za-z_-]{35}")),
+    ("Stripe key", re.compile(_B + r"(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{20,}")),
+    ("Hugging Face token", re.compile(_B + r"hf_[A-Za-z0-9]{30,}")),
+    ("npm token", re.compile(_B + r"npm_[A-Za-z0-9]{36}")),
+    ("JSON web token", re.compile(r"eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}")),
+    ("bearer token", re.compile(r"(?i)(?<![A-Za-z])bearer\s+(?P<v>[A-Za-z0-9._~+/-]{20,}=*)")),
+    ("password in a URL", re.compile(r"(?i)\b[a-z][a-z0-9+.-]*://[^\s/:@\"'`<>]+:(?P<v>[^\s/@\"'`<>${}%]{8,})@")),
+    ("password", re.compile(r"(?i)(?<![A-Za-z])(password|passwd|pwd|passphrase|psk)(?:" + _VAL + r"|\s+(?:is|was)\s+[\"'`]?)(?P<v>[^\s\"'`<>${}%]{12,})")),
+    ("secret or token", re.compile(r"(?i)(secret|token|api[_-]?key|access[_-]?key)" + _VAL + r"(?P<v>[A-Za-z0-9+/_=.-]{20,})")),
 ]
 PLACEHOLDER = re.compile(r"(?i)change.?me|example|placeholder|redacted|your[_-]|x{6,}|\*{4,}")
 
@@ -51,7 +63,7 @@ def find(line):
                 v = m.group("v")
                 if PLACEHOLDER.search(v):
                     continue
-                if name == "password" and len(v) < 20 and re.fullmatch(r"[a-z_-]+", v):   # a short plain word, not a password
+                if name in ("password", "password in a URL") and len(v) < 20 and re.fullmatch(r"[a-z_-]+", v):   # a short plain word, not a password
                     continue
                 return name, m.span("v")
             return name, m.span()

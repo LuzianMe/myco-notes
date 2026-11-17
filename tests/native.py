@@ -869,6 +869,76 @@ def main():
         write(os.path.join(sp, MY, "logs", "moved-changelog.md"), "---\nsummary: Old changelog\n---\n# Moved\n- 2026-11-09: wrote `lonely.md`\n")
         rc, out = run(slint, sp)
         check("lint: an orphan that only a record mentions names that record", f"lonely.md:1 no other note mentions this file by name (only records do: {MY}/logs/moved-changelog.md" in out, out)
+
+        print("secret rules (formats an agent's notes are likely to meet; values built at run time, so this file holds none)")
+        sys.path.insert(0, os.path.join(kit, "tools"))
+        import secret_scan as ss
+        sys.path.pop(0)
+        a, d, n = "AbCdEfGhIjKlMnOpQrStUvWx", "0123456789", "Zz9Yy8Xx7"
+        found = {
+            "Anthropic API key": "ANTHROPIC_API_KEY " + "sk-" + "ant-api03-" + a + d,
+            "OpenAI API key": "key: " + "sk-" + "proj-" + a + d,
+            "API key (sk-)": "sk-" + a + d,
+            "Google API key": "maps " + "AI" + "za" + "Sy" + a + d + "a",
+            "GitLab token": "gl" + "pat-" + a,
+            "GitHub token": "gh" + "s_" + a + d,
+            "Stripe key": "sk" + "_live_" + a,
+            "Hugging Face token": "hf" + "_" + a + d,
+            "npm token": "np" + "m_" + a + d + "ab",
+            "AWS access key": "AS" + "IA" + "ABCDEFGHIJKLMNOP",
+            "Slack token": "https://hooks.slack.com/services/" + "T0123/B0123/" + a,
+            "JSON web token": "ey" + "JhbGciOiJIUzI1NiJ9." + "ey" + "JzdWIiOiIxMjM0NTY3ODkwIn0." + a,
+            "bearer token": "Authorization: " + "Bearer " + a + d,
+            "password in a URL": "postgres://admin:" + n + "q@db.internal/app",
+            "password": "pwd" + "=" + n + n,
+            "password (said in words)": "the router admin password is " + n + "Ww6",
+            "secret or token": "aws_secret_" + "access_key = " + a,
+        }
+        for rule, line in found.items():
+            hit = ss.find(line)
+            check(f"secret rules: {rule} is caught", hit is not None and hit[0] == rule.replace(" (said in words)", ""), f"{rule}: {hit}")
+        clean = ["Authorization: Bearer <token>", "Authorization: Bearer ${API_TOKEN}", "https://user:password@example.com/",
+                 "git clone https://github.com/example/notes.git", "ssh://git@host:22/repo", "cd $(pwd) && ls",
+                 "risk-assessment-for-the-new-cluster-rollout-plan-2026", "postgres://admin:changeme123@db/app",
+                 "the API key lives in the password manager, entry 'billing'", "bearer tokens expire after an hour", "the password is in the vault entry router-admin-2026",
+                 "the admin password is stored in the password manager"]
+        for line in clean:
+            hit = ss.find(line)
+            check(f"secret rules: no false alarm on {line[:40]!r}", hit is None, str(hit))
+
+        inbox = os.path.join(proj, MY, "inbox")
+        before = sorted(os.listdir(inbox)) if os.path.isdir(inbox) else []
+        sizes = {f: os.path.getsize(os.path.join(inbox, f)) for f in before}
+        rc, out = run(L(proj, "capture", T) + ["--commit", "router admin password: " + n + n], proj)
+        check("capture refuses a secret before writing anything (exit 4, value not shown)",
+              rc == 4 and n not in out and sorted(os.listdir(inbox) if os.path.isdir(inbox) else []) == before
+              and all(os.path.getsize(os.path.join(inbox, f)) == s for f, s in sizes.items()), out)
+
+        print("search: ranked results across the notes")
+        sdir = os.path.join(proj, MY, "search-test")
+        write(os.path.join(sdir, "nas.md"), "---\nsummary: The NAS: disks, shares and the nightly backups\n---\n# NAS\n\n## Backups\nNightly backups go to the offsite bucket.\n")
+        write(os.path.join(sdir, "router.md"), "---\nsummary: The router and its firewall rules\n---\n# Router\n\nIt keeps a backup of its config on the NAS, see `nas.md`.\n")
+        write(os.path.join(sdir, "fans.md"), "---\nsummary: Cooling\n---\n# Fans\n\nThe fan noise started in May.\npassword = " + n + n + "\nfan noise again\n")
+        write(os.path.join(proj, MY, "logs", "old-backup-log.md"), "---\nsummary: Backup log of 2025\n---\n# Old backup log\n\nbackup backup backup nas\n")
+        S = L(proj, "search", T)
+        rc, out = run(S + ["backup", "nas"], proj)
+        order = [l.split("`")[1] for l in out.splitlines() if l.startswith("- `")]
+        check("search: the note whose summary and title hold the words ranks first", rc == 0 and order[:1] == [MY + "/search-test/nas.md"], out)
+        check("search: a word matches longer words (backup finds backups) and records are marked", MY + "/logs/old-backup-log.md` (record)" in out, out)
+        check("search: matching lines are shown with their line numbers", "    7: Nightly backups go to the offsite bucket." in out, out)
+        rc, out = run(S + ["backup", "nas", "--notes-only"], proj)
+        check("search: --notes-only leaves records out", rc == 0 and "old-backup-log" not in out, out)
+        rc, out = run(S + ['"fan noise"'], proj)
+        check("search: a quoted phrase matches as written; a secret-looking line is never shown",
+              rc == 0 and "fans.md" in out and n not in out, out)
+        rc, out = run(S + ["--lines", "5", "password"], proj)
+        check("search: a matching line that looks like a secret is hidden", "line hidden" in out and n not in out, out)
+        rc, out = run(S + ["router", "zzzqqq"], proj)
+        check("search: no note holds every word: best partial matches", rc == 0 and "none holds every word" in out and "router.md" in out, out)
+        rc, out = run(S + ["qqqzzzxx"], proj)
+        check("search: nothing found exits 1", rc == 1 and "no note mentions" in out, out)
+        shutil.rmtree(sdir)
+        os.remove(os.path.join(proj, MY, "logs", "old-backup-log.md"))
     finally:
         def _force(func, path, _exc):
             os.chmod(path, 0o700)

@@ -1,0 +1,41 @@
+name: release
+# On every push to main: when the kit's version (scripts/release.py --check: the four version fields agree and CHANGELOG.md has
+# their section) has no tag yet, tag the commit vX.Y.Z and make the GitHub release from the CHANGELOG section.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: release
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check the version and the changelog
+        id: version
+        run: echo "version=$(python3 scripts/release.py --check)" >> "$GITHUB_OUTPUT"
+      - name: Tests
+        run: |
+          git config --global user.name "CI"
+          git config --global user.email "ci@example.invalid"
+          python3 tests/native.py && bash tests/smoke.sh && python3 tests/behaviour/run.py
+      - name: Tag and release when the version is new
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+            echo "v$VERSION is already tagged: nothing to release"
+            exit 0
+          fi
+          python3 scripts/release.py --notes "$VERSION" > "$RUNNER_TEMP/notes.md"
+          gh release create "v$VERSION" --target "$GITHUB_SHA" --title "v$VERSION" --notes-file "$RUNNER_TEMP/notes.md"

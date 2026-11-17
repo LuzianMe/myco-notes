@@ -50,12 +50,20 @@ assert comp is None or len(comp)<=500
 assert t.count(chr(10))<500, 'SKILL.md should stay under 500 lines'
 PY"
 chk "SKILL.md needs no CLAUDE_PLUGIN_ROOT" "! grep -q 'CLAUDE_PLUGIN_ROOT' $skill/SKILL.md"
-chk "every path SKILL.md names exists in the skill folder" "python3 - <<PY
-import re,os
+chk "every path SKILL.md and the mode files name exists in the skill folder" "python3 - <<PY
+import re,os,glob
+for f in ['$skill/SKILL.md']+glob.glob('$skill/modes/*.md'):
+    t=open(f).read()
+    for m in set(re.findall(r'<KIT>/((?:tools|docs|template|modes)[A-Za-z0-9_./-]*)', t)):
+        p=os.path.join('$skill', m.rstrip('/.,)'))
+        assert os.path.exists(p), f+': missing '+m
+PY"
+chk "SKILL.md routes to every mode file and stays small" "python3 - <<PY
+import os
 t=open('$skill/SKILL.md').read()
-for m in set(re.findall(r'<KIT>/((?:tools|docs|template)[A-Za-z0-9_./-]*)', t)):
-    p=os.path.join('$skill', m.rstrip('/.,)'))
-    assert os.path.exists(p), 'missing '+m
+for f in os.listdir('$skill/modes'):
+    assert '<KIT>/modes/'+f in t, 'not routed: '+f
+assert len(t.encode()) < 12000, 'SKILL.md is loaded whole every time the skill triggers: keep the details in modes/'
 PY"
 
 # From here on the kit is a COPY of the skill folder alone: proves the skill is self-contained (what a skill-only installer delivers).
@@ -119,6 +127,7 @@ chk "resume prints a briefing with a footer" "myco-notes/tools/resume | grep -q 
 chk "resume lists the note past its review date" "myco-notes/tools/resume | grep -q 'fresh-smoke.md'"
 chk "index lists a starter note with its summary" "myco-notes/tools/index | grep -q 'state.md\`: Master record'"
 chk "index --missing names a note without a summary" "myco-notes/tools/index --missing | grep -q 'fresh-smoke.md'"
+chk "search ranks the master record for its own words" "myco-notes/tools/search master record | grep -q 'state.md.*Master record'"
 chk "asof shows the notes at HEAD"      "myco-notes/tools/asof HEAD state.md | grep -q 'master record'"
 chk "asof rejects a date before the history" "! myco-notes/tools/asof 2001-01-01"
 rm -f myco-notes/plans/fresh-smoke.md

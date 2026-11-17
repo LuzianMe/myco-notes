@@ -16,7 +16,7 @@ A text over 200 KB is saved with a warning (keep what the notes rely on). The da
 Exit: 0 saved or unchanged, 1 error, 2 usage, 4 refused: the text has a secret-looking string (lines named, values not shown);
 with --commit, notes-commit's own exit code.
 """
-import argparse, datetime, hashlib, os, re, subprocess, sys
+import argparse, hashlib, os, re, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.dont_write_bytecode = True
@@ -157,7 +157,7 @@ def main():
     if supersedes:
         head.append(f"supersedes: {supersedes}")
     origin = a.url.strip() if a.url else f"the local file {val}"
-    body = (f"---\n" + "\n".join(head) + "\n---\n# " + re.sub(r"\s+", " ", a.title).strip() + "\n\n"
+    body = ("---\n" + "\n".join(head) + "\n---\n# " + re.sub(r"\s+", " ", a.title).strip() + "\n\n"
             + f"Retrieved {day} from {origin}. Kept as found (method section 22): not edited after saving"
             + (f"; replaces `{supersedes}`, whose content differs" if supersedes else "") + ".\n\n" + text + "\n")
     with open(os.path.join(d, name), "w", encoding="utf-8", newline="\n") as fh:
