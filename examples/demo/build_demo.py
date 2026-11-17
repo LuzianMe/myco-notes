@@ -197,6 +197,118 @@ SUMMARIES = {
 }
 
 
+# A second season (March to May): a third greenhouse, beds, crop plans, water and power, incidents and decisions, so the
+# mycelium view has enough notes and threads to show what it does.
+BEDS = {"a": ("tomatoes", 4, "greenhouse-a"), "b": ("seedlings", 3, "greenhouse-b"), "c": ("herbs", 3, "greenhouse-c")}
+SEASON = []
+SEASON.append(("2026-03-18", "Greenhouse C for herbs, fed by the new pump", {
+    "entities/greenhouse-c.md": """# Greenhouse C
+
+The herb house, built in March: three beds (`bed-c1.md`, `bed-c2.md`, `bed-c3.md`), two `sensor-node.md` units and its own
+valves on `irrigation-valve.md`. Water comes from `water-tank.md` through `pump.md`. Crop plan: `herbs.md`.
+""",
+    "entities/pump.md": """# Pump
+
+12 V diaphragm pump between `water-tank.md` and the valves of `greenhouse-c.md`; switched by the relay board like
+`irrigation-valve.md`. Why a pump at all: `decision-pump.md`. If it runs dry, the float switch stops it (see `runbook.md`).
+""",
+    "entities/water-tank.md": """# Water tank
+
+1000 l rain-water tank behind greenhouse C, read by a level sensor on a `sensor-node.md`. Feeds `pump.md`; the level shows on
+`dashboard.md` and a low level raises an alert in `alerting.md`.
+""",
+}))
+SEASON.append(("2026-03-21", "Solar chargers for the nodes", {
+    "entities/solar-charger.md": """# Solar charger
+
+A 1 W panel and a small charge controller on six `sensor-node.md` units, after `2026-04-battery-drain.md` showed the cold
+nights cost more than the bench test said. Firmware reports the charge state since `firmware.md` 2.2.
+""",
+}))
+for house, (crop, n, gh) in BEDS.items():
+    files = {}
+    for i in range(1, n + 1):
+        files["beds/bed-%s%d.md" % (house, i)] = """# Bed %s%d
+
+Part of `%s.md`, planted with %s (crop plan: `%s.md`). Watered by `irrigation-valve.md` (channel %d)%s; a `sensor-node.md` hangs above it.
+""" % (house.upper(), i, gh, crop, crop, i, ", soil moisture from `soil-probe.md`" if i % 2 else "")
+    SEASON.append(("2026-03-%02d" % (23 + list(BEDS).index(house) * 2), "Beds of %s" % gh.replace("-", " "), files))
+SEASON.append(("2026-03-29", "Crop plans for the growers", {
+    "crops/tomatoes.md": """# Tomatoes
+
+Beds `bed-a1.md` to `bed-a4.md` in `greenhouse-a.md`. Watering by soil moisture from `soil-probe.md`; heat alerts from
+`alerting.md` matter most in June. Yields are logged on `dashboard.md`.
+""",
+    "crops/seedlings.md": """# Seedlings
+
+Beds `bed-b1.md` to `bed-b3.md` on the heated bench of `greenhouse-b.md`. Frost is the main risk: see
+`2026-02-frost-night.md` and the frost rule in `alerting.md`.
+""",
+    "crops/herbs.md": """# Herbs
+
+Beds `bed-c1.md` to `bed-c3.md` in `greenhouse-c.md`, watered from `water-tank.md` through `pump.md`. Basil, parsley and thyme;
+harvest dates on `dashboard.md`.
+""",
+}))
+SEASON.append(("2026-04-08", "Incident: gateway outage after a power cut", {
+    "logs/2026-04-gateway-outage.md": """# Gateway outage after a power cut (2026-04-07)
+
+The shed switch did not come back after a power cut, so `gateway.md` was dark for 5 hours; `mqtt-broker.md` saw no readings
+and `alerting.md` sent the silent-node alert after 15 minutes, as designed. Fix: the switch now has its own small UPS
+(`state.md`, inventory). Procedure added to `runbook.md`.
+""",
+}))
+SEASON.append(("2026-04-15", "Incident: batteries drained on cold nights", {
+    "logs/2026-04-battery-drain.md": """# Batteries drained on cold nights (April)
+
+Three `sensor-node.md` units in `greenhouse-b.md` died after 7 weeks, not 14 months: lithium cells lose capacity below 0 C
+and `firmware.md` retried sends too often. Fixes: fewer retries in firmware 2.2, and `solar-charger.md` on six nodes.
+""",
+}))
+SEASON.append(("2026-04-20", "Decisions: database retention and the pump", {
+    "plans/decision-retention.md": """# Decision: keep raw readings for two years (2026-04-20)
+
+`timeseries-db.md` keeps raw readings for two years and hourly means forever. Considered: one year (too short for crop
+comparisons). The nightly `backup-job.md` copies both. Revisit when the disk passes 70 %.
+""",
+    "plans/decision-pump.md": """# Decision: a pump and a rain tank for greenhouse C (2026-04-20)
+
+`greenhouse-c.md` gets `water-tank.md` and `pump.md` instead of a new mains line: cheaper, and it uses rain water. The pump is
+switched like `irrigation-valve.md`, so the same broker topics and alerts apply.
+""",
+}))
+SEASON.append(("2026-05-06", "Incident: a valve stuck open in bed B2", {
+    "logs/2026-05-valve-stuck.md": """# Valve stuck open in bed B2 (2026-05-05)
+
+`irrigation-valve.md` channel 2 stayed open for 40 minutes and flooded `bed-b2.md`; `soil-probe.md` showed it first, then the
+growers on `dashboard.md`. Cause: grit in the valve. Fix and new check: `runbook.md`, `checks.md`.
+""",
+}))
+SEASON.append(("2026-05-10", "Master record and runbook for the second season", {
+    "state.md": "+\n- Second season: `greenhouse-c.md` with `pump.md` and `water-tank.md`; ten beds (`bed-a1.md` ...); `solar-charger.md` on six nodes.\n",
+    "runbook.md": "+\n## How do I free a stuck valve? (since 2026-05-06)\nClose the channel on the relay board, clean the valve (see `2026-05-valve-stuck.md`), then run `checks.md`.\n",
+}))
+STEPS += SEASON
+
+SUMMARIES.update({
+    "entities/greenhouse-c.md": "Greenhouse C (herbs): its beds, nodes, valves and where its water comes from",
+    "entities/pump.md": "The pump between the rain tank and greenhouse C: wiring, switching and dry-run protection",
+    "entities/water-tank.md": "The 1000 l rain tank: level sensor, what it feeds and the low-level alert",
+    "entities/solar-charger.md": "Solar chargers on six sensor nodes: why, and how the firmware reports charge",
+    "crops/tomatoes.md": "Crop plan for the tomatoes in greenhouse A: beds, watering, heat",
+    "crops/seedlings.md": "Crop plan for the seedlings on the heated bench of greenhouse B: beds, frost",
+    "crops/herbs.md": "Crop plan for the herbs in greenhouse C: beds, water, harvest",
+    "logs/2026-04-gateway-outage.md": "Gateway outage after a power cut (2026-04-07): timeline, cause, fix",
+    "logs/2026-04-battery-drain.md": "Node batteries drained on cold April nights: cause and fixes",
+    "logs/2026-05-valve-stuck.md": "A valve stuck open and flooded bed B2 (2026-05-05): cause, fix, new check",
+    "plans/decision-retention.md": "Why raw readings are kept for two years and hourly means forever (2026-04-20)",
+    "plans/decision-pump.md": "Why greenhouse C has a pump and a rain tank instead of a mains line (2026-04-20)",
+})
+for _h, (_crop, _n, _gh) in BEDS.items():
+    for _i in range(1, _n + 1):
+        SUMMARIES["beds/bed-%s%d.md" % (_h, _i)] = "Bed %s%d in %s: crop, valve channel, probe" % (_h.upper(), _i, _gh.replace("-", " "))
+
+
 def with_summary(rel, text):
     """The note's text with its summary in the header (an existing header gets the line added)."""
     s = SUMMARIES.get(rel)
@@ -244,15 +356,15 @@ def main():
              "prefixes": ["AGENTS.md", "CLAUDE.md"] + ["myco-notes/" + f for f in ("working-agreement.md", "sync-tracker.md", "state.md", "runbook.md")]},
             # The components are split by what they do, so the map shows several colours instead of one.
             {"id": "field", "name": "In the field", "blurb": "Nodes, radio, firmware and probes.",
-             "prefixes": ["myco-notes/entities/" + f for f in ("sensor-node.md", "gateway.md", "firmware.md", "soil-probe.md")]},
+             "prefixes": ["myco-notes/entities/" + f for f in ("sensor-node.md", "gateway.md", "firmware.md", "soil-probe.md", "solar-charger.md")]},
             {"id": "data", "name": "Data path", "blurb": "Broker, database, forecast and backups.",
              "prefixes": ["myco-notes/entities/" + f for f in ("mqtt-broker.md", "timeseries-db.md", "weather-feed.md", "backup-job.md")]},
             {"id": "logs", "name": "Incidents", "blurb": "What went wrong and what changed.", "prefixes": ["myco-notes/logs/"]},
             {"id": "houses", "name": "Greenhouses", "blurb": "The houses, their beds and valves.",
-             "prefixes": ["myco-notes/entities/" + f for f in ("greenhouse-a.md", "greenhouse-b.md", "irrigation-valve.md")]},
+             "prefixes": ["myco-notes/entities/" + f for f in ("greenhouse-a.md", "greenhouse-b.md", "greenhouse-c.md", "irrigation-valve.md", "pump.md", "water-tank.md")] + ["myco-notes/beds/"]},
             {"id": "plans", "name": "Plans and decisions", "blurb": "Backlog and decision records.", "prefixes": ["myco-notes/plans/"]},
             {"id": "people", "name": "For the growers", "blurb": "What the growers see and hear.",
-             "prefixes": ["myco-notes/entities/" + f for f in ("dashboard.md", "alerting.md")]},
+             "prefixes": ["myco-notes/entities/" + f for f in ("dashboard.md", "alerting.md")] + ["myco-notes/crops/"]},
             {"id": "verify", "name": "Verification", "blurb": "Health checks.", "prefixes": ["myco-notes/verification/"]},
             {"id": "docs", "name": "Method", "blurb": "How the notes are kept.", "prefixes": ["myco-notes/docs/"]},
             {"id": "other", "name": "Other notes", "blurb": "Everything else.", "prefixes": []}]}, fh, indent=1)

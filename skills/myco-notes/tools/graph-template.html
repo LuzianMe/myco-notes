@@ -96,7 +96,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 <div id="left"><div id="head" class="box"><button id="fold" type="button" aria-expanded="true" aria-controls="head" title="Hide the search and the legend">&minus;</button><h1>%%TITLE%%</h1><p id="stats"></p>
 <input id="q" type="search" placeholder="Find a note..." aria-label="Find a note"><div id="legend" role="group" aria-label="Show or hide a group of notes"></div></div>
 <div id="time" class="box" hidden><button id="tfold" type="button" aria-expanded="true" aria-controls="time" title="Hide the timeline">&minus;</button><button id="play" type="button">Replay</button><span id="when"></span><input id="slide" type="range" min="0" value="0" aria-label="Position in the history of the notes"><div id="what"></div><label id="speedl"><span class="lbl">Speed </span><select id="speed" aria-label="Replay speed"><option value="0.5">0.5x</option><option value="1" selected>1x</option><option value="2">2x</option><option value="4">4x</option></select></label></div></div>
-<div id="tools" class="box"><button id="find" type="button" aria-expanded="false" aria-controls="head">Find</button><a href="index.html">Map</a><button id="fit" type="button" title="Fit the whole network in view">Fit</button><button id="depth" type="button" aria-pressed="true" title="Depth: the colony as a ball that grows outward from the read-order notes; recently changed notes reach a little further out. Turn the view with Shift-drag or right-drag, two fingers moved together, or a sideways trackpad swipe; Fit turns it back.">Depth</button><button id="saver" type="button" aria-pressed="false" title="Screensaver: hide the panels, centre the network and let it turn">&#9790;</button>%%THEME_PICKER%%</div>
+<div id="tools" class="box"><button id="find" type="button" aria-expanded="false" aria-controls="head">Find</button><a href="index.html">Map</a><button id="fit" type="button" title="Fit the whole network in view">Fit</button><button id="depth" type="button" aria-pressed="true" title="Depth: the colony as a ball that grows outward from the read-order notes; recently changed notes reach a little further out. Turn the view with Shift-drag or right-drag, two fingers moved together, or a sideways trackpad swipe; Fit turns it back.">Depth</button><button id="hold" type="button" aria-pressed="false" title="Hold still: stop the network turning by itself, to look at one place for longer">&#10074;&#10074;</button><button id="saver" type="button" aria-pressed="false" title="Screensaver: hide the panels, centre the network and let it turn">&#9790;</button>%%THEME_PICKER%%</div>
 <aside id="panel" class="box" hidden aria-live="polite"></aside>
 <nav class="sr" aria-label="All notes"><ul>%%LINKS%%</ul></nav>
 <script id="data" type="application/json">%%DATA%%</script>
@@ -179,7 +179,7 @@ var SPIN=6.2832/60000,IDLE=3000,spin={on:false,dir:1,vy:0,vx:0,last:performance.
 function poke(){spin.last=performance.now();spin.on=false;spin.node=-1}   /* the reader did something: stop turning by itself for a while */
 function sample(){var t=performance.now();spin.samples.push({t:t,y:rot.y,x:rot.x});while(spin.samples.length>2&&t-spin.samples[0].t>120)spin.samples.shift()}
 function release(){   /* a turn was let go: keep its speed (then slow to the idle pace) and its direction */
-  var s=spin.samples,t=performance.now();spin.samples=[];spin.last=t;spin.on=depthOn&&!reduce;spin.node=-1;
+  var s=spin.samples,t=performance.now();spin.samples=[];spin.last=t;spin.on=depthOn&&!reduce&&!held;spin.node=-1;
   if(reduce||s.length<2||t-s[s.length-1].t>90){spin.vy=spin.vx=0;return}
   var a=s[0],b=s[s.length-1],d=Math.max(16,b.t-a.t),vy=(b.y-a.y)/d,vx=(b.x-a.x)/d;
   spin.vy=Math.max(-.006,Math.min(.006,vy));spin.vx=Math.max(-.004,Math.min(.004,vx));   /* at most about one turn a second */
@@ -782,7 +782,7 @@ function frame(now){
   }
   NODES.forEach(function(n){if(n.vis&&n.ap<1)n.ap=Math.min(1,n.ap+dt/650);if(!n.vis)n.ap=0});
   if(alpha>0){tick();if(!playing)tick()}
-  if(!spin.on&&!drag&&!pinch&&depthOn&&!reduce&&now-spin.last>(saverOn?1200:IDLE)){spin.on=true;if(sel>=0)autoFit=false;else if(!autoFit)spin.node=nearMiddle()}
+  if(!spin.on&&!held&&!drag&&!pinch&&depthOn&&!reduce&&now-spin.last>(saverOn?1200:IDLE)){spin.on=true;if(sel>=0)autoFit=false;else if(!autoFit)spin.node=nearMiddle()}
   fitTarget.dt=dt;if(autoFit)fitTarget(playing);   /* the fit glides with the turning picture; during a replay small changes are ignored */
   else if(spin.on&&P&&(sel>=0||spin.node>=0)){cam.tx=P.x;cam.ty=P.y}   /* turning about a note: keep it in the middle */
   else if(!drag&&!pinch)leash();
@@ -869,7 +869,7 @@ cv.addEventListener("wheel",function(ev){
      does a trackpad pinch (which the browser sends as a wheel with ctrlKey) */
   var px=ev.deltaMode===1?16:ev.deltaMode===2?400:1;
   if(depthOn&&!ev.ctrlKey&&Math.abs(ev.deltaX)>Math.abs(ev.deltaY)){   /* the trackpad brings its own momentum; the swipe sets the turning direction */
-    turnTo(rot.y-ev.deltaX*px*.004,rot.x);spin.vy=0;spin.last=performance.now();if(Math.abs(ev.deltaX)>1)spin.dir=ev.deltaX>0?-1:1;spin.on=!reduce;spin.node=-1;return}
+    turnTo(rot.y-ev.deltaX*px*.004,rot.x);spin.vy=0;spin.last=performance.now();if(Math.abs(ev.deltaX)>1)spin.dir=ev.deltaX>0?-1:1;spin.on=!reduce&&!held;spin.node=-1;return}
   poke();autoFit=false;
   var before=world(ev.clientX,ev.clientY),f=Math.exp(-ev.deltaY*.0015);
   cam.tk=Math.max(minK(),Math.min(5,cam.tk*f));cam.k=cam.tk;if(saverOn){saverK=cam.tk;autoFit=true;return}
@@ -897,10 +897,16 @@ document.getElementById("tfold").addEventListener("click",function(){var f=!docu
 setTFold(pref("time")==="fold");
 /* Screensaver: the panels go, the network is centred at the current zoom, labels are off, and it turns by itself; dragging and
    zooming still work and it starts turning again soon after. The same button (or Escape) brings everything back. */
-var saverOn=false,saverK=1;
+var saverOn=false,saverK=1,held=false;
+/* Hold still: the network stops turning by itself (and so the standby spikes stop) until the button is pressed again;
+   dragging still turns it by hand. The screensaver lets go of the hold. */
+function setHold(on){held=on;var b=document.getElementById("hold");b.setAttribute("aria-pressed",on?"true":"false");
+  b.title=on?"Let the network turn by itself again":"Hold still: stop the network turning by itself, to look at one place for longer";
+  if(on){spin.on=false;spin.vy=spin.vx=0}else spin.last=performance.now()}
+document.getElementById("hold").addEventListener("click",function(ev){ev.stopPropagation();setHold(!held)});
 function setSaver(on){saverOn=on;root.classList.toggle("saver",on);var b=document.getElementById("saver");b.setAttribute("aria-pressed",on?"true":"false");
   b.title=on?"Leave the screensaver (or press Escape)":"Screensaver: hide the panels, centre the network and let it turn";
-  autoFit=true;if(on){saverK=cam.tk;select(-1);spin.on=depthOn&&!reduce;spin.node=-1;spin.last=performance.now()-IDLE}}
+  autoFit=true;if(on){if(held)setHold(false);saverK=cam.tk;select(-1);spin.on=depthOn&&!reduce;spin.node=-1;spin.last=performance.now()-IDLE}}
 document.getElementById("saver").addEventListener("click",function(ev){ev.stopPropagation();setSaver(!saverOn)});
 function setPanelFull(f){panelFull=f;panel.classList.toggle("min",!f);var m=document.getElementById("more");if(m){m.textContent=f?"Less":"More";m.setAttribute("aria-expanded",f?"true":"false")}}
 function select(i){
