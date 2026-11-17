@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.35.5
+- **Matrix crystals stand upright**: each octahedron's axis is the colony's vertical, and it turns about it.
+- **The view turns freely up and down too**: no more stop at about 70 degrees; you can turn it right over, and Fit brings it back to the front. Upside down, a sideways drag still moves the near side the way your finger goes.
+
 ## 0.35.4
 - **The view's buttons fit on a phone**: on a narrow screen they wrap onto a second line instead of running off the left edge, so Find is always there, and the theme list is a little narrower.
 - **A folded replay panel is one slim line on a phone** (Replay and the date), giving its space back to the network.
