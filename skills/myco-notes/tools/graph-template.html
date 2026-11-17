@@ -68,6 +68,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 :root[data-embed][data-embed],:root[data-embed] body{background:transparent;color-scheme:normal}
 [data-embed] #left,[data-embed] #tools,[data-embed] #panel,[data-embed] #hint,[data-embed] #time,[data-embed] #empty,[data-embed] .sr{display:none!important}
 [data-still] canvas{pointer-events:none;touch-action:auto;cursor:default}
+[data-embed] canvas{-webkit-mask-image:radial-gradient(closest-side,#000 70%,transparent);mask-image:radial-gradient(closest-side,#000 70%,transparent)}   /* embed: the network fades out towards the edges, so it never looks boxed in */
 @media (max-width:640px){
 #left{display:contents}#left>.box{position:fixed}
 /* header: title and counts only; search and legend open with Find */
@@ -129,7 +130,7 @@ var tc=document.createElement("canvas"),tcx=tc.getContext("2d"),gc=document.crea
 var reduce=window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches;
 var NODES=D.nodes,NN=NODES.length,NC=D.commits.length;
 var root=document.documentElement;
-var EMBED=root.hasAttribute("data-embed"),INTER=!root.hasAttribute("data-still"),MAXK=EMBED?4:5,QS=new URLSearchParams(location.search);
+var EZ=1,EMBED=root.hasAttribute("data-embed"),INTER=!root.hasAttribute("data-still"),MAXK=EMBED?4:5,QS=new URLSearchParams(location.search);
 
 /* ---------- theme ---------- */
 /* every theme's node, group and thread colours (map_themes.py): pal = vivid groups, quiet = the method's record groups */
@@ -378,13 +379,13 @@ function fitTarget(soft){
   var vs=NODES.filter(function(n){return n.vis});if(!vs.length)return;
   var x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
   vs.forEach(function(n){var x=n.wx==null?n.x:n.wx,y=n.wy==null?n.y:n.wy,r=n.r*2*(n.ps||1);x0=Math.min(x0,x-r);x1=Math.max(x1,x+r);y0=Math.min(y0,y-r);y1=Math.max(y1,y+r)});   /* what is on screen: with depth, the turned picture */
-  var wide=W>700&&!EMBED,bw=Math.max(80,x1-x0),bh=Math.max(80,y1-y0)*VS,padX=EMBED?24:wide?382:32,padY=EMBED?24:wide?80:176;
-  var nk=Math.max(.15,Math.min(2.2,Math.min((W-padX)/bw,(H-padY)/bh)))*(1-.04*depthAmt),nx=(x0+x1)/2-(wide?171/nk:0),ny=(y0+y1)/2;   /* centre the network in the space right of the left column */
+  var wide=W>700&&!EMBED,bw=Math.max(80,x1-x0),bh=Math.max(80,y1-y0)*VS,padX=EMBED?W*.22:wide?382:32,padY=EMBED?H*.22:wide?80:176;
+  var nk=Math.max(.15,Math.min(2.2,Math.min((W-padX)/bw,(H-padY)/bh)))*(1-.04*depthAmt)*(EMBED?EZ:1),nx=(x0+x1)/2-(wide?171/nk:0),ny=(y0+y1)/2;   /* centre the network in the space right of the left column */
   if(saverOn){nk=saverK;nx=(x0+x1)/2;ny=(y0+y1)/2}
-  if(cam.fit&&!soft){var e=Math.min(1,(fitTarget.dt||16)/1100);cam.tk+=(nk-cam.tk)*e;cam.tx+=(nx-cam.tx)*e;cam.ty+=(ny-cam.ty)*e;cam.fk=cam.tk;return}   /* the zoom glides to what fills the screen now */
+  if(cam.fit&&!soft){var e=Math.min(1,(fitTarget.dt||16)/1100);cam.tk+=(nk-cam.tk)*e;cam.tx+=(nx-cam.tx)*e;cam.ty+=(ny-cam.ty)*e;cam.fk=cam.tk/(EMBED?EZ:1);return}   /* the zoom glides to what fills the screen now */
   /* soft (during a replay): ignore small changes of the bounding box, so one node drifting at the edge does not make the whole picture breathe */
   if(soft&&cam.fit&&Math.abs(nk-cam.tk)/cam.tk<.07&&Math.hypot(nx-cam.tx,ny-cam.ty)*cam.tk<30)return;
-  cam.tk=nk;cam.tx=nx;cam.ty=ny;cam.fit=true;cam.fk=nk;
+  cam.tk=nk;cam.tx=nx;cam.ty=ny;cam.fit=true;cam.fk=nk/(EMBED?EZ:1);
 }
 
 /* ---------- drawing ---------- */
@@ -412,7 +413,7 @@ function hyphaPath(e){
   var P=[],N=32,s,p,W=[];
   if(!e.fx){e.fx=frac(e.k*3.1+.7,N);e.fz=frac(e.k*5.7+1.3,N)}
   var dx=e.b.x-e.a.x,dy=e.b.y-e.a.y,L=Math.hypot(dx,dy)||1,am=T.style==="smooth"?0:.11,   /* smooth: the original curve */ux=-dy/L,uy=dx/L;
-  var px=L*cam.k,st=px<50?8:px<110?4:px<220?2:1;   /* level of detail: a short thread on screen needs few points */
+  var px=L*cam.k,st=px<50?8:px<110||EMBED?4:px<220?2:1;   /* level of detail: a short thread on screen needs few points */
   for(s=0;s<=N;s+=st){p=curve(e,s/N);var o=e.fx[s]*L*am,wx=p.x+ux*o,wy=p.y+uy*o,wz=e.a.z+(e.b.z-e.a.z)*s/N+(ZS?e.fz[s]*L*am/ZS:0);
     W.push([wx,wy,wz]);var q=proj(wx,wy,wz);P.push([q[0],q[1]])}
   e.W=W;e.L=L;
@@ -586,7 +587,7 @@ function budRGB(n){
     shades[k]=(T.dark?[r*.72,g*.72,b*.72]:[r+(255-r)*.3,g+(255-g)*.3,b+(255-b)*.3]).map(Math.round).join(",")}
   return shades[k];
 }
-function twigOK(){return T.style!=="smooth"&&!busyNow&&cam.k>(cam.fk||cam.k)*.7}   /* no side branches while the reader moves the view, or zoomed far out */
+function twigOK(){return !EMBED&&T.style!=="smooth"&&!busyNow&&cam.k>(cam.fk||cam.k)*.7}   /* no side branches while the reader moves the view, or zoomed far out */
 function twigs(e,w,col){var ga=cx.globalAlpha;cx.strokeStyle=col;cx.lineWidth=Math.max(.5,w*.35);cx.globalAlpha=ga*.5;cx.beginPath();twigPath(e);cx.stroke();cx.globalAlpha=ga}
 function twigPath(e){   /* faint side branches on long threads: decoration only (on a circuit: a short stub at a corner) */
   if(!e.W||e.L*cam.k<150)return;
@@ -654,22 +655,22 @@ function drawSpikes(now){
 }
 function quietThreads(list){   /* into the cache: one fill per colour (the theme's glow, the thread, the buds), fused threads with their fade */
   var keep=cx;cx=tcx;cx.setTransform(1,0,0,1,0,0);cx.clearRect(0,0,tc.width,tc.height);cx.setTransform(DPR,0,0,DPR,0,0);
-  var tw=twigOK(),groups={},fused=[],dig=(T.style==="circuit"||T.style==="fractal");
+  var tw=twigOK(),groups={},fused=[],dig=(T.style==="circuit"||T.style==="fractal"),lite=EMBED;   /* embed: plain lines, no glow, fused threads in one colour: a fraction of the work */
   list.forEach(function(e){var a=Math.min(e.a.ap,e.b.ap),d=Math.min(dim(e.a),dim(e.b)),w=Math.min(2.6,.6+Math.sqrt(e.w)*.45)*Math.min(1.4,cam.k+.3),al=.26*Math.min(1,a*2)*Math.max(d,.35);
     var ef=(fogOf(e.a)+fogOf(e.b))/2;w*=(e.a.ps+e.b.ps)/2;al*=1-.7*ef;
-    if(e.dir===0){fused.push([e,w,a,al]);return}
-    var P=hyphaPath(e);if(P.length<2)return;var src=e.dir>0?e.a:e.b,ab=Math.round(al*25)/25,wb=dig?Math.round(w*2)/2:0,k=threadRGB(src)+"|"+ab+"|"+wb;
-    (groups[k]||(groups[k]={rgb:threadRGB(src),bud:budRGB(src),al:ab,w:wb,it:[]})).it.push([e.dir>0?P:P.slice().reverse(),w,a,e])});
+    if(e.dir===0&&!lite){fused.push([e,w,a,al]);return}
+    var P=hyphaPath(e);if(P.length<2)return;var src=e.dir>=0?e.a:e.b,ab=Math.round(al*25)/25,wb=dig||lite?Math.round(w*2)/2:0,k=threadRGB(src)+"|"+ab+"|"+wb;
+    (groups[k]||(groups[k]={rgb:threadRGB(src),bud:budRGB(src),al:ab,w:wb,it:[]})).it.push([e.dir>=0?P:P.slice().reverse(),w,a,e])});
   cx=gcx;cx.setTransform(1,0,0,1,0,0);cx.clearRect(0,0,gc.width,gc.height);cx.setTransform(DPR/2,0,0,DPR/2,0,0);   /* a soft glow in the theme's thread colour, drawn small and scaled up */
-  Object.keys(groups).forEach(function(k){var g=groups[k];
+  if(!lite)Object.keys(groups).forEach(function(k){var g=groups[k];
     if(dig){cx.strokeStyle="rgba("+T.hypha+","+(g.al*.4*T.tglow).toFixed(3)+")";cx.lineWidth=Math.max(1.5,g.w*3);cx.lineJoin="miter";cx.beginPath();g.it.forEach(function(x){if(x[2]<1)return;var P=x[0],e=x[3];var cs=e.cs||[];linePath([P[0]].concat(e.dir<0?cs.slice().reverse():cs,[P[P.length-1]]))});cx.stroke();return}   /* the glow follows the trace's main route only: a blur needs no zigzag */
     cx.fillStyle="rgba("+T.hypha+","+(g.al*.4*T.tglow).toFixed(3)+")";cx.beginPath();g.it.forEach(function(x){strandPath(x[0],plen(x[0])*x[2],x[1]*2.2,x[1]*.6)});cx.fill()});
-  cx=tcx;cx.setTransform(1,0,0,1,0,0);cx.drawImage(gc,0,0,tc.width,tc.height);cx.setTransform(DPR,0,0,DPR,0,0);
+  cx=tcx;if(!lite){cx.setTransform(1,0,0,1,0,0);cx.drawImage(gc,0,0,tc.width,tc.height)}cx.setTransform(DPR,0,0,DPR,0,0);
   Object.keys(groups).forEach(function(k){var g=groups[k],ends=[];
-    if(dig){cx.strokeStyle="rgba("+g.rgb+","+g.al+")";cx.lineWidth=Math.max(.8,g.w*1.4);cx.lineJoin="miter";cx.beginPath();
+    if(dig||lite){cx.strokeStyle="rgba("+g.rgb+","+g.al+")";cx.lineWidth=Math.max(.8,g.w*(dig?1.4:1));cx.lineJoin=dig?"miter":"round";cx.lineCap=dig?"butt":"round";cx.beginPath();
       g.it.forEach(function(x){var Q=polyUpto(x[0],plen(x[0])*x[2]);linePath(Q);ends.push([Q[Q.length-1],.9+x[1]*.9])});cx.stroke();
       cx.fillStyle="rgba("+g.rgb+","+g.al+")";cx.beginPath();g.it.forEach(function(x){if(x[2]>=1)pads(x[3],x[1])});cx.fill();
-      cx.fillStyle="rgba("+g.bud+","+Math.min(1,g.al*3).toFixed(3)+")";cx.beginPath();ends.forEach(function(t){var r=t[1];cx.rect(t[0][0]-r,t[0][1]-r,2*r,2*r)});cx.fill();
+      cx.fillStyle="rgba("+g.bud+","+Math.min(1,g.al*3).toFixed(3)+")";cx.beginPath();ends.forEach(function(t){var r=t[1];if(dig)cx.rect(t[0][0]-r,t[0][1]-r,2*r,2*r);else{cx.moveTo(t[0][0]+r,t[0][1]);cx.arc(t[0][0],t[0][1],r,0,6.3)}});cx.fill();
       if(tw){cx.strokeStyle="rgba("+g.rgb+","+(g.al*.5).toFixed(3)+")";cx.lineWidth=.6;cx.beginPath();g.it.forEach(function(x){twigPath(x[3])});cx.stroke()}
       return}
     var ci=(T.style==="circuit"||T.style==="fractal");cx.fillStyle="rgba("+g.rgb+","+g.al+")";cx.beginPath();g.it.forEach(function(x){var end=strandPath(x[0],plen(x[0])*x[2],ci?x[1]*.7:x[1]*1.15,ci?x[1]*.7:x[1]*.12);if(end)ends.push([end,.9+x[1]*.9]);if(ci&&x[2]>=1)pads(x[3],x[1])});cx.fill();
@@ -699,10 +700,15 @@ function slotCount(pool){   /* about the square root of the notes in view; zoome
 function lrad(n){return n.pr}
 function lbox(n){var w=n.name.length*6.6-14,x=n.px,y=n.py+lrad(n)*(n.hub?2.1:1)+14;return [x-w/2-8,y-13,x+w/2+8,y+5]}
 function overlaps(b,c){return b[0]<c[2]&&c[0]<b[2]&&b[1]<c[3]&&c[1]<b[3]}
+function embedLabels(){   /* embed: no names on a small frame, zoomed out past the fit, or where the notes crowd together */
+  if(W<360||H<240||cam.k<(cam.fk||cam.k)*.9)return false;
+  var d=NODES.filter(function(n){return n.vis&&n.ap>0&&n.nn}).map(function(n){return n.nn}).sort(function(a,b){return a-b});
+  return d.length<2||d[d.length>>1]>=18;
+}
 function updateLabels(now,dt){
-  var fresh0=sel!==spotFor;
+  var fresh0=sel!==spotFor,eL=!EMBED||embedLabels();
   if(fresh0){spotFor=sel;NODES.forEach(function(n){n.ls=-1e9});lastAdd=-1e9}   /* a new focus: every note may be named again, and the names come quicker */
-  var pool=NODES.filter(function(n){return n.name&&n.vis&&n.ap>=1&&n.i!==sel&&(sel<0||adj[sel].some(function(m){return m.n===n}))&&dim(n)>.5});
+  var pool=NODES.filter(function(n){return eL&&n.name&&(!EMBED||n.nn>=18)&&n.vis&&n.ap>=1&&n.i!==sel&&(sel<0||adj[sel].some(function(m){return m.n===n}))&&dim(n)>.5});
   var ui=[];document.querySelectorAll(".box").forEach(function(el){   /* names stay clear of the search, timeline, tools and detail panel */
     if(el.hidden)return;var r=el.getBoundingClientRect();if(r.width&&r.height)ui.push([r.left,r.top,r.right,r.bottom])});
   var S=slotCount(pool.filter(onScreen).length),keep=pool.length<=S,on=0;
@@ -803,8 +809,11 @@ var raf=0,pause={},started=false;
 function paused(){for(var k in pause)if(pause[k])return true;return false}
 function loop(){if(!raf&&!paused())raf=requestAnimationFrame(frame)}
 function setPause(why,on){pause[why]=on;if(!on){lastT=0;loop()}}
+var lastStep=0;
 function frame(now){
   raf=0;
+  if(EMBED&&!drag&&!pinch&&!playing&&now-lastStep<30&&W>0){loop();return}   /* embed: about 30 frames a second, except while the reader drags or pinches */
+  lastStep=now;
   try{step(now)}catch(e){fail(e,true)}
   loop();
 }
@@ -859,7 +868,7 @@ onCv("pointerdown",function(ev){
   ptr[ev.pointerId]={x:ev.clientX,y:ev.clientY};
   if(downPts().length>=2){
     if(drag&&drag.id>=0)NODES[drag.id].fixed=false;
-    drag=null;autoFit=false;var s=pinchState();pinch={d:s.d,k:cam.tk,w:world(s.mx,s.my),mx:s.mx,my:s.my,ry:rot.y,rx:rot.x};return;
+    drag=null;if(!EMBED)autoFit=false;var s=pinchState();pinch={d:s.d,k:cam.tk,z:EZ,w:world(s.mx,s.my),mx:s.mx,my:s.my,ry:rot.y,rx:rot.x};return;
   }
   var i=EMBED||ev.button===2?-1:pick(ev.clientX,ev.clientY);   /* the right button always turns (with depth), even over a note */
   drag={id:i,sx:ev.clientX,sy:ev.clientY,lx:ev.clientX,ly:ev.clientY,cx:cam.tx,cy:cam.ty,moved:false,turn:depthOn&&(EMBED||ev.button===2||i<0&&ev.shiftKey),ry:rot.y,rx:rot.x,nx:i>=0?NODES[i].x:0,ny:i>=0?NODES[i].y:0};
@@ -871,7 +880,9 @@ onCv("pointermove",function(ev){
   if(pinch){   /* zoom by the change of the finger distance around the midpoint; moving both fingers together turns the view
                   (with depth; one finger pans) or, in the flat view, pans */
     if(downPts().length<2)return;
-    var s=pinchState();cam.tk=cam.k=Math.max(minK(),Math.min(MAXK,pinch.k*s.d/pinch.d));spin.last=performance.now();
+    var s=pinchState();spin.last=performance.now();
+    if(EMBED){ezoom(pinch.z*s.d/pinch.d);if(depthOn){turnTo(pinch.ry+turnSign(pinch.rx)*(s.mx-pinch.mx)*.006,0);sample()}return}
+    cam.tk=cam.k=Math.max(minK(),Math.min(MAXK,pinch.k*s.d/pinch.d));
     var ax=depthOn?pinch.mx:s.mx,ay=depthOn?pinch.my:s.my;
     cam.tx=cam.x=pinch.w.x-(ax-W/2)/cam.k;cam.ty=cam.y=pinch.w.y-(ay-H/2)/(cam.k*VS);
     if(depthOn){turnTo(pinch.ry+turnSign(pinch.rx)*(s.mx-pinch.mx)*.006,pinch.rx-(s.my-pinch.my)*.006);sample()}
@@ -907,13 +918,17 @@ onCv("wheel",function(ev){
   var px=ev.deltaMode===1?16:ev.deltaMode===2?400:1;
   if(depthOn&&!ev.ctrlKey&&Math.abs(ev.deltaX)>Math.abs(ev.deltaY)){   /* the trackpad brings its own momentum; the swipe sets the turning direction */
     turnTo(rot.y-turnSign(rot.x)*ev.deltaX*px*.004,rot.x);spin.vy=0;spin.last=performance.now();if(Math.abs(ev.deltaX)>1)spin.dir=ev.deltaX*turnSign(rot.x)>0?-1:1;spin.on=!reduce&&!held;spin.node=-1;return}
+  var f=Math.exp(-ev.deltaY*.0015);
+  if(EMBED){poke();ezoom(EZ*f);return}
   poke();autoFit=false;
-  var before=world(ev.clientX,ev.clientY),f=Math.exp(-ev.deltaY*.0015);
+  var before=world(ev.clientX,ev.clientY);
   cam.tk=Math.max(minK(),Math.min(MAXK,cam.tk*f));cam.k=cam.tk;if(saverOn){saverK=cam.tk;autoFit=true;return}
   var after=world(ev.clientX,ev.clientY);cam.tx+=before.x-after.x;cam.ty+=before.y-after.y;cam.x=cam.tx;cam.y=cam.ty;
 },{passive:false});
 onCv("contextmenu",function(ev){ev.preventDefault()});   /* right-drag turns, so no menu over the network */
-onCv("dblclick",function(){poke();autoFit=true;turnHome()});
+onCv("dblclick",function(){poke();autoFit=true;if(EMBED)ezoom(1);turnHome()});
+function ezoom(z){   /* embed: the zoom is a factor on the fitted size, about the middle of the network, which stays centred (half to four times) */
+  EZ=Math.max(.5,Math.min(4,z));autoFit=true;cam.fit=true;if(cam.fk){cam.tk=cam.k=cam.fk*EZ}}
 document.getElementById("fit").addEventListener("click",function(){poke();autoFit=true;turnHome()});
 document.addEventListener("myco-theme",readTheme);   /* the picker changed the theme */
 if(window.matchMedia){var mq=matchMedia("(prefers-color-scheme: light)"),onSys=function(){if(!root.getAttribute("data-theme"))readTheme()};

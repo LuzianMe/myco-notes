@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.41.1
+- **The embedded graph fades out at its edges** instead of ending at the frame's rectangle, and the fitted network sits a little further inside the frame.
+- **Zooming an embedded graph keeps it centred**: scroll, pinch and double-click zoom about the middle of the network (half to four times the fitted size), wherever the pointer is, so it can no longer drift off screen.
+- **A faster embedded graph**: threads are plain lines with fewer points, with no glow and no side twigs, two-way threads in one colour, and about 30 frames a second while it turns by itself (full rate while it is dragged). Measured on a 95-note graph with the CPU slowed 4x: about 2.5 times the frames, and the slowest frames at well under half the time.
+- **Labels in an embedded graph only where they can be read**: none on a frame smaller than 360x240, zoomed out past the fitted size, or where the notes crowd together (and none on a single note pressed against its neighbour); they fade out. The full mycelium view is unchanged.
+- **Tests**: `tests/browser.py` checks the edge fade and that zooming in near a corner keeps the network centred.
+
 ## 0.41.0
 - **No more blank mycelium view when it opens with no size**: a graph opened in a hidden iframe or a background tab (0x0) threw on its first frame (`drawImage` with a canvas of width or height 0) and stopped its loop, so it stayed blank until a reload. Frames now draw nothing while there is no size, the loop keeps running, and the graph fits itself the moment it gets one; an error in a frame is reported and no longer stops the loop.
 - **Embed mode, `graph.html?embed=1`**: only the network and its labels on a transparent page, for a website. Drag (mouse or one finger) turns it about its upright axis with the tilt locked, scroll or pinch zooms, a double-click fits; it turns by itself when left alone (not with reduced motion). `?interactive=0` takes no pointer, wheel or touch input at all; `?replay=1` starts with the replay. Drawing pauses while the page is hidden. The host page can send `{type:"myco-theme", theme}`, `{type:"myco-pause"}` and `{type:"myco-resume"}` (accepted only from the parent window); the page sends `{type:"myco-ready"}` after its first frame and `{type:"myco-error"}` if something fails. At most 1.5 device pixels per pixel. Still one file with no network requests.
