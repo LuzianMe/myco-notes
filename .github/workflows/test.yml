@@ -1,6 +1,7 @@
 name: test
 on:
   push:
+    branches: [main]   # a pull request is tested through pull_request; a push to its branch would test it twice
   pull_request:
 permissions:
   contents: read
@@ -20,9 +21,10 @@ jobs:
         run: |
           git config --global user.name "CI"
           git config --global user.email "ci@example.invalid"
-      - name: Native test (no bash; real launchers; Linux, macOS and Windows)
-        run: python tests/native.py
+      - name: Native test (no bash; real launchers; Linux, macOS and Windows; the content checks on Linux only)
+        run: python tests/native.py ${{ runner.os != 'Linux' && '--platform' || '' }}
       - name: Behaviour self-test (each scenario's reference actions pass, a typical mistake is caught)
+        if: runner.os == 'Linux'
         run: python tests/behaviour/run.py
       - name: Release check (the four version fields agree, CHANGELOG.md has their section)
         run: python scripts/release.py --check
