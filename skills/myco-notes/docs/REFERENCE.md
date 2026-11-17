@@ -1,4 +1,4 @@
-# Myco Notes reference: the tools, the layout and new folders
+# Myco Notes reference: the tools, the layout, new folders and the configuration
 
 A quick reference to the kit's reference implementation. The method is in `METHODOLOGY.md`, the format of the notes in `FORMAT.md`, working as a team in `TEAM.md`.
 
@@ -14,6 +14,7 @@ They live in each notes repository's `myco-notes/tools/`. Each has a launcher wi
 | `capture "note"` | A quick note into this month's inbox; `--commit`, `--pr`. |
 | `resume` | The start-of-session briefing, within a character budget. |
 | `index` | Every note with its one-line summary; `--missing`, `--review-scope`. |
+| `search WORDS` | The notes that hold the words, ranked, with summaries and matching lines; `"a phrase"`, `--notes-only`. |
 | `ingest` | Keep an outside document as a source; `--list` shows the sources and who cites them. |
 | `notes-lint.py` | References, headings, dates, freshness header, summaries, sync-log format, ledger, sizes, secrets. |
 | `asof DATE [NOTE]` | What the notes said on a date; `--since`, `--grep`, `--history NOTE`. |
@@ -48,3 +49,11 @@ Repositories from 0.5.x or earlier (`notes/`, `tools/`, `docs/` at the root) kee
 | `later` | not this time | not this time | undecided |
 
 Set `NEW_FOLDERS` in `.myco-notes.conf` to apply one answer every time.
+
+## 4. Files a notes repository has (created by `bootstrap`)
+
+`AGENTS.md`/`CLAUDE.md`; `<notes>/working-agreement.md`; `<notes>/state.md`; `<notes>/runbook.md`; `<notes>/sync-tracker.md`; `<notes>/plans/backlog.md`; `<notes>/logs/`; `<notes>/scripts/`; `<notes>/verification/verification.md`; `<notes>/archive/`; `.myco-notes.conf`; `<tools>/`; `<docs>/` (`<notes>` is `myco-notes` by default, so these are `myco-notes/state.md` and so on).
+
+## 5. Configuration
+
+`.myco-notes.conf` (shell syntax): the layout (`MYCO_DIR`, `NOTES_DIR`, `TOOLS_DIR`, `DOCS_DIR`, `MAP_DIR`, `DATA_DIRS`, `HISTORY_DIRS`, `STATE_FILE` for a master record not called `state.md`), the lint limits (`MAX_NOTE_KB`, `ENTRY_WARN_KB`, `STALE_DAYS` for the freshness header, `RESUME_BUDGET` for `resume`, `REVIEW_FULL_DAYS` for how often a review reads every note), `AGENT_TRAILER` (co-author line for commits made by an agent), `SYNC_GLOBS`/`SYNC_CMD` (keep the live copy of executed files equal to the committed copy), `TIMEZONE` (IANA name for the times `capture` writes), `SOLO` (1 = one owner: an agent merges its own pull request after the check passes, method 19.2), `NEW_FOLDERS` (`ask` default, `add`, `ignorelint`, `ignoreall`: what `notes-commit` does with a new root folder or loose file; `notes-commit --folder NAME=MODE` answers for one item, `NAME=*` for all, `later` leaves it out of this commit), `CHECK_SH`/`CHECK_PY`, `MIRROR_TARGET`, `POST_PUSH_CMDS`, `SECRET_ALLOW_FILE`. Optional `.myco-notes-map.json` (groups, hints, title) and `.myco-notes-lint-ignore` (regexes of findings to drop).

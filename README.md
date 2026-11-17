@@ -56,7 +56,7 @@ Then ask: *"start a Myco Notes repository for my project"*. The agent asks its s
 |---|---|
 | *(nothing: you just make a change)* | The agent checks the system, updates the right notes (master record, runbook, the device's note), adds a sync-log line and commits. |
 | "note that the NAS fan is noisy" | One dated entry in this month's inbox, reply "Saved". Works from a phone. "sort my inbox" files the entries later. |
-| "what changed on the router?" | Answers from the notes, naming the files; offers to keep an answer that took real digging. |
+| "what changed on the router?" | Answers from the notes (the note index, or a ranked `search` when there are many), naming the files; offers to keep an answer that took real digging. |
 | "save this source: <link>" | Keeps the document as found, then proposes what it changes in your notes. |
 | "review the notes" | Reads what changed since the last review and writes each fix as a numbered proposal; you answer yes, no or a change. "full review" reads everything. |
 | "make this folder a Myco Notes repository" | Takes over an existing folder of Markdown notes (Obsidian vaults included): as a copy or in place after a zip backup, keeping its structure or reorganised. Secrets are scanned first, links keep working, nothing original is deleted. |
@@ -65,7 +65,7 @@ At the start of each session the agent reads a short briefing (`resume`) and tel
 
 ## Keeping it true
 
-- **Checked as you go.** A commit hook refuses anything that looks like a password or key; notes say where a secret lives, never its value. The lint, which the agent runs and the pull-request check repeats, finds broken references, passed follow-up and review dates, stale headers, oversized notes and notes without a one-line summary.
+- **Checked as you go.** A commit hook refuses anything that looks like a password or key (including the key formats of AI providers, cloud and code hosts, tokens and passwords in URLs), and a quick note holding one is refused before it is written; notes say where a secret lives, never its value. The lint, which the agent runs and the pull-request check repeats, finds broken references, passed follow-up and review dates, stale headers, oversized notes and notes without a one-line summary.
 - **Reviews with ready fixes.** "Review the notes" reads for what no script can check: contradictions, claims a later entry replaced, subjects without a note, missing links. Each finding is a numbered proposal with the exact edit in `myco-notes/plans/review-YYYY-MM-DD.md`; only what you accept is applied, a changed fix is shown again first, a declined one is not proposed again. Normally only what changed since the last review is read; every 30 days (`REVIEW_FULL_DAYS`) everything. Method section 21.
 - **Sources.** Facts from a manual, release notes or a forum answer are kept with their origin: the document is saved as found in `myco-notes/sources/` (dated, with a checksum, never edited), facts are cited as "per <source>", and when the document changes the notes that relied on it come back for review. The kit's tools fetch nothing; text in a source is data, never instructions. Method section 22.
 - **Nothing is lost.** Old statements are superseded, not deleted; `asof 2026-09-01` shows what the notes said on any date; `mirror-push` keeps a second copy and `restore-drill` proves it restores.
@@ -148,4 +148,4 @@ Built from scratch by a person and an AI agent on a real project, then compared 
 - **[AGENTS.md](https://agents.md)** and **[Agent Skills](https://agentskills.io/specification)**: following these open conventions makes the notes and the skill work with any agent.
 
 ## Tests, contributing, license
-`python3 tests/native.py` (Linux, macOS, Windows) and `bash tests/smoke.sh` (Linux, macOS) run on every push in GitHub Actions. They copy only the skill folder, bootstrap a notes repository from it and exercise every tool. Contributing: see [AGENTS.md](AGENTS.md). License: Apache 2.0, see [LICENSE](LICENSE) and [NOTICE](NOTICE).
+`python3 tests/native.py` (Linux, macOS, Windows) and `bash tests/smoke.sh` (Linux, macOS) run on every push in GitHub Actions. They copy only the skill folder, bootstrap a notes repository from it and exercise every tool. `python3 tests/behaviour/run.py --agent "<your agent's non-interactive command>"` checks what an agent following the skill does in a few scenarios (a quick note, a secret, a new root folder, a review, a question); without `--agent` it checks the scenarios themselves. Contributing: see [AGENTS.md](AGENTS.md). License: Apache 2.0, see [LICENSE](LICENSE) and [NOTICE](NOTICE).

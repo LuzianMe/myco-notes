@@ -22,6 +22,10 @@ jobs:
           git config --global user.email "ci@example.invalid"
       - name: Native test (no bash; real launchers; Linux, macOS and Windows)
         run: python tests/native.py
+      - name: Behaviour self-test (each scenario's reference actions pass, a typical mistake is caught)
+        run: python tests/behaviour/run.py
+      - name: Release check (the four version fields agree, CHANGELOG.md has their section)
+        run: python scripts/release.py --check
       - name: Smoke test (bash)
         if: runner.os != 'Windows'
         run: bash tests/smoke.sh
@@ -55,3 +59,13 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/py38" && ln -sf "$(command -v python)" "$RUNNER_TEMP/py38/python3"
           PATH="$RUNNER_TEMP/py38:$PATH" bash tests/smoke.sh
+  pyflakes:
+    # Unused imports, undefined names and similar mistakes in the tools, the tests and the demo builder.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pyflakes==3.2.0
+      - run: python -m pyflakes skills/myco-notes/tools/*.py tests/*.py tests/behaviour/*.py examples/demo/*.py .github/assets/*.py scripts/*.py

@@ -21,7 +21,8 @@ Options:
   --commit, --pr, --merge, --human   passed on to notes-commit (with --only for the inbox file)
 Time zone: TIMEZONE in .myco-notes.conf (an IANA name such as Europe/Zurich), else this machine's local time; the zone or UTC
 offset is written after the time. Nothing is asked and nothing else is changed: sorting the inbox into the notes is a separate step.
-Exit: 0 saved (and committed if asked), 1 not saved or the commit failed, 2 usage; with --commit, notes-commit's own exit code.
+Exit: 0 saved (and committed if asked), 1 not saved or the commit failed, 2 usage, 4 refused: the note holds a secret-looking
+string (nothing is written and the value is not shown); with --commit, notes-commit's own exit code.
 """
 import argparse
 import datetime
@@ -34,6 +35,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.dont_write_bytecode = True
 sys.path.insert(0, HERE)
 import _myco  # noqa: E402
+import secret_scan  # noqa: E402
 
 
 def now_in(tzname):
@@ -115,6 +117,11 @@ def main():
         extra.append("Related: " + ", ".join(names))
     entry = f"## {stamp} {title}\n{body}\n" + (" · ".join(extra) + "\n" if extra else "")
 
+    hits = [i for i, line in enumerate(entry.split("\n"), 1) if secret_scan.find(line)]
+    if hits:
+        print("capture: REFUSED, nothing was written: the note holds a secret-looking string (values not shown). Write where the "
+              "secret lives (a password manager entry, a file path), never its value, and run again.", file=sys.stderr)
+        return 4
     rel = f"{lay['notes']}/inbox/{month}.md"
     path = os.path.join(root, *rel.split("/"))
     os.makedirs(os.path.dirname(path), exist_ok=True)

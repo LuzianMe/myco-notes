@@ -272,7 +272,7 @@ def main():
         return 0
     project = os.path.basename(root)
     print(f"# {project}: note index ({len(notes)} notes, {len(missing)} without a summary)")
-    print(f"Generated from the notes; `summary` lines come from each note's header (method 10.1). Open the note before acting on it.")
+    print("Generated from the notes; `summary` lines come from each note's header (method 10.1). Open the note before acting on it.")
     groups = {}
     for r in notes:
         folder = os.path.dirname(r[0]) or "."

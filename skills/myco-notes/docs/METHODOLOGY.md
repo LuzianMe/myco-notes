@@ -27,7 +27,7 @@ The method is built for the operational memory of **one project or system**, edi
 
 - **The memory is about a person, or is a stream of small facts** (preferences, contacts, "what did X say about Y"). Files with fixed roles and evidence entries are heavy for that. A store of typed, one-fact-per-file records (entity, predicate, value, validity window) with a query tool suits it better.
 - **Many writers update at once.** Here a write is a plain edit protected by git, the hook and the lint, not a transaction. Dozens of agents writing the same files need a database, or a proposal-and-review pipeline in front of the notes.
-- **You need ranked retrieval or graph queries over thousands of records.** The notes are read by file roles, links and text search; it does not rank, embed or traverse. Past a few hundred notes add a search index (a derived copy, section 9), or keep the data in a real store and write only its description here.
+- **You need semantic retrieval or graph queries over thousands of records.** The notes are read by file roles, links and a ranked word search (`tools/search`); it does not embed or traverse. Past a few thousand notes add a search index (a derived copy, section 9), or keep the data in a real store and write only its description here.
 - **Facts must be machine-checkable.** Prose states a fact, but no tool can tell that two sentences contradict each other (a review, section 21, reads for that, but it is an agent's or a person's judgement, not a check). The freshness header (10.1) and the as-of query (7.1) cover dates and history, not meaning.
 - **Nobody will keep it current.** A notes repository that is not updated in the same session as the change is trusted and wrong, which is worse than no notes. Start smaller: entry point, state, runbook.
 - **The content cannot be written down safely.** If a note would need a secret, or the repository cannot be kept private, record where the thing lives and stop there.
@@ -115,7 +115,7 @@ The root belongs to the project, so folders and files appear there that no one t
 
 ### 3.2 Read order
 
-Always the same, and written in the entry point: (1) working agreement, (2) sync tracker (what is pending, what is stale), (3) master record headline and open items, (4) the runbook entry for the task at hand, (5) the entity note and the latest handoffs. A newcomer should be productive after reading five files. To find the note for a question, read the note index first (`tools/index`: every note with its one-line summary, 10.1) instead of opening files one by one.
+Always the same, and written in the entry point: (1) working agreement, (2) sync tracker (what is pending, what is stale), (3) master record headline and open items, (4) the runbook entry for the task at hand, (5) the entity note and the latest handoffs. A newcomer should be productive after reading five files. To find the note for a question, read the note index first (`tools/index`: every note with its one-line summary, 10.1) instead of opening files one by one; when there are too many notes to scan, search them (`tools/search WORDS`: the notes ranked by where the words appear, with their summaries and matching lines).
 
 ### 3.3 Size discipline
 
@@ -228,7 +228,7 @@ Cadence guideline: **update on the same turn as the change; commit on the same t
 - Copy-suffix backups **are** right for things outside the repository (a config on a server, a database row set, a cloud resource) before you change them; name them `<file>.bak-before-<reason>-<date>` and record them in the entry.
 - **Commit helper.** A single command (for example `notes-commit "what and why"`) that stages everything (or only the paths named, with a preview of what would be committed), runs cheap syntax checks on changed scripts, commits with a descriptive message and a co-author trailer when an agent did the work, optionally pushes the mirror, and syncs scripts that are executed elsewhere (so the running copy always equals the committed copy). A `--human` flag omits the trailer.
 - **Commit granularity.** One logical change per commit; message states what and why in plain language (`Rotate backup key and document the restore test`, not `update notes`). Several small commits beat one large one. Commit before ending any turn or session that edited the notes.
-- **Pre-commit hook.** Reject commits whose added lines look like secrets (private-key blocks; names such as password, passphrase, secret, token, api key followed by a long literal). Allow an explicit one-time override after human review. Keep the hook and the helper in the repository (for example under `tools/`) and install them with a one-line setup script, because `.git/hooks` is not versioned.
+- **Pre-commit hook.** Reject commits whose added lines look like secrets (private-key blocks; the token formats of common cloud, code-hosting and AI providers; JSON web tokens and bearer tokens; a password inside a URL; names such as password, passphrase, secret, token, api key followed by a long literal). Allow an explicit one-time override after human review. Keep the hook and the helper in the repository (for example under `tools/`) and install them with a one-line setup script, because `.git/hooks` is not versioned.
 - **`.gitignore`**: generated output, caches, large binaries that can be rebuilt, backup suffix files, local credentials, per-machine state.
 - **Tags** mark milestones (`audit-2026-11-03`, `before-migration`, `release-1.0`) so a full state can be compared or restored by name.
 - **Branches** are optional for one author; use them for risky restructures and for review by a second person.
@@ -458,6 +458,7 @@ Paths are relative to the kit, which is the skill folder `skills/myco-notes/` (i
 | Per-clone setup, branches and pull requests (18) | `tools/setup-clone` (and `tools/notes-commit`, which switches the hook on in a clone where it is not set), `tools/notes-commit --branch/--push/--pr`, `docs/TEAM.md` |
 | Lint: references, numbering, freshness, due dates, ledger, secrets, size (3.3, 9, 10), the optional freshness header and summaries (10.1), the newest sync-log line (4) | `tools/notes-lint.py` (`HISTORY_DIRS`, `DATA_DIRS`, `MAX_NOTE_KB`, `ENTRY_WARN_KB`, `STALE_DAYS`) |
 | Note index: every note with its one-line summary (3.2, 10.1, 12) | `tools/index` (`--missing` lists notes without a summary); the map shows summaries too |
+| Ranked search: the notes that hold the query's words, summary, title, file name and headings counting most, records counting half, secret-looking lines never shown (3.2, 12) | `tools/search` (`--notes-only`, `--limit`, `--lines`) |
 | Review scope: changed notes and their links, or a full review when due (21.5) | `tools/index --review-scope` (`--full`, `REVIEW_FULL_DAYS`) |
 | Sources: outside documents kept as retrieved, cited by notes, taken in through proposals; a changed source brings its notes back into review (22) | `tools/ingest` (`--url`, `--title`, `--summary`, `--kind`, `--list`, `--commit`); the `sources` header key; `tools/index --review-scope` |
 | Reviews with proposed fixes, applied only when confirmed; upgrades of older repositories (21) | `<notes>/plans/review-YYYY-MM-DD.md` (written by the agent); `tools/resume` lists proposals waiting for an answer |
@@ -468,11 +469,11 @@ Paths are relative to the kit, which is the skill folder `skills/myco-notes/` (i
 | The relations as a network grown like a colony (the read-order notes in the middle, every note in a ring by its distance in links), freshness (recently changed notes glow and reach a little further out), stale follow-ups, missing references, replay of the history (9, 10) | `tools/build-notes-map.py` writes `graph.html` (`tools/notes_graph.py`, `tools/graph-template.html`) |
 | Mirror (8.4); refuses a target that overlaps the repository or holds other files; `--dry-run`; `MIRROR_SCOPE`, `--strict` | `tools/mirror-push` |
 | Restore drill with history and working-copy verdicts (8.4, 11.6) | `tools/restore-drill` |
-| The first run: questions, then where the owner stands (11.5a) | the skill's setup mode, `template/notes/getting-started.md`, the summary `tools/bootstrap` prints at the end |
+| The first run: questions, then where the owner stands (11.5a) | the skill's setup mode (`modes/setup.md`), `template/notes/getting-started.md`, the summary `tools/bootstrap` prints at the end |
 | Health of a notes repository: kit version, tools, hook, layout, settings (11.5) | `tools/doctor` (read-only) |
 | Entry point for agents (12) | `template/AGENTS.md` (+ `CLAUDE.md` containing `@AGENTS.md`) |
 | The repository on disk, precisely enough for other tools to read, write and check it: layout, headers, references, sync log, inbox, reviews, sources | `docs/FORMAT.md` (`FORMAT_VERSION` in `.myco-notes.conf`) |
-| Agent skill | `SKILL.md` (Agent Skills format, read by Claude Code, Codex and other agents; Claude Code plugin manifests in `.claude-plugin/` at the repository root) |
+| Agent skill | `SKILL.md` (Agent Skills format; it routes each request to one file in `modes/`; read by Claude Code, Codex and other agents; Claude Code plugin manifests in `.claude-plugin/` at the repository root) |
 
 ## 18. Teams and shared hosting
 
