@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.42.0
+- **Mycelium view, the gestures swap**: with depth on, a plain drag (the mouse button held, or one finger) on empty space now turns the view, and Shift-drag, right-drag or two fingers moved together move it sideways (pan); before, it was the other way round. Two fingers still pinch to zoom around their midpoint, in the same gesture. A drag that starts on a note still moves that note, and a tap still selects. The flat view (depth off) is unchanged in effect: a drag pans, and Shift-drag and right-drag pan too. The sideways trackpad swipe still turns, the embedded graph is unchanged (a drag turns it).
+- **The hint** at the bottom of the view says the new gestures, and shows again (up to three times) for readers who had dismissed the old one.
+
 ## 0.41.2
 - **Select a note in an embedded graph** (`?embed=1` and every public graph): a click or tap on a note that does not move selects it as in the full view (the note and its neighbours stay lit, the rest dims, their labels show where they have one, and it stays after the pointer leaves); a click or tap on empty space, on the selected note again, or Escape clears it. A drag still turns the view and selects nothing; scroll and pinch still zoom. A selection holds the turning still until it is cleared. Still no note panel and nothing beyond the page's own data; `?interactive=0` is unchanged (no pointer handling at all). Before, embed mode never selected, so a phone (no hover) had no way to highlight a note.
 - **A new message to the host page**: `{type:"myco-select", selected, label}` when the selection changes; `label` is the approved label or `null`. `docs/REFERENCE.md` 6.2.
