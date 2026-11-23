@@ -108,7 +108,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 <div id="left"><div id="head" class="box"><button id="fold" type="button" aria-expanded="true" aria-controls="head" title="Hide the search and the legend">&minus;</button><h1>%%TITLE%%</h1><p id="stats"></p>
 <input id="q" type="search" placeholder="Find a note..." aria-label="Find a note"><div id="legend" role="group" aria-label="Show or hide a group of notes"></div></div>
 <div id="time" class="box" hidden><button id="tfold" type="button" aria-expanded="true" aria-controls="time" title="Hide the timeline">&minus;</button><button id="play" type="button">Replay</button><span id="when"></span><input id="slide" type="range" min="0" value="0" aria-label="Position in the history of the notes"><div id="what"></div><label id="speedl"><span class="lbl">Speed </span><select id="speed" aria-label="Replay speed"><option value="0.5">0.5x</option><option value="1" selected>1x</option><option value="2">2x</option><option value="4">4x</option></select></label></div></div>
-<div id="tools" class="box"><button id="find" type="button" aria-expanded="false" aria-controls="head">Find</button><a href="index.html">Map</a><button id="fit" type="button" title="Fit the whole network in view">Fit</button><button id="depth" type="button" aria-pressed="true" title="Depth: the colony as a ball that grows outward from the read-order notes; recently changed notes reach a little further out. Turn the view with Shift-drag or right-drag, two fingers moved together, or a sideways trackpad swipe; Fit turns it back.">Depth</button><button id="hold" type="button" aria-pressed="false" title="Hold still: stop the network turning by itself, to look at one place for longer">&#10074;&#10074;</button><button id="saver" type="button" aria-pressed="false" title="Screensaver: hide the panels, centre the network and let it turn">&#9790;</button>%%THEME_PICKER%%</div>
+<div id="tools" class="box"><button id="find" type="button" aria-expanded="false" aria-controls="head">Find</button><a href="index.html">Map</a><button id="fit" type="button" title="Fit the whole network in view">Fit</button><button id="depth" type="button" aria-pressed="true" title="Depth: the colony as a ball that grows outward from the read-order notes; recently changed notes reach a little further out. Turn the view by dragging (one finger); move it sideways with Shift-drag or right-drag, or two fingers moved together; Fit turns it back.">Depth</button><button id="hold" type="button" aria-pressed="false" title="Hold still: stop the network turning by itself, to look at one place for longer">&#10074;&#10074;</button><button id="saver" type="button" aria-pressed="false" title="Screensaver: hide the panels, centre the network and let it turn">&#9790;</button>%%THEME_PICKER%%</div>
 <aside id="panel" class="box" hidden aria-live="polite"></aside>
 <nav class="sr" aria-label="All notes"><ul>%%LINKS%%</ul></nav>
 <script id="data" type="application/json">%%DATA%%</script>
@@ -186,8 +186,8 @@ function gcol(g){var c=GCI[g]||[0,g],p=c[0]?T.quiet:T.pal;return p[c[1]%p.length
    slightly above; left alone for a few seconds the network turns slowly, about once a minute, around its centre after Fit, around
    the selected note if there is one, otherwise around the note nearest the middle of the screen (not with reduced motion, and not
    while the pointer rests on a note). A turn keeps its momentum when it is let go, slows to that idle pace and sets its direction
-   until the next turn. Panning tilts the view a little; Shift-drag, two fingers moved together (one
-   finger pans) or a sideways trackpad swipe turn it, all the way round, and tilt it up to about 70 degrees (never over the
+   until the next turn. Panning tilts the view a little; a plain drag (one finger) or a sideways trackpad swipe turns it (Shift-drag,
+   right-drag or two fingers moved together pan it instead), all the way round, and tilt it up to about 70 degrees (never over the
    top). The network turns about its own centre; notes fade with their distance from the viewer, so from behind the oldest
    notes are the near, bright ones. Fit (or a double-click) turns it back to the front. With the Depth button off, the
    projection is exactly the flat view. */
@@ -870,22 +870,20 @@ onCv("pointerdown",function(ev){
     if(drag&&drag.id>=0)NODES[drag.id].fixed=false;
     drag=null;if(!EMBED)autoFit=false;var s=pinchState();pinch={d:s.d,k:cam.tk,z:EZ,w:world(s.mx,s.my),mx:s.mx,my:s.my,ry:rot.y,rx:rot.x};return;
   }
-  var i=EMBED||ev.button===2?-1:pick(ev.clientX,ev.clientY);   /* the right button always turns (with depth), even over a note */
-  drag={pk:EMBED&&ev.button!==2?pick(ev.clientX,ev.clientY):-1,id:i,sx:ev.clientX,sy:ev.clientY,lx:ev.clientX,ly:ev.clientY,cx:cam.tx,cy:cam.ty,moved:false,turn:depthOn&&(EMBED||ev.button===2||i<0&&ev.shiftKey),ry:rot.y,rx:rot.x,nx:i>=0?NODES[i].x:0,ny:i>=0?NODES[i].y:0};
+  var pan=ev.button===2||ev.shiftKey,i=EMBED||pan?-1:pick(ev.clientX,ev.clientY);   /* the right button and Shift always pan, even over a note */
+  drag={pk:EMBED&&ev.button!==2?pick(ev.clientX,ev.clientY):-1,id:i,sx:ev.clientX,sy:ev.clientY,lx:ev.clientX,ly:ev.clientY,cx:cam.tx,cy:cam.ty,moved:false,turn:depthOn&&(EMBED||i<0&&!pan),ry:rot.y,rx:rot.x,nx:i>=0?NODES[i].x:0,ny:i>=0?NODES[i].y:0};
   if(i>=0){NODES[i].fixed=true}
   cv.classList.add("drag");
 });
 onCv("pointermove",function(ev){
   if(ptr[ev.pointerId]){ptr[ev.pointerId].x=ev.clientX;ptr[ev.pointerId].y=ev.clientY}
-  if(pinch){   /* zoom by the change of the finger distance around the midpoint; moving both fingers together turns the view
-                  (with depth; one finger pans) or, in the flat view, pans */
+  if(pinch){   /* zoom by the change of the finger distance around the midpoint; moving both fingers together pans (one finger
+                  turns the view with depth) */
     if(downPts().length<2)return;
     var s=pinchState();spin.last=performance.now();
     if(EMBED){ezoom(pinch.z*s.d/pinch.d);if(depthOn){turnTo(pinch.ry+turnSign(pinch.rx)*(s.mx-pinch.mx)*.006,0);sample()}return}
     cam.tk=cam.k=Math.max(minK(),Math.min(MAXK,pinch.k*s.d/pinch.d));
-    var ax=depthOn?pinch.mx:s.mx,ay=depthOn?pinch.my:s.my;
-    cam.tx=cam.x=pinch.w.x-(ax-W/2)/cam.k;cam.ty=cam.y=pinch.w.y-(ay-H/2)/(cam.k*VS);
-    if(depthOn){turnTo(pinch.ry+turnSign(pinch.rx)*(s.mx-pinch.mx)*.006,pinch.rx-(s.my-pinch.my)*.006);sample()}
+    cam.tx=cam.x=pinch.w.x-(s.mx-W/2)/cam.k;cam.ty=cam.y=pinch.w.y-(s.my-H/2)/(cam.k*VS);
     return;
   }
   if(!drag){var i=pick(ev.clientX,ev.clientY);if(i!==hov){hov=i;cv.classList.toggle("hover",i>=0)}return}
@@ -893,7 +891,7 @@ onCv("pointermove",function(ev){
   if(!drag.moved&&Math.abs(dx)+Math.abs(dy)>4)drag.moved=true;
   if(!drag.moved)return;
   spin.last=performance.now();
-  if(drag.turn){turnTo(drag.ry+turnSign(drag.rx)*dx*.005,drag.rx-dy*.005);sample();return}   /* Shift-drag turns the view */
+  if(drag.turn){turnTo(drag.ry+turnSign(drag.rx)*dx*.005,drag.rx-dy*.005);sample();return}   /* a plain drag on empty space turns the view */
   if(drag.id>=0){var n=NODES[drag.id];
     if(depthAmt>0){n.x=drag.nx+dx*cyw/(cam.k*n.ps);n.y=drag.ny+dy*cpt/(cam.k*n.ps*VS)}   /* turned: follow the finger along the note's own axes */else{var w=world(ev.clientX,ev.clientY);n.x=w.x;n.y=w.y}
     alpha=Math.max(alpha,.35)}
@@ -925,7 +923,7 @@ onCv("wheel",function(ev){
   cam.tk=Math.max(minK(),Math.min(MAXK,cam.tk*f));cam.k=cam.tk;if(saverOn){saverK=cam.tk;autoFit=true;return}
   var after=world(ev.clientX,ev.clientY);cam.tx+=before.x-after.x;cam.ty+=before.y-after.y;cam.x=cam.tx;cam.y=cam.ty;
 },{passive:false});
-onCv("contextmenu",function(ev){ev.preventDefault()});   /* right-drag turns, so no menu over the network */
+onCv("contextmenu",function(ev){ev.preventDefault()});   /* right-drag pans, so no menu over the network */
 onCv("dblclick",function(){poke();autoFit=true;if(EMBED)ezoom(1);turnHome()});
 function ezoom(z){   /* embed: the zoom is a factor on the fitted size, about the middle of the network, which stays centred (half to four times) */
   EZ=Math.max(.5,Math.min(4,z));autoFit=true;cam.fit=true;if(cam.fk){cam.tk=cam.k=cam.fk*EZ}}
@@ -1048,13 +1046,13 @@ paintDepth();
 /* a short hint on how to turn the view: shown with depth on, for a few seconds, on the first visits until the view has been
    turned once (kept in this browser); the wording follows the device (mouse or touch) */
 var hintEl=document.getElementById("hint"),hintT=0;
-function hintDone(){if(hintT){clearTimeout(hintT);hintT=0;hintEl.classList.remove("on")}if(pref("hint")!=="done")pref("hint","done")}
+function hintDone(){if(hintT){clearTimeout(hintT);hintT=0;hintEl.classList.remove("on")}if(pref("hint2")!=="done")pref("hint2","done")}
 function showHint(){
   if(EMBED)return;
-  var seen=pref("hint");if(!depthOn||NN<2||seen==="done"||(+seen||0)>=3)return;
-  pref("hint",String((+seen||0)+1));
+  var seen=pref("hint2");if(!depthOn||NN<2||seen==="done"||(+seen||0)>=3)return;
+  pref("hint2",String((+seen||0)+1));
   var fine=!navigator.maxTouchPoints||window.matchMedia&&matchMedia("(any-hover:hover)").matches;   /* a mouse or trackpad is there (also on a laptop with a touch screen) */
-  hintEl.textContent=fine?"Turn the view: Shift-drag or right-drag (or swipe sideways on a trackpad). Fit faces the front.":"Two fingers moved together turn the view. Fit faces the front.";
+  hintEl.textContent=fine?"Drag to turn the view; Shift-drag or right-drag moves it sideways. Fit faces the front.":"Drag to turn the view; two fingers moved together move it sideways. Fit faces the front.";
   setTimeout(function(){if(!depthOn)return;hintEl.classList.add("on");hintT=setTimeout(function(){hintT=0;hintEl.classList.remove("on")},7000)},1200);
 }
 
