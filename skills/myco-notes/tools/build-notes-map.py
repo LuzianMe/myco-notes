@@ -295,7 +295,7 @@ def main():
         return
     for rel, d in info.items():
         if md_lib:
-            m = md_lib.Markdown(extensions=["tables", "fenced_code", "toc", "sane_lists"])
+            m = md_lib.Markdown(extensions=["tables", "fenced_code", "toc", "sane_lists", _myco.markdown_no_raw_html()])
             body = m.convert(d["shown"]); toc = m.toc
             body = re.sub(r"<code>([^<]+)</code>", lambda mm: (f'<a href="{byid[info[linkable[mm.group(1)]]["id"]]["id"]}.html"><code>{mm.group(1)}</code></a>'
                           if mm.group(1) in linkable and linkable[mm.group(1)] != rel else mm.group(0)), body)

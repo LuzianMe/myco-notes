@@ -127,6 +127,7 @@ chk "resume prints a briefing with a footer" "myco-notes/tools/resume | grep -q 
 chk "resume lists the note past its review date" "myco-notes/tools/resume | grep -q 'fresh-smoke.md'"
 chk "index lists a starter note with its summary" "myco-notes/tools/index | grep -q 'state.md\`: Master record'"
 chk "index --missing names a note without a summary" "myco-notes/tools/index --missing | grep -q 'fresh-smoke.md'"
+chk "index --missing says what it does not count" "myco-notes/tools/index --missing | grep -q 'Not counted:'"
 chk "search ranks the master record for its own words" "myco-notes/tools/search master record | grep -q 'state.md.*Master record'"
 chk "asof shows the notes at HEAD"      "myco-notes/tools/asof HEAD state.md | grep -q 'master record'"
 chk "asof rejects a date before the history" "! myco-notes/tools/asof 2001-01-01"
