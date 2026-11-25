@@ -65,22 +65,21 @@ def review_files(root, lay, normal_only=True):
     commit order); sha is the LAST commit that touched the file (the one that applied its fixes), so the next review starts after them;
     is_full: scope 'full' or absent; source: the source file a review of one source looked at (scope 'source <file>', method 22.3), else
     ''. Such reviews read one document, not the changed notes, so with normal_only (the default) they are left out."""
-    d = os.path.join(root, *lay["notes"].split("/"), "plans")
     out = []
-    if not os.path.isdir(d):
+    paths = _myco.review_paths(root, lay)
+    if not paths:
         return out
     order = {h: i for i, h in enumerate(_myco.git("-C", root, "rev-list", "HEAD").stdout.split())}   # 0 = newest
-    for f in os.listdir(d):
-        if not _myco.REVIEW_FILE.match(f):
-            continue
-        rel = lay["notes"] + "/plans/" + f
-        r = _myco.git("-C", root, "log", "--diff-filter=A", "--format=%ct %H", "-1", "--", rel)
+    for rel in paths:
+        # --follow: a review moved from plans/ to reviews/ (FORMAT.md 7.1) keeps the commit that added it and the commit that last changed its
+        # content; a commit that only renamed it is not "the commit that applied its fixes"
+        r = _myco.git("-C", root, "log", "--follow", "--diff-filter=A", "--format=%ct %H", "-1", "--", rel)
         if r.returncode != 0 or not r.stdout.strip():
             continue                                  # not committed yet: a review being written
         ct = r.stdout.split()[0]
-        last = _myco.git("-C", root, "log", "--format=%H", "-1", "--", rel)
+        last = _myco.git("-C", root, "log", "--follow", "--diff-filter=AM", "--format=%H", "-1", "--", rel)
         sha = last.stdout.strip() or r.stdout.split()[1]
-        fm, _ = _myco.frontmatter(open(os.path.join(d, f), encoding="utf-8", errors="replace").read())
+        fm, _ = _myco.frontmatter(open(os.path.join(root, *rel.split("/")), encoding="utf-8", errors="replace").read())
         scope = fm.get("scope", ("",))[0].strip()
         low = scope.lower()
         source = os.path.basename(scope.split(None, 1)[1].strip().strip("`")) if low.startswith("source") and len(scope.split(None, 1)) > 1 else ""
@@ -125,7 +124,7 @@ def changed_lines(root, base, rel, untracked):
 def review_scope(root, lay, conf, want_full=False, today=None):
     """(scope, reason, base sha or None, changed notes, linked notes, all notes) for the next review (method 21.5)."""
     rows = collect(root, lay)
-    notes = sorted(r[0] for r in rows if not r[3] and not (r[0].startswith(lay["notes"] + "/plans/") and _myco.REVIEW_FILE.match(os.path.basename(r[0]))))
+    notes = sorted(r[0] for r in rows if not r[3] and not _myco.is_review_path(lay, r[0]))
     try:
         full_days = int(conf.get("REVIEW_FULL_DAYS") or 30)
     except ValueError:
@@ -166,6 +165,16 @@ def review_scope(root, lay, conf, want_full=False, today=None):
             linked.update(who)
     linked = sorted(linked - set(ch))
     return "changed", f"since {revs[-1][2]} (commit {base[:7]}); last full review {age} day(s) ago, full every {full_days}", base, ch, linked, notes
+
+
+def old_reviews_note(root, lay):
+    """One line when review files still sit in plans/ (kept there before format 1.2, FORMAT.md 7.1); not a review item, so it never turns 'nothing changed' into work."""
+    old = [r for r in _myco.review_paths(root, lay) if r.startswith(lay["notes"] + "/plans/")]
+    if not old:
+        return ""
+    return (f"Note: {len(old)} review file(s) still sit in `{lay['notes']}/plans/`; reviews now have their own folder `{lay['reviews']}/`. Offer the move once, in one line "
+            f"(`relocate.py --root <project> --move-reviews` from the kit is a dry run, `--apply` does it); do it only on a yes, and say nothing more if the owner declined. "
+            "Everything works either way (method 21.4).")
 
 
 def entry_checks(root, lay, conf, scope, base):
@@ -238,21 +247,27 @@ def main():
         extra = entry_checks(root, lay, conf, scope, revs[-1][1] if revs else None)
         if scope == "full":
             print(f"# Review scope: full ({reason})")
-            print(f"Read all {len(notes)} notes (`index` lists them with their summaries). Header line for the review file: `scope: full`.")
+            note = old_reviews_note(root, lay)
+            if note:
+                print(note)
+            print(f"Read all {len(notes)} notes (`index` lists them with their summaries). Write it to `{lay['reviews']}/review-YYYY-MM-DD.md`; header line: `scope: full`.")
             print("\n## Also check\n" + "".join(f"- {e}\n" for e in extra), end="")
             return 0
         print(f"# Review scope: changed ({reason})")
+        note = old_reviews_note(root, lay)
+        if note:
+            print(note)
         if extra:
             print("\n## Also check\n" + "".join(f"- {e}\n" for e in extra))
         if not ch and not extra:
             print("Nothing changed in the notes since the last review: no review needed (say so in one line; write no review file).")
             return 0
         if not ch:
-            print("No note changed since the last review: check only the items above. Header line for the review file: "
+            print("No note changed since the last review: check only the items above. Write it to " + f"`{lay['reviews']}/review-YYYY-MM-DD.md`; header line: "
                   f"`scope: changed since {base[:7]}`. Finding nothing still means a short review file with 'open: none', committed,"
                   " so the next review starts after it (method 21.5).")
             return 0
-        print(f"Read {len(ch)} changed and {len(linked)} linked note(s) of {len(notes)}. Header line for the review file: `scope: changed since {base[:7]}`."
+        print(f"Read {len(ch)} changed and {len(linked)} linked note(s) of {len(notes)}. Write it to `{lay['reviews']}/review-YYYY-MM-DD.md`; header line: `scope: changed since {base[:7]}`."
               " Finding nothing still means a short review file with 'open: none', committed, so the next review starts after it (method 21.5).")
         print("\n## Changed")
         for n in ch:

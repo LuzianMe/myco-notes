@@ -90,6 +90,7 @@ repo/
     imported/<source>/             notes taken over from an older collection, as found (history; section 20)
     sources/YYYY-MM-DD-<name>.md   outside documents as they were retrieved: manuals, release notes, articles (history; section 22)
     plans/backlog.md, plans/*.md   plans, decisions, research, session handoffs
+    reviews/review-YYYY-MM-DD.md   reviews of the notes with proposed fixes (section 21; before 0.44.0 these lived in plans/)
     archive/                       old detail (history)
     scripts/                       deployed artifacts, bundles with READMEs
     verification/                  health/test guide + script
@@ -461,7 +462,7 @@ Paths are relative to the kit, which is the skill folder `skills/myco-notes/` (i
 | Ranked search: the notes that hold the query's words, summary, title, file name and headings counting most, records counting half, secret-looking lines never shown (3.2, 12) | `tools/search` (`--notes-only`, `--limit`, `--lines`) |
 | Review scope: changed notes and their links, or a full review when due (21.5) | `tools/index --review-scope` (`--full`, `REVIEW_FULL_DAYS`) |
 | Sources: outside documents kept as retrieved, cited by notes, taken in through proposals; a changed source brings its notes back into review (22) | `tools/ingest` (`--url`, `--title`, `--summary`, `--kind`, `--list`, `--commit`); the `sources` header key; `tools/index --review-scope` |
-| Reviews with proposed fixes, applied only when confirmed; upgrades of older repositories (21) | `<notes>/plans/review-YYYY-MM-DD.md` (written by the agent); `tools/resume` lists proposals waiting for an answer |
+| Reviews with proposed fixes, applied only when confirmed; upgrades of older repositories (21) | `<notes>/reviews/review-YYYY-MM-DD.md` (written by the agent); `tools/resume` lists proposals waiting for an answer |
 | Bounded start-of-session briefing (11.2, 12) | `tools/resume` (`--budget`, `RESUME_BUDGET`) |
 | What the notes said on a date, what changed since, history of one note (7.1) | `tools/asof` |
 | Relation map, backlinks, history, publication gate (9, 8.2) | `tools/build-notes-map.py` |
@@ -566,7 +567,7 @@ Read earlier review files first: a fix the owner declined is not proposed again 
 **Side effects belong in the proposal.** Before proposing a fix that moves, shortens or deletes text (condensing a note, moving an old changelog into `logs/` or the archive, merging two notes), check what that text was the only place to mention: a note named nowhere else becomes an orphan, because mentions from records do not count (the lint says which records still name it). The proposal then includes the link that keeps the note connected (a line in the note that stays, the read order or an index note), so the owner approves the whole change, not half of it.
 
 ### 21.2 The review file
-The proposals go into `<notes>/plans/review-YYYY-MM-DD.md`, which is committed (it is a plan, not a change to the notes). Its header carries a `summary`, a `scope` line (`full`, or `changed since <commit>`, 21.5) and an `open` line listing the numbers still waiting for an answer (`open: 1, 2, 3` when it is written, `open: none` when everything is answered); the lint warns when `open` does not match the `Status:` lines below, so the header cannot fall behind. Each proposal is numbered and complete enough to be applied without further thought:
+The proposals go into `<notes>/reviews/review-YYYY-MM-DD.md`, which is committed (it is a plan for changing the notes, not a change to them). Reviews have a folder of their own because they are about the notes, not about the project: they pile up (one or several a day), and mixed into `plans/` they bury the real plans. Repositories made before 0.44.0 (format 1.2) kept them in `plans/`; the tools read both places, and `tools/relocate --move-reviews` moves the old files and the paths that name them in one reviewed step (21.4). Its header carries a `summary`, a `scope` line (`full`, or `changed since <commit>`, 21.5) and an `open` line listing the numbers still waiting for an answer (`open: 1, 2, 3` when it is written, `open: none` when everything is answered); the lint warns when `open` does not match the `Status:` lines below, so the header cannot fall behind. Each proposal is numbered and complete enough to be applied without further thought:
 
 ```
 ## 3. <short title>
@@ -589,11 +590,11 @@ The owner sees a short numbered list (title and one line on the fix) and the pat
 - A fix that depends on another says so (`Needs: 2`); if 2 is declined, the dependent fix is shown again, rewritten, before anything is applied.
 - Afterwards run the lint and compare it with the run before the review. A finding the applied fixes caused (a new orphan, a broken link) is not fixed silently: it becomes a new proposal in the same file, shown to the owner like the others.
 - Update the top of the review file to match: the `open` line (the lint checks it), the summary and the opening paragraph say what was applied, declined and still waiting (an opening that says "nothing has been changed" is no longer true once fixes are applied). A proposal carried over from an earlier review file is answered in its own file, so that file's header changes too.
-- Add one sync-log line: `- **YYYY-MM-DD review:** applied 1, 3, 4; declined 2; 5 revised, waiting (plans/review-YYYY-MM-DD.md)`.
+- Add one sync-log line: `- **YYYY-MM-DD review:** applied 1, 3, 4; declined 2; 5 revised, waiting (reviews/review-YYYY-MM-DD.md)`.
 
 ### 21.4 Bringing an older notes repository up to newer rules (upgrade)
 When the method gains a rule (2.8 added summaries and the sync-log format), repositories made earlier do not follow it yet. They are not rewritten silently:
-1. Refresh the repository's tools and docs from the new kit (`tools/relocate`, 3.1), run the lint, commit.
+1. Refresh the repository's tools and docs from the new kit (`tools/relocate`, 3.1), run the lint, commit. When review files still sit in `plans/` (format 1.1 and older), the refresh says so: offer the move in one line (`relocate --move-reviews` shows what it would rename and which paths it would rewrite; `--apply` does it, then lint and commit), and do it only on a yes. The entry point's review line is proposed in the upgrade review like any other new line.
 2. Write an upgrade review: the findings that come from new rules (notes without a summary, a newest sync-log line in an older form, a missing line in the entry point, a note the starter set gained since, such as the owner's page of 11.5a) become proposals of kind `upgrade`, in batches of about 20 notes, each with its summary written out. Records keep their form (history folders, older sync-log lines, changelog entries): they say what was written at the time.
    A starter note the repository lacks is offered in one line (what it is for), never created unasked; a no is recorded like any declined proposal, so it is not offered again. On a yes it is written from the kit's template with this repository's names and dates, and fitted to its real facts: a template line that is not true here (the owner's page saying the notes exist only on this computer when a mirror already runs) is replaced with what is, from the notes or a live check, and the proposal shows the fitted text, not the template's.
 3. Apply them as in 21.3 and say in the sync-log line which kit version the repository now follows: `- **YYYY-MM-DD upgrade:** summaries for 20 of 46 notes (kit 0.17.0)`. A later session continues with the notes still without a summary (`tools/index --missing`).

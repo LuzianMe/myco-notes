@@ -19,7 +19,7 @@ sys.path.insert(0, HERE)
 import _myco  # noqa: E402
 import map_themes  # noqa: E402
 MAX_COMMITS = 2000
-KIT_GROUPS = {"start", "plans", "inbox", "logs", "verify", "artifacts", "archive", "imported", "sources", "docs", "other"}   # the kit's own group ids (no project words)
+KIT_GROUPS = {"start", "plans", "reviews", "inbox", "logs", "verify", "artifacts", "archive", "imported", "sources", "docs", "other"}   # the kit's own group ids (no project words)
 LABEL_MAX = 60
 DUE = re.compile(r"\b(after|about|due|review-by|waiting until|on or after)\s+(\d{4}-\d{2}-\d{2})\b")
 ILLUSTRATIVE = " *<>{}$|()[]"

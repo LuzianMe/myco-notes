@@ -22,7 +22,7 @@ They live in each notes repository's `myco-notes/tools/`. Each has a launcher wi
 | `mirror-push`, `restore-drill` | A second copy, and proof that it can be restored. |
 | `doctor` | Read-only health check: kit version, hook, layout, settings. |
 | `bootstrap` | A new notes repository (`--data-dir`, `--new-folders`), or take over a folder (`--import`, `--adopt`). Run from the kit. |
-| `relocate` | Move an older notes repository into the single folder, or refresh a notes repository's tools and docs from a newer kit. Run from the kit. |
+| `relocate` | Move an older notes repository into the single folder, or refresh a notes repository's tools and docs from a newer kit; `--move-reviews` moves review files kept in `plans/` into `reviews/` (format 1.2). Run from the kit. |
 | `secret-scan`, `hooks/pre-commit`, `ci-check`, `setup-clone` | The secret rules, the commit hook (secret scan of the added lines), the pull-request check (secret scan and lint), per-clone set-up. |
 
 ## 2. Layout of a notes repository
@@ -30,7 +30,7 @@ They live in each notes repository's `myco-notes/tools/`. Each has a launcher wi
 ```
 my-project/
   AGENTS.md  CLAUDE.md  .github/  .gitignore  .gitattributes  .myco-notes.conf     (agents, git and the host look for these at the root)
-  myco-notes/        the notes (state.md, runbook.md, one note per component, plans/, logs/, inbox/, sources/, ...)
+  myco-notes/        the notes (state.md, runbook.md, one note per component, plans/, reviews/, logs/, inbox/, sources/, ...)
                      plus tools/, docs/ and map/ (generated, gitignored)
   files-input/ ...   your own folders (--data-dir: not notes, gitignored, skipped by the lint and the map)
 ```

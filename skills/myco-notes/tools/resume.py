@@ -70,19 +70,14 @@ def newest_handoff(root, notes):
     return [item + (f" - {status}" if status else "")]
 
 
-def waiting_reviews(root, notes):
-    """Review files in <notes>/plans/ (method 21.2) with proposals still waiting for an answer: one item per file, numbers listed."""
-    d = os.path.join(root, *notes.split("/"), "plans")
+def waiting_reviews(root, lay):
+    """Review files in <notes>/reviews/ and, in older repositories, <notes>/plans/ (method 21.2) with proposals still waiting for an answer: one item per file, numbers listed."""
     items = []
-    if not os.path.isdir(d):
-        return items
-    for f in sorted(os.listdir(d), reverse=True):
-        if not re.fullmatch(r"review-.*\.md", f):
-            continue
-        text = open(os.path.join(d, f), encoding="utf-8", errors="replace").read()
+    for rel in sorted(_myco.review_paths(root, lay), key=lambda r: r.rsplit("/", 1)[1], reverse=True):
+        text = open(os.path.join(root, *rel.split("/")), encoding="utf-8", errors="replace").read()
         open_ = _myco.review_proposals(text)[1]
         if open_:
-            items.append(f"`{notes}/plans/{f}`: {len(open_)} proposal(s) waiting for the owner's answer ({', '.join(open_)}); apply none before a yes (method 21.3)")
+            items.append(f"`{rel}`: {len(open_)} proposal(s) waiting for the owner's answer ({', '.join(open_)}); apply none before a yes (method 21.3)")
     return items
 
 
@@ -147,7 +142,7 @@ def main():
             state.append(f"note index: `{lay['tools']}/index` (every note with its one-line summary); read it to find the right note")
     except Exception:
         pass
-    reviews = waiting_reviews(root, notes)
+    reviews = waiting_reviews(root, lay)
 
     # --- pending, headline, open items
     pending = section_items(read(notes + "/sync-tracker.md"), r"^pending", 30)

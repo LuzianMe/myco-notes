@@ -259,6 +259,15 @@ def main():
         rc, out = run([sys.executable, BUILD, "--layout", "wiki"], flat)
         check("a flat repository (no MYCO_DIR) builds into notes-map", rc == 0 and os.path.isfile(os.path.join(flat, "notes-map", "p", "notes-a.html")) and 'href="notes-b.html"' in read(os.path.join(flat, "notes-map", "p", "notes-a.html")), out)
 
+        print("0.44.0: reviews have their own group, in the folder reviews/ and (older repositories) in plans/")
+        write(os.path.join(root, "myco-notes", "reviews", "review-2026-01-01.md"), "---\nsummary: First review of the orchard notes\nscope: full\nopen: none\n---\n# Review 2026-01-01\n\nNothing to propose; read state.md.\n")
+        rc, out = build(root, os.path.join(tmp, "rev"), "--layout", "wiki")
+        nav = read(os.path.join(tmp, "rev", "assets", "nav.js"))
+        check("the tree has a Reviews group holding the review file", rc == 0 and "Reviews of the notes" in nav and "review-2026-01-01" in nav
+              and nav.index("Reviews of the notes") < nav.index("review-2026-01-01"), out)
+        git(root, "checkout", "-q", "--", ".")
+        os.remove(os.path.join(root, "myco-notes", "reviews", "review-2026-01-01.md"))
+
         print("without the markdown package")
         shim = os.path.join(tmp, "shim")
         write(os.path.join(shim, "markdown.py"), 'raise ImportError("not installed (test)")\n')

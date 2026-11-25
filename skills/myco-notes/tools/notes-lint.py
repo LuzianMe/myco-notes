@@ -17,7 +17,7 @@ Checks
   summary   notes outside the history folders without a one-line `summary` in the header (one info line for all of them; tools/index --missing
             lists them) and summaries longer than 200 characters (method 10.1)
   synclog   the newest line of the sync log in sync-tracker.md must read '- **YYYY-MM-DD kind:** text' (method 4); older lines are history
-  reviews   a review file (<notes>/plans/review-*.md, method 21.2) needs an 'open:' header line that lists exactly the proposals whose
+  reviews   a review file (<notes>/reviews/review-*.md, or plans/ before 0.44.0; method 21.2) needs an 'open:' header line that lists exactly the proposals whose
             Status is still 'proposed' ('open: none' when all are answered); a 'summary: ...' line in a proposal still waiting (also inside code blocks)
             longer than 200 characters
   sources   a source (<notes>/sources/*.md, method 22) whose text no longer matches its sha256 header: sources are never edited
@@ -305,7 +305,7 @@ def main():
 
     # review files: the 'open' header matches the Status lines (method 21.2)
     for rel in md_files:
-        if not (rel.startswith(lay["notes"] + "/plans/") and _myco.REVIEW_FILE.match(os.path.basename(rel))):
+        if not _myco.is_review_path(lay, rel):
             continue
         allp, waiting = _myco.review_proposals(texts[rel])
         if not allp:

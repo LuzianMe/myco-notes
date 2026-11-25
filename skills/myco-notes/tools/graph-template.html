@@ -136,7 +136,7 @@ var EZ=1,EMBED=root.hasAttribute("data-embed"),INTER=!root.hasAttribute("data-st
 /* every theme's node, group and thread colours (map_themes.py): pal = vivid groups, quiet = the method's record groups */
 var TH=JSON.parse(document.getElementById("themes").textContent);
 /* the method's record and reference groups get quiet colours, so the vivid ones go to the read order, the plans and the project's own areas */
-var QUIET={logs:1,archive:1,docs:1,inbox:1,sources:1,imported:1,other:1},GCI=[];
+var QUIET={logs:1,archive:1,docs:1,inbox:1,sources:1,imported:1,reviews:1,other:1},GCI=[];
 (function(){var v=0,q=0;D.groups.forEach(function(g,i){GCI[i]=QUIET[g.id]?[1,q++]:[0,v++]})})();
 var T={};
 /* The theme is set on <html> before the first paint (the script in <head>); no attribute means Auto: light when the system asks
