@@ -10,6 +10,9 @@
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;overflow:hidden;background:radial-gradient(ellipse at 50% 45%,var(--bg2),var(--bg) 70%);color:var(--fg);font:14px/1.45 var(--font)}
 canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+#bench{position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:40;font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;background:rgba(10,14,12,.92);color:#e6efe8;padding:12px 14px;border-radius:10px;max-width:min(720px,calc(100vw - 24px));pointer-events:none}
+#bench.done{pointer-events:auto}#bench table{border-collapse:collapse;margin:8px 0}#bench th,#bench td{padding:2px 8px;text-align:right;border-bottom:1px solid #345}#bench th:first-child,#bench td:first-child,#bench th:nth-child(2),#bench td:nth-child(2){text-align:left}
+#bench button{font:inherit;padding:3px 9px;border:1px solid #6b8;border-radius:6px;background:transparent;color:#cfe;cursor:pointer}
 #perf{position:fixed;left:12px;bottom:12px;z-index:30;font:11px/1.4 ui-monospace,Menlo,Consolas,monospace;background:rgba(10,14,12,.82);color:#e6efe8;padding:8px 10px;border-radius:8px;max-width:min(440px,calc(100vw - 24px));white-space:pre-wrap;pointer-events:none}
 #perf button{font:inherit;margin-top:6px;padding:2px 8px;border:1px solid #6b8;border-radius:6px;background:transparent;color:#cfe;cursor:pointer;pointer-events:auto}
 #g,#t{pointer-events:none;cursor:default}#g[hidden],#t[hidden]{display:none}canvas.hover{cursor:pointer}canvas.drag{cursor:grabbing}
@@ -806,7 +809,7 @@ function draw(now){
    only sends a few numbers per thread (colour, strength, width). Nothing is rebuilt while the network turns, so the threads move with
    the notes. Notes, labels, spikes and the selected note's threads stay on the 2D canvas. Without WebGL 2, or for the digital themes
    (Matrix, Amber terminal: traces on a grid), or in an embed, the 2D drawing above is used as before. */
-var glEs=0,glEk="",glEdgesDone=false,glMatch=null,glMk="",gcv=document.getElementById("g"),GLR=null,glSg=-1,glT="",glZ=0,glPathDirty=true,glWas=false,c2=true,GN=32,GT=7,RGBV={};
+var GLSCALE=Math.max(.4,Math.min(1,+QS.get("scale")||1)),GLGLOW=QS.get("glow")!=="0",glEs=0,glEk="",glEdgesDone=false,glMatch=null,glMk="",gcv=document.getElementById("g"),GLR=null,glSg=-1,glT="",glZ=0,glPathDirty=true,glWas=false,c2=true,GN=32,GT=7,RGBV={};
 var GL_COMMON="#version 300 es\nprecision highp float;precision highp int;precision highp sampler2D;\n"+
 "uniform sampler2D u_path;uniform sampler2D u_edge;uniform vec4 u_c;uniform vec4 u_p;uniform vec4 u_cam;uniform vec4 u_v;uniform vec2 u_fog;uniform vec3 u_glow;\n"+
 "const int N=32;\n"+
@@ -898,7 +901,7 @@ function glNodes(order,t){
       ga=ap*dm*(n.hist?.55:1)*(.14+.6*rec+(n.hub?.2:0)+.12*fz)*(1-.3*fz)*T.glow,gs=r*(n.hub?3.4:2.8)*(1+.25*fz),gm=Math.max(r*1.6,(n.nn||1e9)*(n.hub?1.3:1.15)),fr=0,fa=0,
       da=ap*dm*(n.hist?.6:1)*fog,ra=ap*dm*fog;
     if(gs>gm){ga*=.25+.75*gm/gs;gs=gm}
-    if(n.spore)ga=0;
+    if(n.spore||!GLGLOW)ga=0;
     if(n.fl&&t-n.fl<500&&T.hit!=="spores"&&T.hit!=="bubbles"&&T.hit!=="ink"){var q=(t-n.fl)/500;fr=r*5;fa=(1-q)*n.flA*Math.max(.4,T.glow)}
     var o=k*24,h=n.hub&&rg;k++;
     d[o]=n.px;d[o+1]=n.py;d[o+2]=r;d[o+3]=gs;
@@ -911,7 +914,7 @@ function glNodes(order,t){
   gl.useProgram(R.node.p);gl.uniform2f(R.node.u.u_size,W,H);gl.bindVertexArray(R.nvao);gl.bindBuffer(gl.ARRAY_BUFFER,R.nbuf);gl.bufferData(gl.ARRAY_BUFFER,d.subarray(0,k*24),gl.DYNAMIC_DRAW);
   gl.drawArraysInstanced(gl.TRIANGLE_STRIP,0,4,k);gl.bindVertexArray(null);
 }
-function glActive(){return !!GLR&&!EMBED&&(T.style==="organic"||T.style==="smooth")}
+function glActive(){return !!GLR&&!GLOFF&&!EMBED&&(T.style==="organic"||T.style==="smooth")}
 function rgbv(str){var v=RGBV[str];if(!v){v=RGBV[str]=str.split(",").map(function(x){return (+x)/255})}return v}
 function glPaths(){   /* the 33 points of every thread in the layout's coordinates (what hyphaPath makes before it projects them) */
   var R=GLR,buf=R.pdata,am=T.style==="smooth"?0:.11;
@@ -954,17 +957,17 @@ function glThreads(){
   function use(pr,pass){var u=pr.u;gl.useProgram(pr.p);gl.uniform1i(u.u_path,0);gl.uniform1i(u.u_edge,1);gl.uniform4f(u.u_c,cyw,syw,cpt,spt);
     if(P&&depthAmt>0)gl.uniform4f(u.u_p,P.x,P.y,P.z,depthAmt);else gl.uniform4f(u.u_p,0,0,0,0);
     gl.uniform4f(u.u_cam,cam.x,cam.y,cam.k,VS);gl.uniform4f(u.u_v,W,H,ZS,pass);gl.uniform2f(u.u_fog,FOGLO,FOGHI>FOGLO?1/(FOGHI-FOGLO):0);gl.uniform3f(u.u_glow,hy[0]/255,hy[1]/255,hy[2]/255)}
-  use(R.rib,1);gl.drawArraysInstanced(gl.TRIANGLE_STRIP,0,2*(GN+1),R.n);   /* the glow, then the threads, then the buds */
+  if(GLGLOW){use(R.rib,1);gl.drawArraysInstanced(gl.TRIANGLE_STRIP,0,2*(GN+1),R.n)}   /* the glow, then the threads, then the buds */
   use(R.rib,0);gl.drawArraysInstanced(gl.TRIANGLE_STRIP,0,2*(GN+1),R.n);
   use(R.tip,0);gl.drawArraysInstanced(gl.TRIANGLE_STRIP,0,4,R.n*2);
 }
 function glClear(){if(!GLR)return;var gl=GLR.gl;gl.viewport(0,0,gcv.width,gcv.height);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT)}
-function glSize(){if(!GLR)return;gcv.width=cv.width;gcv.height=cv.height}
+function glSize(){if(!GLR)return;gcv.width=Math.max(1,Math.round(cv.width*GLSCALE));gcv.height=Math.max(1,Math.round(cv.height*GLSCALE))}   /* the card's canvas can be smaller than the page's: the browser scales it up, and everything is worked out in the page's own pixels */
 
 /* ---------- the performance overlay (?perf=1) ----------
    Frame rate, how long a frame's own work took, and where it went, with the settings that decide the cost, so two ways of drawing (?gl=1 and
    the default) can be compared on the same machine. "Copy" puts the numbers in the clipboard as one line. */
-var PERF=QS.get("perf")==="1",PF={t:0,n:0,work:0,sim:0,thr:0,notes:0,long:0,worst:0,last:0,ivs:0,fr:0,ivF:0,frF:0,cn:0,cov:-1,el:null,tx:null,gpu:"",line:""};
+var PERF=QS.get("perf")==="1"||QS.get("bench")==="1",PF={t:0,n:0,work:0,sim:0,thr:0,notes:0,long:0,worst:0,last:0,ivs:0,fr:0,ivF:0,frF:0,cn:0,cov:-1,el:null,tx:null,gpu:"",line:""};
 function perfGpu(){try{var c=document.createElement("canvas"),g=c.getContext("webgl2")||c.getContext("webgl");if(!g)return "no WebGL";var x=g.getExtension("WEBGL_debug_renderer_info");return x?String(g.getParameter(x.UNMASKED_RENDERER_WEBGL)):"unknown"}catch(e){return "unknown"}}
 function perfSelfTest(){   /* how long a fixed 2D canvas job takes here (150 translucent glow sprites on a 900 x 900 canvas, then a one pixel read to wait for the drawing): a hardware canvas takes a few ms, a software one tens */
   try{var c=document.createElement("canvas");c.width=c.height=900;var g=c.getContext("2d"),sp=sprite("#5ad1b0"),ts=[];
@@ -977,10 +980,12 @@ function perfInit(){
   var b=document.createElement("button");b.type="button";b.textContent="Copy numbers";b.addEventListener("click",function(ev){ev.stopPropagation();
     try{navigator.clipboard.writeText(PF.line).then(function(){b.textContent="Copied"},function(){window.prompt("Copy this line",PF.line)})}catch(e){window.prompt("Copy this line",PF.line)}
     setTimeout(function(){b.textContent="Copy numbers"},1500)});
-  d.appendChild(b);document.body.appendChild(d);PF.el=d;PF.gpu=perfGpu();PF.st=-1;PF.t=performance.now();setTimeout(function(){PF.st=perfSelfTest()},2500);   /* the test blocks the page for a moment on a slow machine: after the first frames */
+  d.appendChild(b);var bb=document.createElement("button");bb.type="button";bb.textContent="Run benchmark";bb.style.marginLeft="6px";bb.addEventListener("click",function(ev){ev.stopPropagation();benchStart()});d.appendChild(bb);
+  document.body.appendChild(d);PF.el=d;PF.gpu=perfGpu();PF.st=-1;PF.t=performance.now();setTimeout(function(){PF.st=perfSelfTest()},2500);   /* the test blocks the page for a moment on a slow machine: after the first frames */
 }
 function perfFrame(now){   /* the time between two frames */
   if(!PERF)return;
+  if(BENCH&&BENCH.rec&&PF.last){BENCH.rec.iv.push(now-PF.last);BENCH.rec.pace.push(pace)}
   if(PF.last){var iv=now-PF.last;PF.ivs+=iv;PF.fr++;if(pace===0){PF.ivF+=iv;PF.frF++;if(iv>34)PF.long++;if(iv>PF.worst)PF.worst=iv}}PF.last=now;   /* the numbers that count are those of frames drawn at full pace */
 }
 function perfCoverage(){   /* the share of the screen the thread layer paints (percent), read back in the first three seconds only: it checks that the two ways of drawing show the same */
@@ -993,12 +998,69 @@ function perfShow(){
   if(!PERF||!PF.n)return;var t=performance.now();if(t-PF.t<1000)return;
   var n=PF.n,uf=PF.frF>0,fr=Math.max(1,uf?PF.frF:PF.fr),ivs=Math.max(1,uf?PF.ivF:PF.ivs),fps=1000*fr/ivs,f=function(x){return (x/n).toFixed(1)},mode=glActive()?(!T.nodes&&GLR.node?"GPU threads and notes (WebGL 2)":"GPU threads (WebGL 2), notes on the 2D canvas"):QS.get("gl")==="0"?"2D (the GPU drawing is switched off with ?gl=0)":GLR?"2D (theme not supported by the GPU path)":"2D (WebGL 2 not available)";
   var o={mode:glActive()?(!T.nodes&&GLR.node?"gl":"gl-threads"):"2d",selfTestMs:PF.st,fps:+fps.toFixed(1),frameMs:+(ivs/fr).toFixed(1),worstMs:+PF.worst.toFixed(0),slowPct:+(100*PF.long/fr).toFixed(0),workMs:+f(PF.work),simMs:+f(PF.sim),threadsMs:+f(PF.thr),notesMs:+f(PF.notes),
-    notes:NN,edges:E.length,dpr:+DPR.toFixed(2),cap:DPRCAP,canvas:cv.width+"x"+cv.height,theme:T.id,cadence:TCAD,lite:LITE,spin:!held,turn:+rot.y.toFixed(2),pace:paceName(),gpu:PF.gpu,ua:navigator.userAgent.slice(0,90)};
+    notes:NN,edges:E.length,dpr:+DPR.toFixed(2),cap:DPRCAP,canvas:cv.width+"x"+cv.height,theme:T.id,cadence:TCAD,lite:LITE,spin:!held,turn:+rot.y.toFixed(2),pace:paceName(),paceWhy:paceWhy,glScale:+GLSCALE.toFixed(2),glow:GLGLOW,gpu:PF.gpu,ua:navigator.userAgent.slice(0,90)};
   if(PF.cn<3){PF.cn++;PF.cov=perfCoverage()}o.threadCover=PF.cov;
   PF.line=JSON.stringify(o);
   PF.tx.textContent="Myco graph performance\n"+mode+"\nfps "+o.fps+"   frame "+o.frameMs+" ms   worst "+o.worstMs+" ms   over 33 ms: "+o.slowPct+"%\nown work per frame "+o.workMs+" ms (simulation "+o.simMs+", threads "+o.threadsMs+", notes "+o.notesMs+")\n"+
-    o.notes+" notes, "+o.edges+" threads   canvas "+o.canvas+" (pixel density "+o.dpr+", cap "+o.cap+")\ntheme "+o.theme+"   redraw every "+(glActive()?"1":o.cadence)+" frames"+(o.lite?", plain lines":"")+"   turning by itself "+(o.spin?"on":"off")+" (view turned "+o.turn+" rad)\nframe pace now: "+o.pace+" ("+paceWhy+")"+(uf?"":" (no full-pace frames in this second: the numbers above are of paced frames)")+"\nthe thread layer paints "+o.threadCover+"% of the screen\n2D canvas test: "+(o.selfTestMs<0?"running":o.selfTestMs+" ms (a few ms: hardware canvas, tens: software)")+"\n"+o.gpu;
+    o.notes+" notes, "+o.edges+" threads   canvas "+o.canvas+" (pixel density "+o.dpr+", cap "+o.cap+")\ntheme "+o.theme+"   redraw every "+(glActive()?"1":o.cadence)+" frames"+(o.lite?", plain lines":"")+"   GPU canvas "+Math.round(100*o.glScale)+"%"+(o.glow?"":", no glow")+"   turning by itself "+(o.spin?"on":"off")+" (view turned "+o.turn+" rad)\nframe pace now: "+o.pace+" ("+paceWhy+")"+(uf?"":" (no full-pace frames in this second: the numbers above are of paced frames)")+"\nthe thread layer paints "+o.threadCover+"% of the screen\n2D canvas test: "+(o.selfTestMs<0?"running":o.selfTestMs+" ms (a few ms: hardware canvas, tens: software)")+"\n"+o.gpu;
   PF.t=t;PF.n=0;PF.work=PF.sim=PF.thr=PF.notes=0;PF.long=0;PF.worst=0;PF.ivs=0;PF.fr=0;PF.ivF=0;PF.frF=0;
+}
+
+/* ---------- the benchmark (?bench=1, or "Run benchmark" in the ?perf=1 panel) ----------
+   The page measures itself and hands over a file. With nobody touching the mouse it runs the same four situations, once drawn by the graphics
+   card (when the browser has WebGL 2) and once drawn by the processor: left alone (still), turning by itself (spin), turned by hand (hand: a
+   steady drag), and with a note selected (select). Each lasts six seconds after a short warm-up. The result (frame rate, the spread of frame
+   times, the page's own work, the pace the page chose, the machine's graphics card and the 2D canvas test; no note names, paths or text) is shown
+   in a panel and saved as a JSON file, for sending to whoever tunes the drawing. ?quick=1 makes each situation 1.5 seconds. */
+var BENCHON=QS.get("bench")==="1",BQ=QS.get("quick")==="1",BENCH=null,GLOFF=false;
+function benchPct(a,q){if(!a.length)return 0;var b=a.slice().sort(function(x,y){return x-y});return b[Math.min(b.length-1,Math.floor(q*b.length))]}
+function benchStats(ph){
+  var iv=ph.iv,n=iv.length,sum=iv.reduce(function(a,b){return a+b},0)||1,pc={full:0,live:0,calm:0};
+  ph.pace.forEach(function(p){pc[p===0?"full":p<=33?"live":"calm"]++});
+  return {mode:ph.mode,name:ph.name,seconds:+(sum/1000).toFixed(1),frames:n,fps:+(1000*n/sum).toFixed(1),frameMs:+(sum/Math.max(1,n)).toFixed(1),p50Ms:+benchPct(iv,.5).toFixed(1),p95Ms:+benchPct(iv,.95).toFixed(1),p99Ms:+benchPct(iv,.99).toFixed(1),
+    worstMs:+Math.max.apply(null,iv.concat([0])).toFixed(0),slowPct:+(100*iv.filter(function(x){return x>33.4}).length/Math.max(1,n)).toFixed(0),
+    ownWorkMs:+(ph.work.reduce(function(a,b){return a+b},0)/Math.max(1,ph.work.length)).toFixed(1),paceShare:{full:+(100*pc.full/Math.max(1,n)).toFixed(0),live:+(100*pc.live/Math.max(1,n)).toFixed(0),calm:+(100*pc.calm/Math.max(1,n)).toFixed(0)},touched:ph.touched}
+}
+function benchPanel(html,done){
+  var d=document.getElementById("bench");if(!d){d=document.createElement("div");d.id="bench";document.body.appendChild(d)}
+  d.innerHTML=html;d.className=done?"done":"";return d;
+}
+function benchStart(){
+  if(BENCH)return;
+  var modes=GLR?["gpu","2d"]:["2d"],list=[],dur=BQ?1500:6000,warm=BQ?500:1200;
+  modes.forEach(function(m){["still","spin","hand","select"].forEach(function(k){list.push({mode:m,name:k,iv:[],pace:[],work:[],touched:false})})});
+  BENCH={list:list,i:-1,out:[],rec:null,drive:null,held:held,t0:Date.now(),dur:dur,warm:warm,touched:false};
+  var feel=function(){if(BENCH&&BENCH.rec)BENCH.rec.touched=true;if(BENCH)BENCH.touched=true};
+  BENCH.listen=feel;["pointerdown","keydown","wheel","touchstart"].forEach(function(t){addEventListener(t,feel,true)});
+  window.MYCO_BENCH=null;benchNext();
+}
+function benchNext(){
+  var B=BENCH;if(!B)return;
+  if(B.rec){B.out.push(benchStats(B.rec));B.rec=null}
+  B.i++;B.drive=null;
+  if(B.i>=B.list.length)return benchFinish();
+  var ph=B.list[B.i];
+  benchPanel("<b>Benchmark running</b> ("+(B.i+1)+" of "+B.list.length+": "+(ph.mode==="gpu"?"graphics card":"processor")+", "+ph.name+")<br>Please do not touch the mouse or keyboard, and keep this tab in front.");
+  GLOFF=ph.mode==="2d";tKey="";glEdgesDone=false;select(-1);spin.vy=spin.vx=0;spin.on=false;
+  var now=performance.now();
+  if(ph.name==="still"){setHold(true,true);lastAct=now-5000;spin.last=now}
+  else if(ph.name==="spin"){setHold(false,true);spin.last=now-IDLE-1000}
+  else if(ph.name==="hand"){setHold(true,true);B.drive=function(dt){turnTo(rot.y+.0008*dt,rot.x);spin.last=performance.now();lastAct=spin.last}}
+  else{var best=-1,bi=-1;NODES.forEach(function(n){if(n.vis&&n.in>bi){bi=n.in;best=n.i}});setHold(false,true);select(best);spin.last=now-IDLE-1000}
+  setTimeout(function(){if(BENCH!==B)return;B.rec=ph;setTimeout(function(){if(BENCH===B)benchNext()},B.dur)},B.warm);
+}
+function benchFinish(){
+  var B=BENCH;BENCH=null;removeEventListener("pointerdown",B.listen,true);removeEventListener("keydown",B.listen,true);removeEventListener("wheel",B.listen,true);removeEventListener("touchstart",B.listen,true);
+  GLOFF=false;tKey="";glEdgesDone=false;select(-1);setHold(B.held,true);
+  var res={tool:"myco-notes graph benchmark",startedAt:new Date(B.t0).toISOString(),seconds:+((Date.now()-B.t0)/1000).toFixed(0),quick:BQ,theme:T.id,notes:NN,edges:E.length,
+    window:{w:innerWidth,h:innerHeight,dpr:+(window.devicePixelRatio||1).toFixed(2),canvas:cv.width+"x"+cv.height,cap:DPRCAP,glScale:+GLSCALE.toFixed(2)},
+    webgl2:!!GLR,gpu:PF.gpu,canvas2dTestMs:PF.st,ua:navigator.userAgent,phases:B.out,touchedDuringRun:B.touched};
+  window.MYCO_BENCH=res;var txt=JSON.stringify(res,null,1),rows=B.out.map(function(p){return "<tr><td>"+(p.mode==="gpu"?"card":"processor")+"</td><td>"+p.name+"</td><td>"+p.fps+"</td><td>"+p.p95Ms+"</td><td>"+p.slowPct+"%</td><td>"+p.ownWorkMs+"</td><td>"+p.paceShare.full+"/"+p.paceShare.live+"/"+p.paceShare.calm+"</td></tr>"}).join("");
+  var d=benchPanel("<b>Benchmark done</b>"+(B.touched?" (input was detected during the run: those numbers may be off)":"")+"<table><tr><th>drawn by</th><th>situation</th><th>fps</th><th>95% of frames under (ms)</th><th>slow</th><th>own ms</th><th>full/live/calm %</th></tr>"+rows+"</table><button type=button id=bdl>Download the results</button> <button type=button id=bcp>Copy</button> <button type=button id=bcl>Close</button>",true);
+  var name="myco-graph-bench-"+new Date(B.t0).toISOString().replace(/[-:]/g,"").slice(0,15)+".json",save=function(){try{var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([txt],{type:"application/json"}));a.download=name;document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},500)}catch(e){}};
+  d.querySelector("#bdl").addEventListener("click",save);d.querySelector("#bcl").addEventListener("click",function(){d.remove()});
+  d.querySelector("#bcp").addEventListener("click",function(){try{navigator.clipboard.writeText(txt).then(function(){d.querySelector("#bcp").textContent="Copied"},function(){window.prompt("Copy this",txt)})}catch(e){window.prompt("Copy this",txt)}});
+  save();   /* the browser may ask or refuse a download that no click started: the button is there then */
 }
 
 /* ---------- loop ---------- */
@@ -1058,6 +1120,7 @@ function step(now){
   var dt=Math.min(64,now-(lastT||now));lastT=now;
   governor(now);
   var pt0=PERF?performance.now():0;
+  if(BENCH&&BENCH.drive)BENCH.drive(dt);
   if(playing){
     acc+=dt;var iv=Math.max(45,Math.min(700,24000/Math.max(NC,1)))/parseFloat(document.getElementById("speed").value);
     while(acc>=iv&&playing){acc-=iv;if(cur>=NC){stopPlay();break}setStep(cur+1,true)}
@@ -1074,25 +1137,25 @@ function step(now){
   if(PERF)PF.sim+=performance.now()-pt0;
   draw(now);
   pace=paceOf(now);
-  if(PERF){PF.work+=performance.now()-pt0;PF.n++;perfShow()}
+  if(PERF){var wk=performance.now()-pt0;PF.work+=wk;PF.n++;if(BENCH&&BENCH.rec)BENCH.rec.work.push(wk);perfShow()}
   if(!readySent){readySent=true;tell("myco-ready")}
 }
 /* Governor for a slow machine. Steps, each taken once and never undone (so nothing can flicker), the next only if the one before was not
-   enough: (1) on a screen with more than 1.5 device pixels per pixel, the density drops to 1.5 (a little softer, 44% fewer pixels); (2) while
-   the network turns by itself its threads are redrawn every 6th frame instead of every 3rd (the turning is a little steppier); (3) the threads
-   become plain lines without glow (the way an embedded graph draws them). Each step follows three seconds of frames spaced more than 40 ms
-   apart (under 25 a second), counted after the first five seconds. It does nothing when frames are fast or during a replay; step (1) is
-   skipped at 1x, at 1.5x and in embed mode, steps (2) and (3) when the GPU draws the threads (?gl=1). */
+   enough, each after three seconds of frames spaced more than 40 ms apart (under 25 a second), counted after the first five seconds of
+   full-pace frames (paced frames are slow on purpose): (1) on a screen with more than 1.5 device pixels per pixel, the density drops to 1.5
+   (44% fewer pixels). Then, when the card draws: (2) its canvas drops to 75% and (3) to 60% of the page's size, scaled up by the browser (a
+   little softer, far fewer pixels to fill); when the processor draws: (2) the threads are redrawn every 6th frame instead of every 3rd, (3) they
+   become plain lines without glow. ?scale=0.5 starts the card at a given size. It does nothing when frames are fast or during a replay. */
 var govLast=0;
 function governor(now){
   var dt=govLast?Math.min(1000,now-govLast):0;govLast=now;   /* the real time between frames (the animation's own step is capped at 64 ms) */
-  if(pace>0){govLast=0;return}   /* paced frames are slow on purpose */
+  if(pace>0||BENCH){govLast=0;return}   /* paced frames are slow on purpose; a benchmark measures what is, so nothing steps down in it */
   if(playing||!dt)return;
-  var dense=DPRCAP>1.5&&(window.devicePixelRatio||1)>1.5,more=!EMBED&&!glActive()&&(TCAD<6||!LITE);
-  if(!dense&&!more)return;
+  var gon=glActive(),dense=DPRCAP>1.5&&(window.devicePixelRatio||1)>1.5,more=!EMBED&&!gon&&(TCAD<6||!LITE),gls=gon&&GLSCALE>.6;
+  if(!dense&&!more&&!gls)return;
   runT+=dt;if(runT<5000)return;
   slowT=dt>40?slowT+dt:Math.max(0,slowT-dt*2);
-  if(slowT>3000){slowT=0;if(dense){DPRCAP=1.5;resize()}else if(TCAD<6){TCAD=6}else{LITE=true;tKey=""}}
+  if(slowT>3000){slowT=0;if(dense){DPRCAP=1.5;resize()}else if(gls){GLSCALE=GLSCALE>.75?.75:.6;glSize();glEdgesDone=false}else if(TCAD<6){TCAD=6}else{LITE=true;tKey=""}}
 }
 function startPlay(){
   if(cur>=NC){setStep(0,false);alpha=.1}
@@ -1319,6 +1382,7 @@ function showHint(){
 
 /* ---------- start ---------- */
 initGL();perfInit();
+if(BENCHON)setTimeout(benchStart,2500);   /* after the first frames and the card's start */
 readTheme();resize();
 if(NN===0){document.getElementById("empty").style.display="flex"}
 document.getElementById("time").hidden=NC<2;root.classList.toggle("notime",NC<2);
