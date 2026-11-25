@@ -696,12 +696,16 @@ function embedLabels(){   /* embed: no names on a small frame, zoomed out past t
   var d=NODES.filter(function(n){return n.vis&&n.ap>0&&n.nn}).map(function(n){return n.nn}).sort(function(a,b){return a-b});
   return d.length<2||d[d.length>>1]>=18;
 }
+var uiAt=-1e9,uiList=[];
+function uiRects(now){   /* names stay clear of the search, timeline, tools and detail panel; measured at most four times a second while nothing is being done (reading the sizes of the panels makes the browser lay the page out) */
+  if(pace>0&&now-uiAt<250)return uiList;
+  uiAt=now;uiList=[];document.querySelectorAll(".box").forEach(function(el){if(el.hidden)return;var r=el.getBoundingClientRect();if(r.width&&r.height)uiList.push([r.left,r.top,r.right,r.bottom])});return uiList;
+}
 function updateLabels(now,dt){
   var fresh0=sel!==spotFor,eL=!EMBED||sel>=0||embedLabels();
   if(fresh0){spotFor=sel;NODES.forEach(function(n){n.ls=-1e9});lastAdd=-1e9}   /* a new focus: every note may be named again, and the names come quicker */
   var pool=NODES.filter(function(n){return eL&&n.name&&(!EMBED||sel>=0||n.nn>=18)&&n.vis&&n.ap>=1&&n.i!==sel&&(sel<0||adj[sel].some(function(m){return m.n===n}))&&dim(n)>.5});
-  var ui=[];document.querySelectorAll(".box").forEach(function(el){   /* names stay clear of the search, timeline, tools and detail panel */
-    if(el.hidden)return;var r=el.getBoundingClientRect();if(r.width&&r.height)ui.push([r.left,r.top,r.right,r.bottom])});
+  var ui=uiRects(now);
   var S=slotCount(pool.filter(onScreen).length),keep=pool.length<=S,on=0;
   NODES.forEach(function(n){   /* a name outside the new neighbourhood, past its time, or now under a panel fades out; one that still belongs stays */
     if(n.lt&&((!keep&&now>n.lu)||pool.indexOf(n)<0||ui.some(function(u){return overlaps(lbox(n),u)}))){n.lt=0;n.ls=now}
@@ -732,7 +736,7 @@ function draw(now){
   var hotE=[],coldE=[],gon=glActive(),gn=gon&&!T.nodes&&!!GLR.node;   /* gn: the card draws the notes too (the themes whose notes are plain discs) */
   E.forEach(function(e){e._g=0;if(!edgeVis(e)||Math.min(e.a.ap,e.b.ap)<=0)return;if(focus>=0&&(e.a.i===focus||e.b.i===focus)){hotE.push(e);if(gn)e._g=2}else{coldE.push(e);e._g=1}});
   busyNow=!!(drag||pinch)||now-spin.last<400;
-  var mk=match?Object.keys(match).length+":"+Object.keys(match)[0]:"",settling=alpha>0||NODES.some(function(n){return n.vis&&(n.ap<1||Math.abs(n.zt-n.z)>.003)});
+  var mk=match?Object.keys(match).length+":"+Object.keys(match)[0]:"",settling=settlingNow=alpha>0||NODES.some(function(n){return n.vis&&(n.ap<1||Math.abs(n.zt-n.z)>.003)});
   var key=[W,H,DPR,cam.x.toFixed(2),cam.y.toFixed(2),cam.k.toFixed(4),cyw.toFixed(4),syw.toFixed(4),cpt.toFixed(4),spt.toFixed(4),depthAmt.toFixed(3),focus,mk,T.id,cur,coldE.length,settling?now:0].join("|");
   var tT=PERF?performance.now():0;
   if(gon!==glWas){glWas=gon;gcv.hidden=!gon;tc.hidden=gon;tKey="";if(gon)tcx.clearRect(0,0,tc.width,tc.height);else glClear()}   /* the layer of the 2D threads is not needed while the card draws them */
@@ -802,7 +806,7 @@ function draw(now){
    only sends a few numbers per thread (colour, strength, width). Nothing is rebuilt while the network turns, so the threads move with
    the notes. Notes, labels, spikes and the selected note's threads stay on the 2D canvas. Without WebGL 2, or for the digital themes
    (Matrix, Amber terminal: traces on a grid), or in an embed, the 2D drawing above is used as before. */
-var gcv=document.getElementById("g"),GLR=null,glSg=-1,glT="",glZ=0,glPathDirty=true,glWas=false,c2=true,GN=32,GT=7,RGBV={};
+var glEs=0,glEk="",glEdgesDone=false,glMatch=null,glMk="",gcv=document.getElementById("g"),GLR=null,glSg=-1,glT="",glZ=0,glPathDirty=true,glWas=false,c2=true,GN=32,GT=7,RGBV={};
 var GL_COMMON="#version 300 es\nprecision highp float;precision highp int;precision highp sampler2D;\n"+
 "uniform sampler2D u_path;uniform sampler2D u_edge;uniform vec4 u_c;uniform vec4 u_p;uniform vec4 u_cam;uniform vec4 u_v;uniform vec2 u_fog;uniform vec3 u_glow;\n"+
 "const int N=32;\n"+
@@ -919,7 +923,7 @@ function glPaths(){   /* the 33 points of every thread in the layout's coordinat
   var gl=R.gl;gl.bindTexture(gl.TEXTURE_2D,R.path);gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,GN+1,R.n,gl.RGBA,gl.FLOAT,buf);
 }
 function glEdges(){   /* what each thread looks like now: seven texels of four numbers (see the vertex shaders) */
-  var R=GLR,d=R.edata,kc=Math.min(1.4,cam.k+.3);
+  var R=GLR,d=R.edata,kc=Math.min(1.4,cam.k+.3),load=E.length*W*H*DPR*DPR/1e6,gf=load<400?1:load>1600?.35:1-(load-400)/1200*.65;   /* gf: the glow gets thinner and fainter as threads times pixels grow (it costs the most per pixel and shows the least in a dense graph) */
   E.forEach(function(e){
     var o=e.k*GT*4,i;
     if(!e._g){d[o+3]=0;d[o+7]=0;d[o+19]=0;d[o+27]=0;return}
@@ -927,20 +931,23 @@ function glEdges(){   /* what each thread looks like now: seven texels of four n
       src=e.dir>=0?e.a:e.b,dst=e.dir>=0?e.b:e.a,Ls=Math.hypot(e.a.px-e.b.px,e.a.py-e.b.py)||1,
       tc0=Math.min(.45,(src.pr+1.5)/Ls),tc1=Math.min(.45,(dst.pr+1.5)/Ls),ps=(e.a.ps+e.b.ps)/2,fused=e.dir===0,ca=rgbv(threadRGB(e.a)),cb=fused?rgbv(threadRGB(e.b)):null,cs=fused?ca:rgbv(threadRGB(src));
     d[o]=cs[0];d[o+1]=cs[1];d[o+2]=cs[2];d[o+3]=al;                                        /* 0: colour at the start, strength */
-    i=fused?cb:cs;d[o+4]=i[0];d[o+5]=i[1];d[o+6]=i[2];d[o+7]=fused||hot?0:al*.4*T.tglow;       /* 1: colour at the end, strength of the glow */
+    i=fused?cb:cs;d[o+4]=i[0];d[o+5]=i[1];d[o+6]=i[2];d[o+7]=fused||hot?0:al*.4*T.tglow*gf;       /* 1: colour at the end, strength of the glow */
     d[o+8]=fused?w*.5:w*1.15;d[o+9]=fused?w*.5:w*.12;d[o+10]=tc0;d[o+11]=tc1;               /* 2: half widths (start, end), the rim of the notes */
     d[o+12]=a;d[o+13]=e.dir;d[o+14]=.9+w*ps*.9;d[o+15]=al*3;                                /* 3: growth, direction, bud radius, bud strength */
     if(fused){var ba=rgbv(budRGB(e.b)),bb=rgbv(budRGB(e.a));d[o+16]=ba[0];d[o+17]=ba[1];d[o+18]=ba[2];d[o+19]=a>=1?1:0;d[o+24]=bb[0];d[o+25]=bb[1];d[o+26]=bb[2];d[o+27]=a>=1?1:0}
     else{d[o+19]=0;var bs=rgbv(budRGB(src));d[o+24]=bs[0];d[o+25]=bs[1];d[o+26]=bs[2];d[o+27]=1}   /* 4, 6: the buds at the two ends */
-    d[o+20]=w*2.2;d[o+21]=w*.6;d[o+22]=0;d[o+23]=0;                                         /* 5: half widths of the glow */
+    d[o+20]=w*2.2*gf;d[o+21]=w*.6*gf;d[o+22]=0;d[o+23]=0;                                         /* 5: half widths of the glow */
   });
   var gl=R.gl;gl.bindTexture(gl.TEXTURE_2D,R.edge);gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,GT,R.n,gl.RGBA,gl.FLOAT,d);
 }
+function glMatchKey(){if(match!==glMatch){glMatch=match;glMk=match?Object.keys(match).length+":"+Object.keys(match)[0]:""}return glMk}
 function glThreads(){
   var R=GLR,gl=R.gl,sg=0;
   NODES.forEach(function(n){if(n.vis)sg+=n.x*1.37+n.y*2.11+n.z*53.7});
   if(sg!==glSg||T.id!==glT||Math.abs(ZS-glZ)>.5){glSg=sg;glT=T.id;glZ=ZS;glPaths()}
-  glEdges();
+  var es=cam.k*977+cur*7.3+W*3+H,ek=T.id+"|"+(sel>=0?sel:hov)+"|"+glMatchKey();
+  NODES.forEach(function(n){if(n.vis)es+=n.px*1.01+n.py*1.73+n.pr*13.1+n.ps*29.3+n.ap*31.7});
+  if(es!==glEs||ek!==glEk||!glEdgesDone){glEs=es;glEk=ek;glEdgesDone=true;glEdges()}   /* the data of the threads is sent again only when something that shapes it changed */
   gl.viewport(0,0,gcv.width,gcv.height);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);gl.enable(gl.BLEND);gl.blendFunc(gl.ONE,gl.ONE_MINUS_SRC_ALPHA);
   gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,R.path);gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,R.edge);
   var hy=T.hypha.split(",").map(Number);
@@ -957,7 +964,7 @@ function glSize(){if(!GLR)return;gcv.width=cv.width;gcv.height=cv.height}
 /* ---------- the performance overlay (?perf=1) ----------
    Frame rate, how long a frame's own work took, and where it went, with the settings that decide the cost, so two ways of drawing (?gl=1 and
    the default) can be compared on the same machine. "Copy" puts the numbers in the clipboard as one line. */
-var PERF=QS.get("perf")==="1",PF={t:0,n:0,work:0,sim:0,thr:0,notes:0,long:0,worst:0,last:0,ivs:0,fr:0,cn:0,cov:-1,el:null,tx:null,gpu:"",line:""};
+var PERF=QS.get("perf")==="1",PF={t:0,n:0,work:0,sim:0,thr:0,notes:0,long:0,worst:0,last:0,ivs:0,fr:0,ivF:0,frF:0,cn:0,cov:-1,el:null,tx:null,gpu:"",line:""};
 function perfGpu(){try{var c=document.createElement("canvas"),g=c.getContext("webgl2")||c.getContext("webgl");if(!g)return "no WebGL";var x=g.getExtension("WEBGL_debug_renderer_info");return x?String(g.getParameter(x.UNMASKED_RENDERER_WEBGL)):"unknown"}catch(e){return "unknown"}}
 function perfSelfTest(){   /* how long a fixed 2D canvas job takes here (150 translucent glow sprites on a 900 x 900 canvas, then a one pixel read to wait for the drawing): a hardware canvas takes a few ms, a software one tens */
   try{var c=document.createElement("canvas");c.width=c.height=900;var g=c.getContext("2d"),sp=sprite("#5ad1b0"),ts=[];
@@ -974,7 +981,7 @@ function perfInit(){
 }
 function perfFrame(now){   /* the time between two frames */
   if(!PERF)return;
-  if(PF.last){var iv=now-PF.last;PF.ivs+=iv;PF.fr++;if(iv>34)PF.long++;if(iv>PF.worst)PF.worst=iv}PF.last=now;
+  if(PF.last){var iv=now-PF.last;PF.ivs+=iv;PF.fr++;if(pace===0){PF.ivF+=iv;PF.frF++;if(iv>34)PF.long++;if(iv>PF.worst)PF.worst=iv}}PF.last=now;   /* the numbers that count are those of frames drawn at full pace */
 }
 function perfCoverage(){   /* the share of the screen the thread layer paints (percent), read back in the first three seconds only: it checks that the two ways of drawing show the same */
   try{var k=0,i,w,h;
@@ -984,14 +991,14 @@ function perfCoverage(){   /* the share of the screen the thread layer paints (p
 }
 function perfShow(){
   if(!PERF||!PF.n)return;var t=performance.now();if(t-PF.t<1000)return;
-  var n=PF.n,fr=Math.max(1,PF.fr),fps=1000*fr/Math.max(1,PF.ivs),f=function(x){return (x/n).toFixed(1)},mode=glActive()?(!T.nodes&&GLR.node?"GPU threads and notes (WebGL 2)":"GPU threads (WebGL 2), notes on the 2D canvas"):QS.get("gl")==="0"?"2D (the GPU drawing is switched off with ?gl=0)":GLR?"2D (theme not supported by the GPU path)":"2D (WebGL 2 not available)";
-  var o={mode:glActive()?(!T.nodes&&GLR.node?"gl":"gl-threads"):"2d",selfTestMs:PF.st,fps:+fps.toFixed(1),frameMs:+(PF.ivs/fr).toFixed(1),worstMs:+PF.worst.toFixed(0),slowPct:+(100*PF.long/fr).toFixed(0),workMs:+f(PF.work),simMs:+f(PF.sim),threadsMs:+f(PF.thr),notesMs:+f(PF.notes),
-    notes:NN,edges:E.length,dpr:+DPR.toFixed(2),cap:DPRCAP,canvas:cv.width+"x"+cv.height,theme:T.id,cadence:TCAD,lite:LITE,spin:!held,turn:+rot.y.toFixed(2),gpu:PF.gpu,ua:navigator.userAgent.slice(0,90)};
+  var n=PF.n,uf=PF.frF>0,fr=Math.max(1,uf?PF.frF:PF.fr),ivs=Math.max(1,uf?PF.ivF:PF.ivs),fps=1000*fr/ivs,f=function(x){return (x/n).toFixed(1)},mode=glActive()?(!T.nodes&&GLR.node?"GPU threads and notes (WebGL 2)":"GPU threads (WebGL 2), notes on the 2D canvas"):QS.get("gl")==="0"?"2D (the GPU drawing is switched off with ?gl=0)":GLR?"2D (theme not supported by the GPU path)":"2D (WebGL 2 not available)";
+  var o={mode:glActive()?(!T.nodes&&GLR.node?"gl":"gl-threads"):"2d",selfTestMs:PF.st,fps:+fps.toFixed(1),frameMs:+(ivs/fr).toFixed(1),worstMs:+PF.worst.toFixed(0),slowPct:+(100*PF.long/fr).toFixed(0),workMs:+f(PF.work),simMs:+f(PF.sim),threadsMs:+f(PF.thr),notesMs:+f(PF.notes),
+    notes:NN,edges:E.length,dpr:+DPR.toFixed(2),cap:DPRCAP,canvas:cv.width+"x"+cv.height,theme:T.id,cadence:TCAD,lite:LITE,spin:!held,turn:+rot.y.toFixed(2),pace:paceName(),gpu:PF.gpu,ua:navigator.userAgent.slice(0,90)};
   if(PF.cn<3){PF.cn++;PF.cov=perfCoverage()}o.threadCover=PF.cov;
   PF.line=JSON.stringify(o);
   PF.tx.textContent="Myco graph performance\n"+mode+"\nfps "+o.fps+"   frame "+o.frameMs+" ms   worst "+o.worstMs+" ms   over 33 ms: "+o.slowPct+"%\nown work per frame "+o.workMs+" ms (simulation "+o.simMs+", threads "+o.threadsMs+", notes "+o.notesMs+")\n"+
-    o.notes+" notes, "+o.edges+" threads   canvas "+o.canvas+" (pixel density "+o.dpr+", cap "+o.cap+")\ntheme "+o.theme+"   redraw every "+(glActive()?"1":o.cadence)+" frames"+(o.lite?", plain lines":"")+"   turning by itself "+(o.spin?"on":"off")+" (view turned "+o.turn+" rad)\nthe thread layer paints "+o.threadCover+"% of the screen\n2D canvas test: "+(o.selfTestMs<0?"running":o.selfTestMs+" ms (a few ms: hardware canvas, tens: software)")+"\n"+o.gpu;
-  PF.t=t;PF.n=0;PF.work=PF.sim=PF.thr=PF.notes=0;PF.long=0;PF.worst=0;PF.ivs=0;PF.fr=0;
+    o.notes+" notes, "+o.edges+" threads   canvas "+o.canvas+" (pixel density "+o.dpr+", cap "+o.cap+")\ntheme "+o.theme+"   redraw every "+(glActive()?"1":o.cadence)+" frames"+(o.lite?", plain lines":"")+"   turning by itself "+(o.spin?"on":"off")+" (view turned "+o.turn+" rad)\nframe pace now: "+o.pace+" ("+paceWhy+")"+(uf?"":" (no full-pace frames in this second: the numbers above are of paced frames)")+"\nthe thread layer paints "+o.threadCover+"% of the screen\n2D canvas test: "+(o.selfTestMs<0?"running":o.selfTestMs+" ms (a few ms: hardware canvas, tens: software)")+"\n"+o.gpu;
+  PF.t=t;PF.n=0;PF.work=PF.sim=PF.thr=PF.notes=0;PF.long=0;PF.worst=0;PF.ivs=0;PF.fr=0;PF.ivF=0;PF.frF=0;
 }
 
 /* ---------- loop ---------- */
@@ -1011,14 +1018,36 @@ function resize(){
 /* the loop: one frame at a time while nothing pauses it (the page hidden, or the host page's {type:"myco-pause"}); an error in a
    frame is reported and the loop goes on, and while the page has no size yet (a hidden iframe or a background tab opened with
    0x0) frames draw nothing and wait for the size */
-var raf=0,pause={},started=false;
+var raf=0,tmo=0,pause={},started=false,pace=0,paceWhy="",lastAct=performance.now(),settlingNow=false;
 function paused(){for(var k in pause)if(pause[k])return true;return false}
-function loop(){if(!raf&&!paused())raf=requestAnimationFrame(frame)}
-function setPause(why,on){pause[why]=on;if(!on){lastT=0;loop()}}
+/* Pacing. A frame is drawn at once while something moves or the reader is at work (pace 0: dragging, zooming, hovering, a turn, a replay, a
+   settling layout, a glide of the camera, a ripple, and for a second and a half after any input); at about 30 a second while only
+   spikes, flashes, particles, the lit threads of a selected note or the screensaver run (pace 33 ms); and at about 15 a second when all that moves is the
+   slow life of the view (names fading in and out, the pulse of recent notes; pace 66 ms). Any input wakes it at once. A cooler laptop keeps its
+   clock speed, so the turns and drags stay smooth. */
+function paceOf(now){
+  if(EMBED)return drag||pinch||playing?(paceWhy="input",0):(paceWhy="embed",33);
+  var w=drag?"drag":pinch?"pinch":playing?"replay":spin.on?"turning":now-lastAct<1500?"input":alpha>0?"layout":rot.home?"turning home":settlingNow?"settling":
+    Math.abs(spin.vy)>1e-5||Math.abs(spin.vx)>1e-5?"momentum":Math.abs((depthOn?1:0)-depthAmt)>.003?"depth":
+    Math.abs(cam.tx-cam.x)*cam.k>.5||Math.abs(cam.ty-cam.y)*cam.k>.5||Math.abs(cam.tk-cam.k)>.004*cam.k?"camera":ripples.length?"ripple":"";
+  if(w){paceWhy=w;return 0}
+  var fl=false;for(var i=0;!fl&&i<NODES.length;i++){var n=NODES[i];if(n.fl&&now-n.fl<500)fl=true}
+  if(spikes.length||parts.length||fl||sel>=0||saverOn){paceWhy=spikes.length?"spikes":parts.length?"particles":fl?"flash":sel>=0?"selection":"screensaver";return 33}
+  paceWhy="names, pulse";return 66;
+}
+function paceName(){return pace===0?"full":pace<=33?"live":"calm"}
+function loop(){
+  if(raf||tmo||paused())return;
+  var wait=pace?pace-(performance.now()-lastStep):0;
+  if(wait>6)tmo=setTimeout(function(){tmo=0;if(!raf&&!paused())raf=requestAnimationFrame(frame)},wait);
+  else raf=requestAnimationFrame(frame);
+}
+function wake(){lastAct=performance.now();if(tmo){clearTimeout(tmo);tmo=0}if(!raf&&!paused())raf=requestAnimationFrame(frame)}
+["pointermove","pointerdown","pointerup","wheel","keydown","input","change","click","touchstart","touchmove"].forEach(function(t){addEventListener(t,wake,{capture:true,passive:true})});
+function setPause(why,on){pause[why]=on;if(!on){lastT=0;lastAct=performance.now();loop()}}
 var lastStep=0;
 function frame(now){
   raf=0;
-  if(EMBED&&!drag&&!pinch&&!playing&&now-lastStep<30&&W>0){loop();return}   /* embed: about 30 frames a second, except while the reader drags or pinches */
   lastStep=now;perfFrame(now);
   try{step(now)}catch(e){fail(e,true)}
   loop();
@@ -1044,6 +1073,7 @@ function step(now){
   updateLabels(now,dt);
   if(PERF)PF.sim+=performance.now()-pt0;
   draw(now);
+  pace=paceOf(now);
   if(PERF){PF.work+=performance.now()-pt0;PF.n++;perfShow()}
   if(!readySent){readySent=true;tell("myco-ready")}
 }
@@ -1056,6 +1086,7 @@ function step(now){
 var govLast=0;
 function governor(now){
   var dt=govLast?Math.min(1000,now-govLast):0;govLast=now;   /* the real time between frames (the animation's own step is capped at 64 ms) */
+  if(pace>0){govLast=0;return}   /* paced frames are slow on purpose */
   if(playing||!dt)return;
   var dense=DPRCAP>1.5&&(window.devicePixelRatio||1)>1.5,more=!EMBED&&!glActive()&&(TCAD<6||!LITE);
   if(!dense&&!more)return;
@@ -1262,7 +1293,7 @@ window.addEventListener("message",function(ev){
   if(!IN_FRAME||ev.source!==window.parent)return;
   var m=ev.data;if(!m||typeof m!=="object"||typeof m.type!=="string")return;
   if(m.type==="myco-theme"){var t=String(m.theme||"");if(t==="auto")root.removeAttribute("data-theme");else if(TH[t])root.setAttribute("data-theme",t);else return;
-    var sp=document.getElementById("theme-pick");if(sp)sp.value=t;readTheme();tKey=""}
+    var sp=document.getElementById("theme-pick");if(sp)sp.value=t;readTheme();tKey="";wake()}
   else if(m.type==="myco-pause")setPause("host",true);
   else if(m.type==="myco-resume")setPause("host",false);
 });
