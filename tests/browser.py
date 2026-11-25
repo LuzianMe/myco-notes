@@ -53,7 +53,7 @@ BLOBS = ("(function(){var c=document.getElementById('c'),d=c.getContext('2d').ge
          "var b=g[k]||(g[k]={n:0,x:0,y:0});b.n++;b.x+=x;b.y+=y}"
          "return Object.keys(g).map(function(k){var b=g[k];return [b.x/b.n/c.width*innerWidth,b.y/b.n/c.height*innerHeight,b.n]}).sort(function(a,b){return b[2]-a[2]})})()")
 PAINTED = ("(function(){var c=document.getElementById('c'),d=c.getContext('2d').getImageData(0,0,c.width,c.height).data,k=0;"
-           "for(var i=3;i<d.length;i+=4)if(d[i])k++;return k})()")
+           "for(var i=3;i<d.length;i+=4)k+=d[i];return k})()")   # the sum of the alpha values: dimming fades what is drawn, it does not remove it, and the sum moves little while the view turns
 
 
 def wiki_checks(b, base, site, demo):
@@ -144,6 +144,51 @@ def wiki_checks(b, base, site, demo):
             pg.wait_for_timeout(900)
             check("wiki phone: a note chosen in the menu opens", "/p/" in pg.url and "myco-notes-state" not in pg.url, pg.url)
         pg.close()
+    ctx.close()
+
+    print("wiki layout, long notes")
+    longnote = os.path.join(demo, "myco-notes", "zz-long-note.md")
+    para = "Word " * 150
+    rows = "".join(f"| row {i} | 10.0.0.{i} | {'long cell text ' * 30} |\n" for i in range(3))
+    with open(longnote, "w", encoding="utf-8", newline="") as fh:
+        fh.write("---\nsummary: A long test note with long headings, paragraphs, a table and folded sections\n---\n# Long note\n\n"
+                 + para + "\n\n"
+                 + "".join(f"# {n}. A section with a long title (the part in parentheses that goes below it; and more words to make it long enough)\n\n"
+                           f"## Inner {n}\n\n| Role | Address | Notes |\n|---|---|---|\n{rows}\n" + (para + "\n\n") * 20 for n in (1, 2, 3)))
+    try:
+        subprocess.run([sys.executable, os.path.join(demo, "myco-notes", "tools", "build-notes-map.py"), "--root", demo, "--layout", "wiki",
+                        "--out", os.path.join(site, "wiki-long")], check=True, capture_output=True)
+    finally:
+        os.remove(longnote)
+    url = base + "wiki-long/p/myco-notes-zz-long-note.html"
+    ctx = b.new_context(viewport={"width": 1280, "height": 800})
+    pg, errs = open_page(ctx, url)
+    check("wiki long: a long heading shows its start, the parenthesis below it, and the outline the start with the whole as its tooltip",
+          pg.locator(".doc h1 .hmain").count() == 3 and pg.locator(".doc h1 .hsub").count() == 3 and pg.locator(".doc h1 .hmain").first.inner_text().endswith("A section with a long title")
+          and "parentheses" in (pg.locator("#outline .toc a").first.get_attribute("title") or ""), str(errs))
+    check("wiki long: a very long paragraph is clipped with a Show more button, and the button opens and closes it",
+          pg.locator(".doc > p.clip button.more").count() == 1 and pg.evaluate("document.querySelector('.doc > p.clip > .clipbox').getBoundingClientRect().height") < 140
+          and (pg.click(".doc > p.clip button.more"), pg.evaluate("document.querySelector('.doc > p.clip > .clipbox').getBoundingClientRect().height") > 200)[1]
+          and (pg.click(".doc > p.clip button.more"), pg.evaluate("document.querySelector('.doc > p.clip > .clipbox').getBoundingClientRect().height") < 140)[1])
+    check("wiki long: a long table cell is clipped too", pg.locator("table td.clip button.more").count() >= 1)
+    check("wiki long: the big sections are folded, with an open-all control", pg.locator("details.fold").count() == 3 and pg.locator("details.fold[open]").count() == 0 and pg.locator(".foldall").count() == 1)
+    pg.click(".foldall button >> nth=0")
+    check("wiki long: Open all sections opens them", pg.locator("details.fold[open]").count() == 3)
+    pg.click(".foldall button >> nth=1")
+    check("wiki long: Fold them again closes them", pg.locator("details.fold[open]").count() == 0)
+    pg.click("#outline .toc a >> nth=1")
+    pg.wait_for_timeout(300)
+    check("wiki long: an outline link into a folded section opens it", pg.locator("details.fold[open]").count() == 1 and "#" in pg.url, pg.url)
+    pg.close()
+    pg, errs = open_page(ctx, url + "#inner-2")
+    check("wiki long: a link with a #section inside a fold opens it", pg.locator("details.fold[open]").count() == 1 and pg.locator("#inner-2").is_visible(), str(errs))
+    ctx.close()
+    ctx = b.new_context(viewport={"width": 390, "height": 800})
+    pg, errs = open_page(ctx, url + "#inner-1")
+    wide = pg.evaluate("document.documentElement.scrollWidth - innerWidth")
+    check("wiki long, phone: a table of three columns is a card per row, no sideways scrolling, no error",
+          wide <= 0 and not errs and pg.locator("table.stack").count() >= 1 and pg.evaluate("getComputedStyle(document.querySelector('table.stack td')).display") == "block"
+          and pg.locator("table.stack td[data-label=Address]").count() >= 1, f"{wide} {errs}")
     ctx.close()
 
 
@@ -296,7 +341,24 @@ def main():
                 pg.mouse.move(box["x"] + 5, box["y"] + 5)
                 pg.wait_for_timeout(1500)
                 dimmed = fr.evaluate(PAINTED)
-                check("the selection stays after the pointer leaves: the other notes stay dimmed", sels()[-1].get("selected") and dimmed < base_paint * .985,
+                if dimmed >= base_paint * .97:   # a note with very many neighbours dims little: try other notes until one dims clearly
+                    for bx, by, _ in [x for x in blobs if x[:2] != picked[:2]][:25]:
+                        pg.keyboard.press("Escape")
+                        pg.wait_for_timeout(700)
+                        base_paint = fr.evaluate(PAINTED)
+                        n0 = len(sels())
+                        pg.mouse.click(box["x"] + bx, box["y"] + by)
+                        pg.wait_for_timeout(250)
+                        new = sels()[n0:]
+                        if not (new and new[-1].get("selected") and new[-1].get("label")):
+                            continue
+                        pg.mouse.move(box["x"] + 5, box["y"] + 5)
+                        pg.wait_for_timeout(1500)
+                        dimmed = fr.evaluate(PAINTED)
+                        picked = (bx, by, new[-1]["label"])
+                        if dimmed < base_paint * .97:
+                            break
+                check("the selection stays after the pointer leaves: the other notes stay dimmed", sels()[-1].get("selected") and dimmed < base_paint * .97,
                       f"{base_paint} {dimmed} {sels()[-1]}")
                 pg.mouse.click(box["x"] + 8, box["y"] + box["height"] - 8)
                 pg.wait_for_timeout(1200)

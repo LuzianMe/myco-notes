@@ -268,6 +268,18 @@ def main():
         git(root, "checkout", "-q", "--", ".")
         os.remove(os.path.join(root, "myco-notes", "reviews", "review-2026-01-01.md"))
 
+        print("0.44.1: long headings")
+        write(os.path.join(root, "myco-notes", "longhead.md"), "---\nsummary: A note with a long heading\n---\n# Long heading note\n\n"
+              "# 1. Current state (each row carries its own check date; the last full re-check is in the review file)\n\nText.\n\n## Short one\n\nMore.\n\n"
+              "## A heading with `code` (and a parenthesis that is short)\n\nX.\n\n## Averyveryveryverylongheadingwithoutanyparenthesisatall that goes on and on and on and on\n\nY.\n")
+        rc, out = build(root, os.path.join(tmp, "lh"), "--layout", "wiki")
+        lh = page_of(os.path.join(tmp, "lh"), "myco-notes-longhead")
+        check("a long heading with a parenthesis: the start is the heading, the rest a quieter line, the anchor unchanged",
+              rc == 0 and '<span class="hmain">1. Current state</span> <span class="hsub">(each row' in lh and 'id="1-current-state-each-row-carries' in lh, out)
+        check("a short heading, and a heading whose tag comes before the parenthesis, are left as they are", '<h2 id="short-one">Short one<a' in lh and 'class="hmain"><code>' not in lh, out)
+        check("the outline shows the start of a long heading with the whole as its tooltip", re.search(r'<a href="#1-current-state[^"]*" title="1\. Current state \(each row[^"]*">1\. Current state</a>', lh) is not None, out)
+        os.remove(os.path.join(root, "myco-notes", "longhead.md"))
+
         print("without the markdown package")
         shim = os.path.join(tmp, "shim")
         write(os.path.join(shim, "markdown.py"), 'raise ImportError("not installed (test)")\n')

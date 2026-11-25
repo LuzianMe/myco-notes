@@ -155,6 +155,60 @@
     else if (e.key === 'Escape' && B.classList.contains('menu-open')) setMenu(false);
   });
 
+  /* ---- long notes: clip very long paragraphs, list items and table cells (Show more), fold the big top-level sections ---- */
+  var doc = document.querySelector('article.doc');
+  function openFor(node) {   /* a link or a hash that points into a folded section opens it */
+    for (var d = node; d && d !== doc; d = d.parentNode) { if (d.tagName === 'DETAILS') d.open = true; if (d.classList && d.classList.contains('clip')) d.classList.add('open'); }
+  }
+  if (doc) {
+    B.classList.add('js');
+    [].slice.call(doc.querySelectorAll('table')).forEach(function (tb) {   /* the column names for the phone's card view (CSS shows it under 600px) */
+      var hs = [].slice.call(tb.querySelectorAll('thead th')).map(function (h) { return h.textContent.trim(); });
+      if (hs.length < 3) return;
+      tb.classList.add('stack');
+      [].slice.call(tb.querySelectorAll('tbody tr')).forEach(function (r) { [].slice.call(r.children).forEach(function (c, i) { if (hs[i]) c.setAttribute('data-label', hs[i]); }); });
+    });
+    var LIM = { P: 700, LI: 520, TD: 260 };
+    [].slice.call(doc.querySelectorAll('p, li, td')).forEach(function (e) {
+      if (e.closest('pre') || (e.tagName === 'LI' && e.querySelector('ul, ol, p, pre, table'))) return;
+      if ((e.textContent || '').length <= LIM[e.tagName]) return;
+      var box = el('div', 'clipbox');
+      while (e.firstChild) box.appendChild(e.firstChild);
+      e.appendChild(box);
+      var b = el('button', 'more', 'Show more'); b.type = 'button'; b.setAttribute('aria-expanded', 'false');
+      b.addEventListener('click', function () { var o = e.classList.toggle('open'); b.textContent = o ? 'Show less' : 'Show more'; b.setAttribute('aria-expanded', o ? 'true' : 'false'); });
+      e.classList.add('clip'); e.appendChild(b);
+    });
+    var kids = [].slice.call(doc.children), lvl = 9;
+    kids.forEach(function (k) { var m = /^H([1-3])$/.exec(k.tagName); if (m) lvl = Math.min(lvl, +m[1]); });
+    var FOLD = 12000, groups = [], g = null;
+    kids.forEach(function (k) {
+      if (k.tagName === 'H' + lvl) { g = { head: k, nodes: [], len: 0 }; groups.push(g); }
+      else if (g) { g.nodes.push(k); g.len += (k.textContent || '').length; }
+    });
+    if (groups.length > 1 && (doc.textContent || '').length > 40000) {
+      var folds = [];
+      groups.forEach(function (x) {
+        if (x.len < FOLD || !x.nodes.length) return;
+        var d = el('details', 'fold'), s = el('summary', '', 'Show this section (' + Math.round(x.len / 1024) + ' KB)');
+        d.appendChild(s); x.head.parentNode.insertBefore(d, x.nodes[0]);
+        x.nodes.forEach(function (n) { d.appendChild(n); });
+        folds.push(d);
+      });
+      if (folds.length) {
+        var bar = el('p', 'foldall'), all = el('button', '', 'Open all sections'), none = el('button', '', 'Fold them again');
+        all.type = none.type = 'button';
+        all.addEventListener('click', function () { folds.forEach(function (d) { d.open = true; }); });
+        none.addEventListener('click', function () { folds.forEach(function (d) { d.open = false; }); });
+        bar.appendChild(all); bar.appendChild(none); bar.appendChild(document.createTextNode(folds.length + ' long sections are folded'));
+        doc.insertBefore(bar, doc.firstChild);
+      }
+    }
+    function jump() { var id = decodeURIComponent((location.hash || '').slice(1)), t = id && document.getElementById(id); if (t && doc.contains(t)) { openFor(t); t.scrollIntoView(); } }
+    window.addEventListener('hashchange', jump);
+    if (location.hash) jump();
+  }
+
   /* ---- the outline: mark the heading being read ---- */
   var links = [].slice.call(document.querySelectorAll('#outline .toc a')), heads = [];
   links.forEach(function (a) { var h = document.getElementById(decodeURIComponent((a.getAttribute('href') || '').slice(1))); if (h) heads.push([h, a]); });
@@ -163,7 +217,7 @@
     function spy() {
       ticking = false;
       var pick = heads[0][1], line = 90;
-      heads.forEach(function (p) { if (p[0].getBoundingClientRect().top <= line) pick = p[1]; });
+      heads.forEach(function (p) { if (p[0].getClientRects().length && p[0].getBoundingClientRect().top <= line) pick = p[1]; });
       if (pick === on) return;
       if (on) { on.classList.remove('active'); on.removeAttribute('aria-current'); }
       pick.classList.add('active'); pick.setAttribute('aria-current', 'location'); on = pick;
