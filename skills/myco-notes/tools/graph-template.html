@@ -729,12 +729,12 @@ function draw(now){
   cx.setTransform(DPR,0,0,DPR,0,0);cx.clearRect(0,0,W,H);
   var focus=sel>=0?sel:hov,t=now;
   /* hyphae: the quiet ones from the cache, the ones of the focused note live on top */
-  var hotE=[],coldE=[];
-  E.forEach(function(e){e._g=0;if(!edgeVis(e)||Math.min(e.a.ap,e.b.ap)<=0)return;if(focus>=0&&(e.a.i===focus||e.b.i===focus))hotE.push(e);else{coldE.push(e);e._g=1}});
+  var hotE=[],coldE=[],gon=glActive(),gn=gon&&!T.nodes&&!!GLR.node;   /* gn: the card draws the notes too (the themes whose notes are plain discs) */
+  E.forEach(function(e){e._g=0;if(!edgeVis(e)||Math.min(e.a.ap,e.b.ap)<=0)return;if(focus>=0&&(e.a.i===focus||e.b.i===focus)){hotE.push(e);if(gn)e._g=2}else{coldE.push(e);e._g=1}});
   busyNow=!!(drag||pinch)||now-spin.last<400;
   var mk=match?Object.keys(match).length+":"+Object.keys(match)[0]:"",settling=alpha>0||NODES.some(function(n){return n.vis&&(n.ap<1||Math.abs(n.zt-n.z)>.003)});
   var key=[W,H,DPR,cam.x.toFixed(2),cam.y.toFixed(2),cam.k.toFixed(4),cyw.toFixed(4),syw.toFixed(4),cpt.toFixed(4),spt.toFixed(4),depthAmt.toFixed(3),focus,mk,T.id,cur,coldE.length,settling?now:0].join("|");
-  var tT=PERF?performance.now():0,gon=glActive();
+  var tT=PERF?performance.now():0;
   if(gon!==glWas){glWas=gon;gcv.hidden=!gon;tKey="";if(gon)tcx.clearRect(0,0,tc.width,tc.height);else glClear()}
   if(gon)glThreads();   /* the card draws every thread every frame, from the layout's coordinates */
   else{tLast++;if(key!==tKey&&!(spin.on&&!playing&&!busyNow&&tLast<TCAD)){tKey=key;tLast=0;quietThreads(coldE)}}
@@ -743,7 +743,7 @@ function draw(now){
   hotE.forEach(function(e){
     var a=Math.min(e.a.ap,e.b.ap),w=Math.min(2.6,.6+Math.sqrt(e.w)*.45)*1.5*Math.min(1.4,cam.k+.3),al=.85*Math.min(1,a*2);
     var ef=(fogOf(e.a)+fogOf(e.b))/2;w*=(e.a.ps+e.b.ps)/2;al*=1-.7*ef;
-    hypha(e,w,a,al.toFixed(3),Math.min(1,al*3).toFixed(3));
+    if(!gn)hypha(e,w,a,al.toFixed(3),Math.min(1,al*3).toFixed(3));
     if(!reduce&&a>=1)fire(e,t,Math.max(1,hotE.length/2.5));   /* a lit thread fires now and then, like a neuron */
   });
   /* now and then, in standby, a faint spike runs along a random thread */
@@ -753,7 +753,7 @@ function draw(now){
   /* notes */
   if(PERF)tT=performance.now();
   var order=NODES.filter(function(n){return n.vis&&n.ap>0}).sort(function(a,b){return depthAmt>0?b.pz-a.pz:(a.hub?1:0)-(b.hub?1:0)});   /* with depth: back to front */
-  order.forEach(function(n){
+  var noteDraw=function(n){
     var rec=recency(n),pulse=reduce||playing?1:1+.1*Math.sin(t/650+n.i)*rec,d=dim(n),sc=ease(n.ap),r=n.pr*sc*pulse,x=n.px,y=n.py,fz=fogOf(n),fog=1-.68*fz;   /* further back: fainter, a softer wider glow, no shine */
     var col=n.due?T.wilt:gcol(n.g);
     cx.globalAlpha=Math.min(1,n.ap)*d*(n.hist?.55:1)*(.14+.6*rec+(n.hub?.2:0)+.12*fz)*(1-.3*fz)*T.glow;
@@ -772,7 +772,15 @@ function draw(now){
     if(n.miss&&(cam.k>.7||focus===n.i)){var ang=hash(n.i+9)*6.28,x2=x+Math.cos(ang)*(r+13),y2=y+Math.sin(ang)*(r+13);cx.setLineDash([2,2]);cx.strokeStyle=T.wilt;cx.lineWidth=1;cx.beginPath();cx.moveTo(x+Math.cos(ang)*r,y+Math.sin(ang)*r);cx.lineTo(x2,y2);cx.stroke();cx.setLineDash([]);cx.fillStyle=T.wilt;cx.font="10px system-ui";cx.textAlign="center";cx.fillText("?",x2+Math.cos(ang)*4,y2+Math.sin(ang)*4+3)}
     cx.globalAlpha=1;
     if(n.name&&n.la>.01&&d>.5&&!saverOn){var la=n.la*n.la*(3-2*n.la);label(n.name.replace(/\.md$/,""),x,y+r*(n.hub?2.1:1)+14+(1-la)*5,n.hub||n.i===sel,la*(forced(n)?1:1-.4*fz))}   /* a name rises a few pixels as it fades in */
-  });
+  };
+  var noteOverlay=function(n){   /* when the card draws the notes: what stays on the 2D canvas (the hub particles of the themes with them, the mark of a missing reference, the name) */
+    var rec=recency(n),pulse=reduce||playing?1:1+.1*Math.sin(t/650+n.i)*rec,d=dim(n),sc=ease(n.ap),r=n.pr*sc*pulse,x=n.px,y=n.py,fz=fogOf(n),fog=1-.68*fz,col=n.due?T.wilt:gcol(n.g);
+    if(n.hub&&T.rings!=="rings"){cx.globalAlpha=Math.min(1,n.ap)*d*(n.hist?.6:1)*fog;hubParticles(n,x,y,r,col,t,Math.min(1,n.ap)*d*fog)}
+    if(n.miss&&(cam.k>.7||focus===n.i)){cx.globalAlpha=Math.min(1,n.ap)*d*(n.hist?.6:1)*fog;var ang=hash(n.i+9)*6.28,x2=x+Math.cos(ang)*(r+13),y2=y+Math.sin(ang)*(r+13);cx.setLineDash([2,2]);cx.strokeStyle=T.wilt;cx.lineWidth=1;cx.beginPath();cx.moveTo(x+Math.cos(ang)*r,y+Math.sin(ang)*r);cx.lineTo(x2,y2);cx.stroke();cx.setLineDash([]);cx.fillStyle=T.wilt;cx.font="10px system-ui";cx.textAlign="center";cx.fillText("?",x2+Math.cos(ang)*4,y2+Math.sin(ang)*4+3)}
+    cx.globalAlpha=1;
+    if(n.name&&n.la>.01&&d>.5&&!saverOn){var la=n.la*n.la*(3-2*n.la);label(n.name.replace(/\.md$/,""),x,y+r*(n.hub?2.1:1)+14+(1-la)*5,n.hub||n.i===sel,la*(forced(n)?1:1-.4*fz))}
+  };
+  if(gn){glNodes(order,t);order.forEach(noteOverlay)}else order.forEach(noteDraw);
   drawParts(t);
   /* ripples: a new or changed note lets out a ring, in the theme's own shape (a circle, a diamond, an octagon) */
   ripples=ripples.filter(function(rp){return t-rp.t<1100});
@@ -829,11 +837,11 @@ var GL_VS_TIP=GL_COMMON+
 " gl_Position=clip(q.xy+corner*ext);v_col=vec4(tc.rgb,min(1.,m.w*(1.-.7*fogOf(q.w))));v_d=corner*ext;v_k=vec2(R,0.);}\n";
 var GL_FS_TIP="#version 300 es\nprecision highp float;in vec4 v_col;in vec2 v_d;in vec2 v_k;out vec4 o;\n"+
 "void main(){float cov=clamp(v_k.x-length(v_d)+.5,0.,1.);float a=v_col.a*cov;o=vec4(v_col.rgb*a,a);}\n";
-function glProgram(gl,vs,fs){
+function glProgram(gl,vs,fs,names){
   function sh(t,src){var o=gl.createShader(t);gl.shaderSource(o,src);gl.compileShader(o);if(!gl.getShaderParameter(o,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(o));return o}
   var p=gl.createProgram();gl.attachShader(p,sh(gl.VERTEX_SHADER,vs));gl.attachShader(p,sh(gl.FRAGMENT_SHADER,fs));gl.linkProgram(p);
   if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p));
-  var u={};["u_path","u_edge","u_c","u_p","u_cam","u_v","u_fog","u_glow"].forEach(function(k){u[k]=gl.getUniformLocation(p,k)});return {p:p,u:u};
+  var u={};(names||["u_path","u_edge","u_c","u_p","u_cam","u_v","u_fog","u_glow"]).forEach(function(k){u[k]=gl.getUniformLocation(p,k)});return {p:p,u:u};
 }
 function glTex(gl,w,h){var t=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
@@ -846,8 +854,56 @@ function initGL(){
     var R={gl:gl,rib:glProgram(gl,GL_VS_RIBBON,GL_FS_RIBBON),tip:glProgram(gl,GL_VS_TIP,GL_FS_TIP),n:E.length};
     R.path=glTex(gl,GN+1,R.n);R.edge=glTex(gl,GT,R.n);R.pdata=new Float32Array((GN+1)*R.n*4);R.edata=new Float32Array(GT*R.n*4);
     gcv.addEventListener("webglcontextlost",function(ev){ev.preventDefault();GLR=null;glWas=false;gcv.hidden=true;tKey=""});
-    GLR=R;
+    initNodes(R);GLR=R;
   }catch(e){GLR=null;try{console.warn("WebGL 2 is not available, the threads are drawn by the processor:",e&&e.message||e)}catch(_){}}
+}
+var GL_VS_NODE="#version 300 es\nprecision highp float;\n"+
+"layout(location=0) in vec4 a0;layout(location=1) in vec4 a1;layout(location=2) in vec4 a2;layout(location=3) in vec4 a3;layout(location=4) in vec4 a4;layout(location=5) in vec4 a5;\n"+
+"uniform vec2 u_size;flat out vec4 f0;flat out vec4 f1;flat out vec4 f2;flat out vec4 f3;flat out vec4 f4;flat out vec4 f5;out vec2 v_p;\n"+
+"void main(){vec2 corner=vec2(float(gl_VertexID&1)*2.-1.,float(gl_VertexID>>1)*2.-1.);\n"+
+" float ext=max(max(a0.w,a2.z),max(a3.z+2.,a0.z+6.))+2.;vec2 p=a0.xy+corner*ext;\n"+
+" gl_Position=vec4(p.x/u_size.x*2.-1.,1.-p.y/u_size.y*2.,0.,1.);v_p=corner*ext;f0=a0;f1=a1;f2=a2;f3=a3;f4=a4;f5=a5;}\n";
+var GL_FS_NODE="#version 300 es\nprecision highp float;flat in vec4 f0;flat in vec4 f1;flat in vec4 f2;flat in vec4 f3;flat in vec4 f4;flat in vec4 f5;in vec2 v_p;out vec4 o;\n"+
+"vec4 over(vec4 dst,vec3 c,float a){return vec4(c*a,a)+dst*(1.-a);}\n"+
+"float prof(float u){return u>=1.?0.:(u<.35?mix(1.,.5333,u/.35):mix(.5333,0.,(u-.35)/.65));}\n"+
+"float ring(float d,float R,float lw){return clamp(lw*.5+.5-abs(d-R),0.,1.);}\n"+
+"void main(){float d=length(v_p),r=f0.z;vec3 col=f1.rgb;vec4 c=vec4(0.);\n"+
+" if(f0.w>0.&&f1.a>0.)c=over(c,col,f1.a*prof(d/f0.w));\n"+
+" if(f2.z>0.&&f2.w>0.)c=over(c,col,f2.w*prof(d/f2.z));\n"+
+" if(f4.x<.5){c=over(c,col,f2.x*clamp(r-d+.5,0.,1.));float ds=length(v_p-vec2(-.28,-.3)*r);c=over(c,vec3(1.),f2.y*clamp(.38*r-ds+.5,0.,1.));}\n"+
+" else c=over(c,col,f2.x*ring(d,max(1.5,r*.8),1.3));\n"+
+" if(f3.y>0.)c=over(c,col,f3.y*ring(d,f3.x,1.4));if(f3.w>0.)c=over(c,col,f3.w*ring(d,f3.z,1.4));\n"+
+" if(f4.y>.5){float rr=r+3.5,an=atan(v_p.y,v_p.x),on=step(mod(an*rr+1000.,5.),2.);c=over(c,f5.rgb,f2.x*ring(d,rr,1.2)*on);}\n"+
+" o=c;}\n";
+var HEXV={};
+function hexv(c){var v=HEXV[c];if(!v){var n=parseInt(c.slice(1),16);v=HEXV[c]=[(n>>16&255)/255,(n>>8&255)/255,(n&255)/255]}return v}
+function initNodes(R){   /* the notes: a glow, a disc with its shine, the hub's rings, the mark of a note past its review date, one quad each (a failure leaves the notes to the 2D canvas) */
+  try{
+    var gl=R.gl;R.node=glProgram(gl,GL_VS_NODE,GL_FS_NODE,["u_size"]);
+    R.nvao=gl.createVertexArray();gl.bindVertexArray(R.nvao);R.nbuf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,R.nbuf);
+    for(var i=0;i<6;i++){gl.enableVertexAttribArray(i);gl.vertexAttribPointer(i,4,gl.FLOAT,false,96,i*16);gl.vertexAttribDivisor(i,1)}
+    gl.bindVertexArray(null);R.ndata=new Float32Array(Math.max(1,NN)*24);
+  }catch(e){R.node=null;try{console.warn("The notes stay on the 2D canvas:",e&&e.message||e)}catch(_){}}
+}
+function glNodes(order,t){
+  var R=GLR,gl=R.gl,d=R.ndata,k=0,rg=T.rings==="rings",wl=hexv(T.wilt);
+  order.forEach(function(n){
+    var rec=recency(n),pulse=reduce||playing?1:1+.1*Math.sin(t/650+n.i)*rec,dm=dim(n),sc=ease(n.ap),r=n.pr*sc*pulse,fz=fogOf(n),fog=1-.68*fz,col=hexv(n.due?T.wilt:gcol(n.g)),ap=Math.min(1,n.ap),
+      ga=ap*dm*(n.hist?.55:1)*(.14+.6*rec+(n.hub?.2:0)+.12*fz)*(1-.3*fz)*T.glow,gs=r*(n.hub?3.4:2.8)*(1+.25*fz),gm=Math.max(r*1.6,(n.nn||1e9)*(n.hub?1.3:1.15)),fr=0,fa=0,
+      da=ap*dm*(n.hist?.6:1)*fog,ra=ap*dm*fog;
+    if(gs>gm){ga*=.25+.75*gm/gs;gs=gm}
+    if(n.spore)ga=0;
+    if(n.fl&&t-n.fl<500&&T.hit!=="spores"&&T.hit!=="bubbles"&&T.hit!=="ink"){var q=(t-n.fl)/500;fr=r*5;fa=(1-q)*n.flA*Math.max(.4,T.glow)}
+    var o=k*24,h=n.hub&&rg;k++;
+    d[o]=n.px;d[o+1]=n.py;d[o+2]=r;d[o+3]=gs;
+    d[o+4]=col[0];d[o+5]=col[1];d[o+6]=col[2];d[o+7]=ga;
+    d[o+8]=da;d[o+9]=n.spore?0:da*(1-fz)*(T.dark?.28:.4);d[o+10]=fr;d[o+11]=fa;
+    d[o+12]=h?Math.max(0,r*1.55+(reduce||playing?0:1.2*Math.sin(t/900+n.i))):0;d[o+13]=h?ra*.55:0;d[o+14]=h?r*2.1:0;d[o+15]=h?ra*.25:0;
+    d[o+16]=n.spore?1:0;d[o+17]=n.due?1:0;d[o+18]=0;d[o+19]=0;d[o+20]=wl[0];d[o+21]=wl[1];d[o+22]=wl[2];d[o+23]=0;
+  });
+  if(!k)return;
+  gl.useProgram(R.node.p);gl.uniform2f(R.node.u.u_size,W,H);gl.bindVertexArray(R.nvao);gl.bindBuffer(gl.ARRAY_BUFFER,R.nbuf);gl.bufferData(gl.ARRAY_BUFFER,d.subarray(0,k*24),gl.DYNAMIC_DRAW);
+  gl.drawArraysInstanced(gl.TRIANGLE_STRIP,0,4,k);gl.bindVertexArray(null);
 }
 function glActive(){return !!GLR&&!EMBED&&(T.style==="organic"||T.style==="smooth")}
 function rgbv(str){var v=RGBV[str];if(!v){v=RGBV[str]=str.split(",").map(function(x){return (+x)/255})}return v}
@@ -865,11 +921,11 @@ function glEdges(){   /* what each thread looks like now: seven texels of four n
   E.forEach(function(e){
     var o=e.k*GT*4,i;
     if(!e._g){d[o+3]=0;d[o+7]=0;d[o+19]=0;d[o+27]=0;return}
-    var a=Math.min(e.a.ap,e.b.ap),dm=Math.min(dim(e.a),dim(e.b)),w=Math.min(2.6,.6+Math.sqrt(e.w)*.45)*kc,al=.26*Math.min(1,a*2)*Math.max(dm,.35),
+    var hot=e._g===2,a=Math.min(e.a.ap,e.b.ap),dm=Math.min(dim(e.a),dim(e.b)),w=Math.min(2.6,.6+Math.sqrt(e.w)*.45)*kc*(hot?1.5:1),al=hot?.85*Math.min(1,a*2):.26*Math.min(1,a*2)*Math.max(dm,.35),
       src=e.dir>=0?e.a:e.b,dst=e.dir>=0?e.b:e.a,Ls=Math.hypot(e.a.px-e.b.px,e.a.py-e.b.py)||1,
       tc0=Math.min(.45,(src.pr+1.5)/Ls),tc1=Math.min(.45,(dst.pr+1.5)/Ls),ps=(e.a.ps+e.b.ps)/2,fused=e.dir===0,ca=rgbv(threadRGB(e.a)),cb=fused?rgbv(threadRGB(e.b)):null,cs=fused?ca:rgbv(threadRGB(src));
     d[o]=cs[0];d[o+1]=cs[1];d[o+2]=cs[2];d[o+3]=al;                                        /* 0: colour at the start, strength */
-    i=fused?cb:cs;d[o+4]=i[0];d[o+5]=i[1];d[o+6]=i[2];d[o+7]=fused?0:al*.4*T.tglow;       /* 1: colour at the end, strength of the glow */
+    i=fused?cb:cs;d[o+4]=i[0];d[o+5]=i[1];d[o+6]=i[2];d[o+7]=fused||hot?0:al*.4*T.tglow;       /* 1: colour at the end, strength of the glow */
     d[o+8]=fused?w*.5:w*1.15;d[o+9]=fused?w*.5:w*.12;d[o+10]=tc0;d[o+11]=tc1;               /* 2: half widths (start, end), the rim of the notes */
     d[o+12]=a;d[o+13]=e.dir;d[o+14]=.9+w*ps*.9;d[o+15]=al*3;                                /* 3: growth, direction, bud radius, bud strength */
     if(fused){var ba=rgbv(budRGB(e.b)),bb=rgbv(budRGB(e.a));d[o+16]=ba[0];d[o+17]=ba[1];d[o+18]=ba[2];d[o+19]=a>=1?1:0;d[o+24]=bb[0];d[o+25]=bb[1];d[o+26]=bb[2];d[o+27]=a>=1?1:0}
@@ -901,13 +957,18 @@ function glSize(){if(!GLR)return;gcv.width=cv.width;gcv.height=cv.height}
    the default) can be compared on the same machine. "Copy" puts the numbers in the clipboard as one line. */
 var PERF=QS.get("perf")==="1",PF={t:0,n:0,work:0,sim:0,thr:0,notes:0,long:0,worst:0,last:0,ivs:0,fr:0,cn:0,cov:-1,el:null,tx:null,gpu:"",line:""};
 function perfGpu(){try{var c=document.createElement("canvas"),g=c.getContext("webgl2")||c.getContext("webgl");if(!g)return "no WebGL";var x=g.getExtension("WEBGL_debug_renderer_info");return x?String(g.getParameter(x.UNMASKED_RENDERER_WEBGL)):"unknown"}catch(e){return "unknown"}}
+function perfSelfTest(){   /* how long a fixed 2D canvas job takes here (150 translucent glow sprites on a 900 x 900 canvas, then a one pixel read to wait for the drawing): a hardware canvas takes a few ms, a software one tens */
+  try{var c=document.createElement("canvas");c.width=c.height=900;var g=c.getContext("2d"),sp=sprite("#5ad1b0"),ts=[];
+    for(var rep=0;rep<3;rep++){var t0=performance.now();for(var i=0;i<150;i++){g.globalAlpha=.3;g.drawImage(sp,(i*37)%700,(i*53)%700,180,180)}g.getImageData(0,0,1,1);ts.push(performance.now()-t0)}
+    ts.sort(function(a,b){return a-b});return +ts[1].toFixed(1)}catch(e){return -1}
+}
 function perfInit(){
   if(!PERF)return;
   var d=document.createElement("div");d.id="perf";PF.tx=document.createElement("div");d.appendChild(PF.tx);
   var b=document.createElement("button");b.type="button";b.textContent="Copy numbers";b.addEventListener("click",function(ev){ev.stopPropagation();
     try{navigator.clipboard.writeText(PF.line).then(function(){b.textContent="Copied"},function(){window.prompt("Copy this line",PF.line)})}catch(e){window.prompt("Copy this line",PF.line)}
     setTimeout(function(){b.textContent="Copy numbers"},1500)});
-  d.appendChild(b);document.body.appendChild(d);PF.el=d;PF.gpu=perfGpu();PF.t=performance.now();
+  d.appendChild(b);document.body.appendChild(d);PF.el=d;PF.gpu=perfGpu();PF.st=-1;PF.t=performance.now();setTimeout(function(){PF.st=perfSelfTest()},2500);   /* the test blocks the page for a moment on a slow machine: after the first frames */
 }
 function perfFrame(now){   /* the time between two frames */
   if(!PERF)return;
@@ -921,13 +982,13 @@ function perfCoverage(){   /* the share of the screen the thread layer paints (p
 }
 function perfShow(){
   if(!PERF||!PF.n)return;var t=performance.now();if(t-PF.t<1000)return;
-  var n=PF.n,fr=Math.max(1,PF.fr),fps=1000*fr/Math.max(1,PF.ivs),f=function(x){return (x/n).toFixed(1)},mode=glActive()?"GPU threads (WebGL 2)":QS.get("gl")==="1"?(GLR?"2D (theme not supported by the GPU path)":"2D (WebGL 2 not available)"):"2D";
-  var o={mode:glActive()?"gl":"2d",fps:+fps.toFixed(1),frameMs:+(PF.ivs/fr).toFixed(1),worstMs:+PF.worst.toFixed(0),slowPct:+(100*PF.long/fr).toFixed(0),workMs:+f(PF.work),simMs:+f(PF.sim),threadsMs:+f(PF.thr),notesMs:+f(PF.notes),
+  var n=PF.n,fr=Math.max(1,PF.fr),fps=1000*fr/Math.max(1,PF.ivs),f=function(x){return (x/n).toFixed(1)},mode=glActive()?(!T.nodes&&GLR.node?"GPU threads and notes (WebGL 2)":"GPU threads (WebGL 2), notes on the 2D canvas"):QS.get("gl")==="1"?(GLR?"2D (theme not supported by the GPU path)":"2D (WebGL 2 not available)"):"2D";
+  var o={mode:glActive()?(!T.nodes&&GLR.node?"gl":"gl-threads"):"2d",selfTestMs:PF.st,fps:+fps.toFixed(1),frameMs:+(PF.ivs/fr).toFixed(1),worstMs:+PF.worst.toFixed(0),slowPct:+(100*PF.long/fr).toFixed(0),workMs:+f(PF.work),simMs:+f(PF.sim),threadsMs:+f(PF.thr),notesMs:+f(PF.notes),
     notes:NN,edges:E.length,dpr:+DPR.toFixed(2),cap:DPRCAP,canvas:cv.width+"x"+cv.height,theme:T.id,cadence:TCAD,lite:LITE,spin:!held,turn:+rot.y.toFixed(2),gpu:PF.gpu,ua:navigator.userAgent.slice(0,90)};
   if(PF.cn<3){PF.cn++;PF.cov=perfCoverage()}o.threadCover=PF.cov;
   PF.line=JSON.stringify(o);
   PF.tx.textContent="Myco graph performance\n"+mode+"\nfps "+o.fps+"   frame "+o.frameMs+" ms   worst "+o.worstMs+" ms   over 33 ms: "+o.slowPct+"%\nown work per frame "+o.workMs+" ms (simulation "+o.simMs+", threads "+o.threadsMs+", notes "+o.notesMs+")\n"+
-    o.notes+" notes, "+o.edges+" threads   canvas "+o.canvas+" (pixel density "+o.dpr+", cap "+o.cap+")\ntheme "+o.theme+"   redraw every "+(glActive()?"1":o.cadence)+" frames"+(o.lite?", plain lines":"")+"   turning by itself "+(o.spin?"on":"off")+" (view turned "+o.turn+" rad)\nthe thread layer paints "+o.threadCover+"% of the screen\n"+o.gpu;
+    o.notes+" notes, "+o.edges+" threads   canvas "+o.canvas+" (pixel density "+o.dpr+", cap "+o.cap+")\ntheme "+o.theme+"   redraw every "+(glActive()?"1":o.cadence)+" frames"+(o.lite?", plain lines":"")+"   turning by itself "+(o.spin?"on":"off")+" (view turned "+o.turn+" rad)\nthe thread layer paints "+o.threadCover+"% of the screen\n2D canvas test: "+(o.selfTestMs<0?"running":o.selfTestMs+" ms (a few ms: hardware canvas, tens: software)")+"\n"+o.gpu;
   PF.t=t;PF.n=0;PF.work=PF.sim=PF.thr=PF.notes=0;PF.long=0;PF.worst=0;PF.ivs=0;PF.fr=0;
 }
 
