@@ -12,7 +12,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:radial-gradient(ellips
 canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
 #perf{position:fixed;left:12px;bottom:12px;z-index:30;font:11px/1.4 ui-monospace,Menlo,Consolas,monospace;background:rgba(10,14,12,.82);color:#e6efe8;padding:8px 10px;border-radius:8px;max-width:min(440px,calc(100vw - 24px));white-space:pre-wrap;pointer-events:none}
 #perf button{font:inherit;margin-top:6px;padding:2px 8px;border:1px solid #6b8;border-radius:6px;background:transparent;color:#cfe;cursor:pointer;pointer-events:auto}
-#g,#t{pointer-events:none;cursor:default}#g[hidden]{display:none}canvas.hover{cursor:pointer}canvas.drag{cursor:grabbing}
+#g,#t{pointer-events:none;cursor:default}#g[hidden],#t[hidden]{display:none}canvas.hover{cursor:pointer}canvas.drag{cursor:grabbing}
 .box{position:fixed;background:var(--panel);border:1px solid var(--line);border-radius:12px;backdrop-filter:blur(8px)}
 #left{position:fixed;top:12px;left:12px;width:min(330px,calc(100vw - 24px));max-height:calc(100vh - 24px);overflow-y:auto;display:flex;flex-direction:column;gap:10px;pointer-events:none;scrollbar-width:none}
 #left>.box{position:static;pointer-events:auto}
@@ -726,7 +726,7 @@ function updateLabels(now,dt){
   });
 }
 function draw(now){
-  cx.setTransform(DPR,0,0,DPR,0,0);cx.clearRect(0,0,W,H);
+  cx.setTransform(DPR,0,0,DPR,0,0);if(c2)cx.clearRect(0,0,W,H);   /* c2: the 2D canvas has something on it (with the notes on the card it is often empty) */
   var focus=sel>=0?sel:hov,t=now;
   /* hyphae: the quiet ones from the cache, the ones of the focused note live on top */
   var hotE=[],coldE=[],gon=glActive(),gn=gon&&!T.nodes&&!!GLR.node;   /* gn: the card draws the notes too (the themes whose notes are plain discs) */
@@ -735,7 +735,7 @@ function draw(now){
   var mk=match?Object.keys(match).length+":"+Object.keys(match)[0]:"",settling=alpha>0||NODES.some(function(n){return n.vis&&(n.ap<1||Math.abs(n.zt-n.z)>.003)});
   var key=[W,H,DPR,cam.x.toFixed(2),cam.y.toFixed(2),cam.k.toFixed(4),cyw.toFixed(4),syw.toFixed(4),cpt.toFixed(4),spt.toFixed(4),depthAmt.toFixed(3),focus,mk,T.id,cur,coldE.length,settling?now:0].join("|");
   var tT=PERF?performance.now():0;
-  if(gon!==glWas){glWas=gon;gcv.hidden=!gon;tKey="";if(gon)tcx.clearRect(0,0,tc.width,tc.height);else glClear()}
+  if(gon!==glWas){glWas=gon;gcv.hidden=!gon;tc.hidden=gon;tKey="";if(gon)tcx.clearRect(0,0,tc.width,tc.height);else glClear()}   /* the layer of the 2D threads is not needed while the card draws them */
   if(gon)glThreads();   /* the card draws every thread every frame, from the layout's coordinates */
   else{tLast++;if(key!==tKey&&!(spin.on&&!playing&&!busyNow&&tLast<TCAD)){tKey=key;tLast=0;quietThreads(coldE)}}
   if(PERF){PF.thr+=performance.now()-tT;tT=performance.now()}   /* turning by itself: every third frame */
@@ -773,12 +773,13 @@ function draw(now){
     cx.globalAlpha=1;
     if(n.name&&n.la>.01&&d>.5&&!saverOn){var la=n.la*n.la*(3-2*n.la);label(n.name.replace(/\.md$/,""),x,y+r*(n.hub?2.1:1)+14+(1-la)*5,n.hub||n.i===sel,la*(forced(n)?1:1-.4*fz))}   /* a name rises a few pixels as it fades in */
   };
+  var drew2=false;
   var noteOverlay=function(n){   /* when the card draws the notes: what stays on the 2D canvas (the hub particles of the themes with them, the mark of a missing reference, the name) */
     var rec=recency(n),pulse=reduce||playing?1:1+.1*Math.sin(t/650+n.i)*rec,d=dim(n),sc=ease(n.ap),r=n.pr*sc*pulse,x=n.px,y=n.py,fz=fogOf(n),fog=1-.68*fz,col=n.due?T.wilt:gcol(n.g);
-    if(n.hub&&T.rings!=="rings"){cx.globalAlpha=Math.min(1,n.ap)*d*(n.hist?.6:1)*fog;hubParticles(n,x,y,r,col,t,Math.min(1,n.ap)*d*fog)}
-    if(n.miss&&(cam.k>.7||focus===n.i)){cx.globalAlpha=Math.min(1,n.ap)*d*(n.hist?.6:1)*fog;var ang=hash(n.i+9)*6.28,x2=x+Math.cos(ang)*(r+13),y2=y+Math.sin(ang)*(r+13);cx.setLineDash([2,2]);cx.strokeStyle=T.wilt;cx.lineWidth=1;cx.beginPath();cx.moveTo(x+Math.cos(ang)*r,y+Math.sin(ang)*r);cx.lineTo(x2,y2);cx.stroke();cx.setLineDash([]);cx.fillStyle=T.wilt;cx.font="10px system-ui";cx.textAlign="center";cx.fillText("?",x2+Math.cos(ang)*4,y2+Math.sin(ang)*4+3)}
+    if(n.hub&&T.rings!=="rings"){drew2=true;cx.globalAlpha=Math.min(1,n.ap)*d*(n.hist?.6:1)*fog;hubParticles(n,x,y,r,col,t,Math.min(1,n.ap)*d*fog)}
+    if(n.miss&&(cam.k>.7||focus===n.i)){drew2=true;cx.globalAlpha=Math.min(1,n.ap)*d*(n.hist?.6:1)*fog;var ang=hash(n.i+9)*6.28,x2=x+Math.cos(ang)*(r+13),y2=y+Math.sin(ang)*(r+13);cx.setLineDash([2,2]);cx.strokeStyle=T.wilt;cx.lineWidth=1;cx.beginPath();cx.moveTo(x+Math.cos(ang)*r,y+Math.sin(ang)*r);cx.lineTo(x2,y2);cx.stroke();cx.setLineDash([]);cx.fillStyle=T.wilt;cx.font="10px system-ui";cx.textAlign="center";cx.fillText("?",x2+Math.cos(ang)*4,y2+Math.sin(ang)*4+3)}
     cx.globalAlpha=1;
-    if(n.name&&n.la>.01&&d>.5&&!saverOn){var la=n.la*n.la*(3-2*n.la);label(n.name.replace(/\.md$/,""),x,y+r*(n.hub?2.1:1)+14+(1-la)*5,n.hub||n.i===sel,la*(forced(n)?1:1-.4*fz))}
+    if(n.name&&n.la>.01&&d>.5&&!saverOn){drew2=true;var la=n.la*n.la*(3-2*n.la);label(n.name.replace(/\.md$/,""),x,y+r*(n.hub?2.1:1)+14+(1-la)*5,n.hub||n.i===sel,la*(forced(n)?1:1-.4*fz))}
   };
   if(gn){glNodes(order,t);order.forEach(noteOverlay)}else order.forEach(noteDraw);
   drawParts(t);
@@ -789,6 +790,7 @@ function draw(now){
     cx.strokeStyle=gcol(n.g);cx.globalAlpha=(1-p)*(rp.born?.9:.55);cx.lineWidth=rp.born?2.4:1.4;
     cx.beginPath();ringPath(x,y,(n.r*Math.max(.7,cam.k)+8+p*(rp.born?46:26))*n.ps);cx.stroke();cx.globalAlpha=1;   /* in the shape of the theme's notes */
   });
+  c2=!gn||drew2||spikes.length>0||parts.length>0||ripples.length>0;
   if(PERF)PF.notes+=performance.now()-tT;
 }
 
@@ -800,7 +802,7 @@ function draw(now){
    only sends a few numbers per thread (colour, strength, width). Nothing is rebuilt while the network turns, so the threads move with
    the notes. Notes, labels, spikes and the selected note's threads stay on the 2D canvas. Without WebGL 2, or for the digital themes
    (Matrix, Amber terminal: traces on a grid), or in an embed, the 2D drawing above is used as before. */
-var gcv=document.getElementById("g"),GLR=null,glSg=-1,glT="",glZ=0,glPathDirty=true,glWas=false,GN=32,GT=7,RGBV={};
+var gcv=document.getElementById("g"),GLR=null,glSg=-1,glT="",glZ=0,glPathDirty=true,glWas=false,c2=true,GN=32,GT=7,RGBV={};
 var GL_COMMON="#version 300 es\nprecision highp float;precision highp int;precision highp sampler2D;\n"+
 "uniform sampler2D u_path;uniform sampler2D u_edge;uniform vec4 u_c;uniform vec4 u_p;uniform vec4 u_cam;uniform vec4 u_v;uniform vec2 u_fog;uniform vec3 u_glow;\n"+
 "const int N=32;\n"+
@@ -847,13 +849,13 @@ function glTex(gl,w,h){var t=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
   gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA32F,w,h,0,gl.RGBA,gl.FLOAT,null);return t}
 function initGL(){
-  if(QS.get("gl")!=="1"||EMBED||!E.length)return;
+  if(QS.get("gl")==="0"||EMBED||!E.length)return;
   try{
     var gl=gcv.getContext("webgl2",{alpha:true,premultipliedAlpha:true,antialias:false,depth:false,stencil:false,powerPreference:"high-performance"});
     if(!gl)return;
     var R={gl:gl,rib:glProgram(gl,GL_VS_RIBBON,GL_FS_RIBBON),tip:glProgram(gl,GL_VS_TIP,GL_FS_TIP),n:E.length};
     R.path=glTex(gl,GN+1,R.n);R.edge=glTex(gl,GT,R.n);R.pdata=new Float32Array((GN+1)*R.n*4);R.edata=new Float32Array(GT*R.n*4);
-    gcv.addEventListener("webglcontextlost",function(ev){ev.preventDefault();GLR=null;glWas=false;gcv.hidden=true;tKey=""});
+    gcv.addEventListener("webglcontextlost",function(ev){ev.preventDefault();GLR=null;glWas=false;gcv.hidden=true;tc.hidden=false;tKey=""});
     initNodes(R);GLR=R;
   }catch(e){GLR=null;try{console.warn("WebGL 2 is not available, the threads are drawn by the processor:",e&&e.message||e)}catch(_){}}
 }
@@ -982,7 +984,7 @@ function perfCoverage(){   /* the share of the screen the thread layer paints (p
 }
 function perfShow(){
   if(!PERF||!PF.n)return;var t=performance.now();if(t-PF.t<1000)return;
-  var n=PF.n,fr=Math.max(1,PF.fr),fps=1000*fr/Math.max(1,PF.ivs),f=function(x){return (x/n).toFixed(1)},mode=glActive()?(!T.nodes&&GLR.node?"GPU threads and notes (WebGL 2)":"GPU threads (WebGL 2), notes on the 2D canvas"):QS.get("gl")==="1"?(GLR?"2D (theme not supported by the GPU path)":"2D (WebGL 2 not available)"):"2D";
+  var n=PF.n,fr=Math.max(1,PF.fr),fps=1000*fr/Math.max(1,PF.ivs),f=function(x){return (x/n).toFixed(1)},mode=glActive()?(!T.nodes&&GLR.node?"GPU threads and notes (WebGL 2)":"GPU threads (WebGL 2), notes on the 2D canvas"):QS.get("gl")==="0"?"2D (the GPU drawing is switched off with ?gl=0)":GLR?"2D (theme not supported by the GPU path)":"2D (WebGL 2 not available)";
   var o={mode:glActive()?(!T.nodes&&GLR.node?"gl":"gl-threads"):"2d",selfTestMs:PF.st,fps:+fps.toFixed(1),frameMs:+(PF.ivs/fr).toFixed(1),worstMs:+PF.worst.toFixed(0),slowPct:+(100*PF.long/fr).toFixed(0),workMs:+f(PF.work),simMs:+f(PF.sim),threadsMs:+f(PF.thr),notesMs:+f(PF.notes),
     notes:NN,edges:E.length,dpr:+DPR.toFixed(2),cap:DPRCAP,canvas:cv.width+"x"+cv.height,theme:T.id,cadence:TCAD,lite:LITE,spin:!held,turn:+rot.y.toFixed(2),gpu:PF.gpu,ua:navigator.userAgent.slice(0,90)};
   if(PF.cn<3){PF.cn++;PF.cov=perfCoverage()}o.threadCover=PF.cov;
