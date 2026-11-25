@@ -245,6 +245,15 @@ def turn_checks(b, base):
           pg.get_attribute("#hold", "aria-pressed") == "true" and moved(first, top(pg)) and "turning by itself on" in pg.inner_text("#perf"), f"{first} {top(pg)}")
     pg.click("#hold")
     check("the button turns it off again", pg.get_attribute("#hold", "aria-pressed") == "false")
+    pg.mouse.move(500, 400)
+    pg.wait_for_timeout(9000)
+    idle = pg.inner_text("#perf")
+    for i in range(12):   # the pointer keeps moving, so the panel's next update (once a second) falls in the full-pace window
+        pg.mouse.move(520 + i * 7, 420 + i * 5)
+        pg.wait_for_timeout(250)
+    busy = pg.inner_text("#perf")
+    check("pacing: left alone the view draws at a calm or live pace, and a pointer move brings back full pace",
+          ("frame pace now: calm" in idle or "frame pace now: live" in idle) and "frame pace now: full" in busy, idle + "\n--\n" + busy)
     ctx.close()
     ctx = b.new_context(viewport={"width": 1000, "height": 650})
     pg = ctx.new_page()
