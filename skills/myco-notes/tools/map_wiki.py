@@ -14,7 +14,9 @@ import html
 import json
 import os
 import re
+import secrets
 import shutil
+import sys
 from urllib.parse import unquote
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -29,6 +31,7 @@ MORE_AFTER = 15                # a list of links longer than this folds the rest
 SCHEME = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
 TAG = re.compile(r"(<[^>]*>)")
 A_HREF = re.compile(r'<a href="([^"]*)"([^>]*)>(.*?)</a>', re.S)
+RAW_TEXT = re.compile(r"<(?:script|style|title|textarea|xmp|noscript|iframe|plaintext|noembed|noframes|template|svg|math)\b|<!--", re.I)
 MD_TEXT_LINK = re.compile(r"\[([^\]\n]*)\]\(\s*<?([^)\s>]+)>?(?:\s+\"[^\"]*\")?\s*\)")
 FRESH_KEYS = ("last_confirmed", "review_after", "valid_from", "valid_until", "supersedes", "superseded_by")
 
@@ -47,12 +50,16 @@ class Linker:
 
     def __init__(self, c):
         self.c, self.n = c, 0
+        self.mark = f' data-myco="{secrets.token_hex(8)}"'      # only the tags written below carry it: the Markdown step lets those through and escapes any other raw HTML
+
+    def trusted(self, tag):
+        return self.mark in tag
 
     def page(self, tgt, frag=""):
         return self.c.info[tgt]["id"] + ".html" + frag
 
-    def dead(self, text, why):
-        return f'<span class="nolink" title="{esc(why)}">{text}</span>'
+    def dead(self, text, why, mark=""):
+        return f'<span class="nolink"{mark} title="{esc(why)}">{text}</span{mark}>'
 
     def wiki(self, rel, src):
         """[[Note]], [[Note|text]], [[Note#heading]] and ![[Note]] in Markdown source (code is left alone) become HTML links."""
@@ -62,11 +69,11 @@ class Linker:
             target, heading, text = (m.group(2) or "").strip(), (m.group(3) or "").strip(), (m.group(4) or "").strip()
             label = esc(text or (target + ("#" + heading if heading else "") if target else heading))
             if not target:
-                return f'<a class="wikilink" href="#{esc(dash(heading))}">{label}</a>' if heading else m.group(0)
+                return f'<a class="wikilink"{self.mark} href="#{esc(dash(heading))}">{label}</a{self.mark}>' if heading else m.group(0)
             tgt = c.link_index.resolve("wiki", target, rel)
             if tgt in c.info:
-                return f'<a class="wikilink" href="{self.page(tgt, "#" + dash(heading) if heading else "")}">{label}</a>'
-            return self.dead(label, f"No note called {target} in this map")
+                return f'<a class="wikilink"{self.mark} href="{self.page(tgt, "#" + dash(heading) if heading else "")}">{label}</a{self.mark}>'
+            return self.dead(label, f"No note called {target} in this map", self.mark)
 
         out, in_code = [], False
         for line in src.split("\n"):
@@ -187,9 +194,10 @@ def render(c, d, linker):
     if first:                                            # the title is the page's own heading
         src = src[first.end():]
     if c.md_lib:
-        m = c.md_lib.Markdown(extensions=["tables", "fenced_code", "toc", "sane_lists"],
+        m = c.md_lib.Markdown(extensions=["tables", "fenced_code", "toc", "sane_lists", _myco.markdown_no_raw_html(linker.trusted)],
                               extension_configs={"toc": {"permalink": "#", "permalink_title": "Link to this section", "toc_depth": "1-3"}})
-        body = linker.mentions(rel, linker.relative(rel, m.convert(linker.wiki(rel, src))))
+        body = m.convert(linker.wiki(rel, src)).replace(linker.mark, "")
+        body = linker.mentions(rel, linker.relative(rel, body))
         body = re.sub(r"<pre>", '<pre tabindex="0">', body)
         body = re.sub(r"<table>", '<div class="tablewrap" tabindex="0" role="region" aria-label="Table"><table>', body).replace("</table>", "</table></div>")
         toc = m.toc if re.search(r"<li>", m.toc or "") else ""
@@ -198,6 +206,21 @@ def render(c, d, linker):
     else:
         body, toc = '<pre class="plain" tabindex="0">' + linker.plain(rel, src) + "</pre>", ""
     return body, toc
+
+
+def page_problems(page):
+    """What is wrong with a note page that was just written, as short sentences (empty when it is fine). A tag that reaches the article from a note's text
+    (the renderer turns raw HTML off, so this should never happen) can open a raw-text element that swallows the rest of the page, the scripts included,
+    and nothing shows an error: the tree and the outline are just empty."""
+    out = []
+    if page.count("<title>") != 1:
+        out.append(f"{page.count('<title>')} <title> elements instead of 1")
+    if len(re.findall(r'<script src="[^"]*assets/(?:nav|wiki)\.js"></script>', page)) != 2:
+        out.append("not both <script src> tags (assets/nav.js, assets/wiki.js)")
+    art = re.search(r'<article class="doc">(.*?)</article>', page, re.S)
+    if art and RAW_TEXT.search(art.group(1)):
+        out.append("a raw-text or comment tag inside the article")
+    return out
 
 
 # ---------- the notes' own status ----------
@@ -437,7 +460,10 @@ def build(c):
 
     linker = Linker(c)
     for rel, d in info.items():
-        write(os.path.join(c.out, "p", d["id"] + ".html"), note_page(c, d, linker, ctx))
+        page = note_page(c, d, linker, ctx)
+        write(os.path.join(c.out, "p", d["id"] + ".html"), page)
+        for why in page_problems(page):
+            print(f"warning: {rel}: the page is broken ({why}); the tree and the outline may not load", file=sys.stderr)
         shutil.copy(os.path.join(c.root, rel), os.path.join(c.out, "raw", d["id"] + ".md"))
     write(os.path.join(c.out, "index.html"), home_page(c, ctx))
     write(os.path.join(c.out, "recent.html"), recent_page(c, commits))

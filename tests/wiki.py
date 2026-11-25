@@ -280,6 +280,41 @@ def main():
         check("the outline shows the start of a long heading with the whole as its tooltip", re.search(r'<a href="#1-current-state[^"]*" title="1\. Current state \(each row[^"]*">1\. Current state</a>', lh) is not None, out)
         os.remove(os.path.join(root, "myco-notes", "longhead.md"))
 
+        print("raw HTML in a note's text")
+        write(os.path.join(root, "myco-notes", "rawhtml.md"), "---\nsummary: A note whose text names tags\n---\n# Raw tags\n\n"
+              "- Saved: <title>\n- Edit the <textarea> field\n- <script>alert(1)</script>\n- <!-- never closed\n- A forged <a class=\"wikilink\" href=\"javascript:alert(1)\">link</a> and a real [[runbook]] link\n- `<title>` in a code span, <https://example.com/x> a link and &amp; an entity\n\n"
+              "<div>a block of text</div>\n\n| a | b |\n|---|---|\n| <textarea> | x |\n\n## Heading with <style>\n\n```\n<title> fenced\n```\n")
+        for layout in ("wiki", "classic"):
+            o = os.path.join(tmp, "raw-" + layout)
+            rc, out = build(root, o, "--layout", layout)
+            pg = page_of(o, "myco-notes-rawhtml")
+            art = pg[pg.index("<article"):pg.index("</article>")]
+            check(f"{layout}: it builds and warns about nothing", rc == 0 and "warning" not in out, out)
+            check(f"{layout}: the page keeps one title and no element opened by the text",
+                  pg.count("<title>") == 1 and not re.search(r"<(textarea|style|xmp|iframe|plaintext)\b|<div>|<!--", art) and "<script>alert" not in pg, art[:600])
+            check(f"{layout}: the text is shown as text", all(t in art for t in ("Saved: &lt;title&gt;", "&lt;textarea&gt; field", "&lt;script&gt;alert(1)&lt;/script&gt;", "&lt;!-- never closed", "&lt;div&gt;a block of text&lt;/div&gt;")), art[:600])
+            check(f"{layout}: code spans, fenced blocks, autolinks and entities still work",
+                  "<code>&lt;title&gt;</code>" in art and "<code>&lt;title&gt; fenced" in art and '<a href="https://example.com/x">' in art and "&amp; an entity" in art, art[:900])
+            if layout == "wiki":
+                check("wiki: a link a note forges by hand is text, the real [[wiki link]] beside it is a link",
+                      '<a class="wikilink" href="javascript:' not in pg and "link&lt;/a&gt; and a real" in art and "forged &lt;a class=" in art and '<a class="wikilink" href="myco-notes-runbook.html">runbook</a>' in art and "data-myco" not in pg, art[:500])
+                check("wiki: both script tags of the page are still there, and the structure parses",
+                      pg.count('<script src="../assets/nav.js"></script><script src="../assets/wiki.js"></script>') == 1 and 'id="tree"' in pg and 'id="outline"' in pg
+                      and 'id="rawhtml"' not in pg, pg[-300:])
+                tags = []
+                class Tags(HTMLParser):
+                    def handle_starttag(self, tag, attrs):
+                        tags.append(tag)
+                Tags().feed(pg)
+                check("wiki: the page has exactly the shell's script elements (no script came from the text)", tags.count("script") == 4 and tags.count("title") == 1, str(tags.count("script")))
+        sys.path.insert(0, os.path.join(REPO, "skills", "myco-notes", "tools"))
+        import map_wiki
+        good = page_of(os.path.join(tmp, "raw-wiki"), "myco-notes-rawhtml")
+        check("the page check accepts a good page", map_wiki.page_problems(good) == [])
+        broken = good.replace('<article class="doc">', '<article class="doc"><title>').replace('<script src="../assets/nav.js"></script><script src="../assets/wiki.js"></script>', "")
+        check("the page check names a page that lost its scripts and carries a raw-text tag", len(map_wiki.page_problems(broken)) == 3, str(map_wiki.page_problems(broken)))
+        os.remove(os.path.join(root, "myco-notes", "rawhtml.md"))
+
         print("without the markdown package")
         shim = os.path.join(tmp, "shim")
         write(os.path.join(shim, "markdown.py"), 'raise ImportError("not installed (test)")\n')

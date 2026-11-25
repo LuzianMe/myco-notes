@@ -4,7 +4,7 @@ import re
 import subprocess
 import sys
 
-VERSION = "0.44.1"   # the kit version these tools come from; moves with plugin.json and SKILL.md (tests check it)
+VERSION = "0.44.2"   # the kit version these tools come from; moves with plugin.json and SKILL.md (tests check it)
 FORMAT_VERSION = "1.2"   # the version of docs/FORMAT.md that new repositories follow; bootstrap writes it, relocate adds it when missing
 AGENT_SKILL_DIRS = (".claude/skills", ".agents/skills")   # a copy of the skill kept in a notes repository for agents (a cloud session loads it from there): not notes, so the lint and the map leave it out
 
@@ -203,6 +203,28 @@ def first_sentence(text, fm_end=0):
         s = m.group(1) if m else s
         return s if len(s) <= SUMMARY_MAX else s[:SUMMARY_MAX - 3].rstrip() + "..."
     return ""
+
+
+def markdown_no_raw_html(trusted=None):
+    """A Python-Markdown extension that turns raw HTML off: a tag written in a note's text (`Saved: <title>`, `<script>`, an unclosed `<!--`) is shown as
+    text, as the note's author meant it, instead of reaching the page as markup (an unclosed `<title>` or `<textarea>` swallows the rest of the page,
+    a `<script>` runs). Code spans, fenced blocks, autolinks and entities are unchanged. `trusted(tag)` may let through the tags the renderer itself
+    wrote into the source (the wiki layout's links); it must not be satisfiable by a note's text. Needs the `markdown` package (the caller has it)."""
+    from markdown.extensions import Extension
+    from markdown.inlinepatterns import HTML_RE, HtmlInlineProcessor
+
+    class Filter(HtmlInlineProcessor):
+        def handleMatch(self, m, data):
+            if trusted and trusted(m.group(1)):
+                return super().handleMatch(m, data)
+            return None, None, None
+
+    class NoRawHtml(Extension):
+        def extendMarkdown(self, md):
+            md.preprocessors.deregister("html_block")
+            md.inlinePatterns.deregister("html")
+            md.inlinePatterns.register(Filter(HTML_RE, md), "html", 90)
+    return NoRawHtml()
 
 
 def note_summary(text):

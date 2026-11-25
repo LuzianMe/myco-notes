@@ -275,7 +275,7 @@ An implementation SHOULD provide these; each says what it may touch.
 | **Health** (`doctor`) | versions, layout, hook, settings, the implementation installed twice | nothing |
 
 ### 12.3 Optional operations
-A **map** of the mycelium (`build-notes-map.py`) MUST keep reference direction (5.3) and SHOULD stay out of version control. A **mirror** (`mirror-push`) and a **restore drill** (`restore-drill`) protect against losing the repository; they are the owner's choice (method 11.5a), never set up unasked.
+A **map** of the mycelium (`build-notes-map.py`) MUST keep reference direction (5.3) and SHOULD stay out of version control. It MUST show raw HTML written in a note's text as text, not as markup (one unclosed tag must not break the page and a script in a note must not run). A **mirror** (`mirror-push`) and a **restore drill** (`restore-drill`) protect against losing the repository; they are the owner's choice (method 11.5a), never set up unasked.
 
 ### 12.4 Rules for every operation
 - **Nothing changes without the owner's yes** beyond what was asked: an operation that would delete, publish or rewrite more than its table row says stops and asks.

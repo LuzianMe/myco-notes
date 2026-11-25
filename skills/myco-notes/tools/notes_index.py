@@ -8,7 +8,7 @@ It reads; it never writes. It is generated, so it is never out of date and never
 
 Usage:  tools/index [--root DIR] [--all] [--missing] [--review-scope [--full]]
         --all           list every record in the history folders too
-        --missing       only the notes outside the history folders that have no summary (for an upgrade, method 21.4)
+        --missing       only the notes outside the history folders that have no summary (for an upgrade, method 21.4); says what it does not count
         --review-scope  what the next review should read (method 21.5): the notes changed since the last commit of the newest review
                         file, the one that applied its fixes (uncommitted edits included), plus the notes named in the changed lines
                         and the notes that point to a changed note (unless more than 5 do: a hub such as the master record); or every note when a full review is due (no
@@ -284,6 +284,10 @@ def main():
         print(f"# Notes without a summary: {len(missing)} of {len(notes)}")
         for rel, s, _, _ in missing:
             print(f"- `{rel}`" + (f" (first line: {s})" if s else ""))
+        skipped = sum(1 for r in rows if r[3] and not r[2])
+        print(f"\nNot counted: {skipped} note(s) in the history folders ({', '.join(lay['history'])}) without a summary (records keep their form, method 10.1), "
+              f"and the entry files and the {lay['tools']}/ and {lay['docs']}/ folders, which this index does not list. "
+              "The notes map shows all of them; one without a summary appears there with its first characters ending in \"...\".")
         return 0
     project = os.path.basename(root)
     print(f"# {project}: note index ({len(notes)} notes, {len(missing)} without a summary)")
