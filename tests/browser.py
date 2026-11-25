@@ -318,11 +318,11 @@ def gpu_scale_checks(b, base):
     pg = ctx.new_page()
     pg.on("pageerror", lambda e: errs.append(str(e)[:160]))
     cdp = ctx.new_cdp_session(pg)
-    cdp.send("Emulation.setCPUThrottlingRate", {"rate": 4})
+    cdp.send("Emulation.setCPUThrottlingRate", {"rate": 20})   # the page's own work must alone make frames slow, whatever the machine
     pg.goto(base + "map/graph.html?theme=dark&perf=1")
     pg.wait_for_timeout(1500)
     pg.evaluate("setInterval(function(){document.dispatchEvent(new Event('keydown'))},400)")   # input keeps the pace at full, as a reader at work would
-    pg.wait_for_timeout(26000)
+    pg.wait_for_timeout(32000)
     sz = pg.evaluate("[document.getElementById('g').width, document.getElementById('c').width]")
     check("a slow machine lowers the card's canvas in steps, never below 60%", .55 * sz[1] <= sz[0] < sz[1] and not errs, f"{sz} {errs}")
     ctx.close()
