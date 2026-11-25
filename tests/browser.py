@@ -192,6 +192,34 @@ def wiki_checks(b, base, site, demo):
     ctx.close()
 
 
+def layer_checks(b, base):
+    """The thread layer and the pixel density governor of the full view (map/graph.html)."""
+    print("the thread layer and the pixel density")
+    ctx = b.new_context(viewport={"width": 800, "height": 600}, device_scale_factor=1)
+    errs = []
+    pg = ctx.new_page()
+    pg.on("pageerror", lambda e: errs.append(str(e)[:160]))
+    pg.goto(base + "map/graph.html?theme=dark")
+    pg.wait_for_timeout(2500)
+    info = pg.evaluate("""(function(){var t=document.getElementById('t'),c=document.getElementById('c'),a=function(k){var d=k.getContext('2d').getImageData(0,0,k.width,k.height).data,s=0;for(var i=3;i<d.length;i+=4)s+=d[i];return s};
+      return {order:!!(t.compareDocumentPosition(c)&Node.DOCUMENT_POSITION_FOLLOWING),pe:getComputedStyle(t).pointerEvents,same:t.width===c.width&&t.height===c.height,threads:a(t),notes:a(c)}})()""")
+    check("threads are a layer under the notes: same size, no pointer input, both painted", info["order"] and info["pe"] == "none" and info["same"] and info["threads"] > 1000 and info["notes"] > 1000 and not errs, f"{info} {errs}")
+    pg.close()
+    ctx.close()
+    ctx = b.new_context(viewport={"width": 1280, "height": 800}, device_scale_factor=2)
+    pg = ctx.new_page()
+    pg.on("pageerror", lambda e: errs.append(str(e)[:160]))
+    cdp = ctx.new_cdp_session(pg)
+    cdp.send("Emulation.setCPUThrottlingRate", {"rate": 6})
+    pg.goto(base + "map/graph.html?theme=dark")
+    pg.wait_for_timeout(1500)
+    w0 = pg.evaluate("document.getElementById('c').width")
+    pg.wait_for_timeout(18000)
+    w1 = pg.evaluate("document.getElementById('c').width")
+    check("a slow machine at 2 device pixels per pixel is lowered once to 1.5", w0 == 2560 and w1 == 1920 and not errs, f"{w0} -> {w1} {errs}")
+    ctx.close()
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--chromium", default=None, help="a Chromium or headless-shell binary, if Playwright's own is not installed")
@@ -395,6 +423,7 @@ def main():
             st = fr.evaluate("(function(){var c=getComputedStyle(document.getElementById('c'));return [c.pointerEvents,c.touchAction]})()")
             check("interactive=0: no error, and the canvas takes no pointer or touch", not errs and st[0] == "none" and st[1] == "auto", f"{st} {errs}")
             pg.close()
+            layer_checks(b, base)
             wiki_checks(b, base, site, demo)
             b.close()
         srv.shutdown()

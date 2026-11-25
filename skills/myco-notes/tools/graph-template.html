@@ -10,7 +10,7 @@
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;overflow:hidden;background:radial-gradient(ellipse at 50% 45%,var(--bg2),var(--bg) 70%);color:var(--fg);font:14px/1.45 var(--font)}
 canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
-canvas.hover{cursor:pointer}canvas.drag{cursor:grabbing}
+#t{pointer-events:none;cursor:default}canvas.hover{cursor:pointer}canvas.drag{cursor:grabbing}
 .box{position:fixed;background:var(--panel);border:1px solid var(--line);border-radius:12px;backdrop-filter:blur(8px)}
 #left{position:fixed;top:12px;left:12px;width:min(330px,calc(100vw - 24px));max-height:calc(100vh - 24px);overflow-y:auto;display:flex;flex-direction:column;gap:10px;pointer-events:none;scrollbar-width:none}
 #left>.box{position:static;pointer-events:auto}
@@ -102,7 +102,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 %%THEME_HEAD%%
 </head>
 <body>
-<canvas id="c" role="img" aria-label="Graph of the notes: each note is a node, each mention between notes is a thread. The list of all notes follows for keyboard and screen reader use."></canvas>
+<canvas id="t" aria-hidden="true"></canvas><canvas id="c" role="img" aria-label="Graph of the notes: each note is a node, each mention between notes is a thread. The list of all notes follows for keyboard and screen reader use."></canvas>
 <div id="empty">No notes to draw yet.</div>
 <div id="hint" role="status"></div>
 <div id="left"><div id="head" class="box"><button id="fold" type="button" aria-expanded="true" aria-controls="head" title="Hide the search and the legend">&minus;</button><h1>%%TITLE%%</h1><p id="stats"></p>
@@ -124,9 +124,10 @@ window.addEventListener("error",function(ev){fail(ev.error||ev.message,false)});
 window.addEventListener("unhandledrejection",function(ev){fail(ev.reason,false)});
 var D=JSON.parse(document.getElementById("data").textContent);
 var cv=document.getElementById("c"),cx=cv.getContext("2d");
-/* the quiet threads are drawn into this second canvas and reused until something changes (the view, the layout, the focus, the
-   theme); while the network turns by itself they are redrawn about 20 times a second, the notes on top every frame */
-var tc=document.createElement("canvas"),tcx=tc.getContext("2d"),gc=document.createElement("canvas"),gcx=gc.getContext("2d"),tKey="",tLast=0,busyNow=false,tcache={},spikes=[],ambT=0;   /* gc: the threads' glow at half resolution (soft, and a quarter of the pixels) */
+/* the quiet threads are drawn into this second canvas, a layer under the main one (#t), and reused until something changes (the
+   view, the layout, the focus, the theme); while the network turns by itself they are redrawn about 20 times a second, the notes on
+   top every frame. A layer of its own means the browser composes the two, and no full-screen copy is made in every frame. */
+var tc=document.getElementById("t"),tcx=tc.getContext("2d"),gc=document.createElement("canvas"),gcx=gc.getContext("2d"),tKey="",tLast=0,busyNow=false,tcache={},spikes=[],ambT=0;   /* gc: the threads' glow at half resolution (soft, and a quarter of the pixels) */
 var reduce=window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches;
 var NODES=D.nodes,NN=NODES.length,NC=D.commits.length;
 var root=document.documentElement;
@@ -174,7 +175,7 @@ D.edges.forEach(function(e,k){
 });
 var cur=NC;                                   /* commits applied: 0..NC */
 var hov=-1,sel=-1,match=null,alpha=1,playing=false,acc=0,ripples=[];
-var cam={x:0,y:0,k:1,tx:0,ty:0,tk:1},autoFit=true,W=0,H=0,DPR=1,lastT=0,VS=1;
+var cam={x:0,y:0,k:1,tx:0,ty:0,tk:1},autoFit=true,W=0,H=0,DPR=1,lastT=0,VS=1,DPRCAP=EMBED?1.5:2,slowT=0,runT=0,TCAD=3;   /* DPRCAP: most device pixels per pixel; lowered once, to 1.5, when frames stay slow (see governor) */
 function gcol(g){var c=GCI[g]||[0,g],p=c[0]?T.quiet:T.pal;return p[c[1]%p.length]}
 
 /* ---------- depth ----------
@@ -743,8 +744,7 @@ function draw(now){
   busyNow=!!(drag||pinch)||now-spin.last<400;
   var mk=match?Object.keys(match).length+":"+Object.keys(match)[0]:"",settling=alpha>0||NODES.some(function(n){return n.vis&&(n.ap<1||Math.abs(n.zt-n.z)>.003)});
   var key=[W,H,DPR,cam.x.toFixed(2),cam.y.toFixed(2),cam.k.toFixed(4),cyw.toFixed(4),syw.toFixed(4),cpt.toFixed(4),spt.toFixed(4),depthAmt.toFixed(3),focus,mk,T.id,cur,coldE.length,twigOK(),settling?now:0].join("|");
-  tLast++;if(key!==tKey&&!(spin.on&&!playing&&!busyNow&&tLast<3)){tKey=key;tLast=0;quietThreads(coldE)}   /* turning by itself: every third frame */
-  cx.setTransform(1,0,0,1,0,0);cx.drawImage(tc,0,0);cx.setTransform(DPR,0,0,DPR,0,0);
+  tLast++;if(key!==tKey&&!(spin.on&&!playing&&!busyNow&&tLast<TCAD)){tKey=key;tLast=0;quietThreads(coldE)}   /* turning by itself: every third frame */
   if(depthAmt>0)hotE.sort(function(p,q){return (q.a.pz+q.b.pz)-(p.a.pz+p.b.pz)});
   hotE.forEach(function(e){
     var a=Math.min(e.a.ap,e.b.ap),w=Math.min(2.6,.6+Math.sqrt(e.w)*.45)*1.5*Math.min(1.4,cam.k+.3),al=.85*Math.min(1,a*2);
@@ -798,7 +798,7 @@ function fitBar(){   /* phone: the title leaves room for the buttons beside it, 
 }
 function resize(){
   var had=W>0&&H>0;
-  DPR=Math.min(EMBED?1.5:2,window.devicePixelRatio||1);W=innerWidth;H=innerHeight;VS=W>700?1:Math.max(1,Math.min(1.7,(H-(EMBED?24:176))/(W-(EMBED?24:32))*.9));   /* embed: at most 1.5 device pixels per pixel, to spare phone batteries */   /* tall phone screen: the picture is stretched vertically (positions only, nodes stay round) so the network fills the height */
+  DPR=Math.min(DPRCAP,window.devicePixelRatio||1);W=innerWidth;H=innerHeight;VS=W>700?1:Math.max(1,Math.min(1.7,(H-(EMBED?24:176))/(W-(EMBED?24:32))*.9));   /* embed: at most 1.5 device pixels per pixel, to spare phone batteries */   /* tall phone screen: the picture is stretched vertically (positions only, nodes stay round) so the network fills the height */
   cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);tc.width=cv.width;tc.height=cv.height;gc.width=Math.ceil(cv.width/2);gc.height=Math.ceil(cv.height/2);tKey="";fitBar();
   if(!had&&W>0&&H>0&&started&&autoFit){cam.fit=false;fitTarget();cam.x=cam.tx;cam.y=cam.ty;cam.k=cam.tk}   /* the first real size (a hidden iframe or tab shown): fit at once */
 }
@@ -821,6 +821,7 @@ function step(now){
   if(innerWidth!==W||innerHeight!==H)resize();
   if(W<=0||H<=0){lastT=now;return}
   var dt=Math.min(64,now-(lastT||now));lastT=now;
+  governor(now);
   if(playing){
     acc+=dt;var iv=Math.max(45,Math.min(700,24000/Math.max(NC,1)))/parseFloat(document.getElementById("speed").value);
     while(acc>=iv&&playing){acc-=iv;if(cur>=NC){stopPlay();break}setStep(cur+1,true)}
@@ -836,6 +837,21 @@ function step(now){
   updateLabels(now,dt);
   draw(now);
   if(!readySent){readySent=true;tell("myco-ready")}
+}
+/* Governor for a slow machine. Two steps, each taken once and never undone (so nothing can flicker), the second only if the first was not
+   enough: (1) on a screen with more than 1.5 device pixels per pixel, the density drops to 1.5 (a little softer, 44% fewer pixels); (2) while
+   the network turns by itself its threads are redrawn every 6th frame instead of every 3rd (the turning is a little steppier). Each step
+   follows three seconds of frames spaced more than 40 ms apart (under 25 a second), counted after the first five seconds. It does nothing
+   when frames are fast, during a replay, or for step (1) at 1x, at 1.5x and in embed mode. */
+var govLast=0;
+function governor(now){
+  var dt=govLast?Math.min(1000,now-govLast):0;govLast=now;   /* the real time between frames (the animation's own step is capped at 64 ms) */
+  if(playing||!dt)return;
+  var dense=DPRCAP>1.5&&(window.devicePixelRatio||1)>1.5;
+  if(!dense&&TCAD>=6)return;
+  runT+=dt;if(runT<5000)return;
+  slowT=dt>40?slowT+dt:Math.max(0,slowT-dt*2);
+  if(slowT>3000){slowT=0;if(dense){DPRCAP=1.5;resize()}else{TCAD=6}}
 }
 function startPlay(){
   if(cur>=NC){setStep(0,false);alpha=.1}

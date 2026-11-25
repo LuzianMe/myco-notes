@@ -6,6 +6,7 @@
 Builds the demo notes (examples/demo/build_demo.py) in a temporary folder, serves its map locally, and writes next to this script:
   mycelium.webp         the replay of the git history, then the view turning in 3D while it switches through the themes
   graph-themes.webp     a gallery of the themes, one tile each
+  wiki-layout.webp      a note page of the wiki layout (build-notes-map.py --layout wiki), light and dark side by side
 Needs Playwright for Python and Pillow (pip install playwright pillow); these are only for making the README's pictures, the kit
 itself does not use them. --chromium points at a Chromium or headless-shell binary if Playwright's own is not installed.
 """
@@ -17,9 +18,37 @@ THEMES = ["mycelium", "matrix", "amber", "deepsea", "fruit", "paper", "contrast"
 PROBE = "window.__turn=function(d,t){rot.y+=d;rot.x=t;spin.on=false;spin.vy=0;spin.last=performance.now()};"
 
 
+def wiki_shot(a, demo, tmp, Image, sync_playwright):
+    """One note page of the wiki layout in the Light and Dark themes, side by side (the tree, breadcrumbs, summary, links here, previous and next)."""
+    wk = os.path.join(tmp, "wiki")
+    subprocess.run([sys.executable, os.path.join(demo, "myco-notes", "tools", "build-notes-map.py"), "--root", demo, "--layout", "wiki", "--out", wk],
+                   check=True, capture_output=True)
+    h = functools.partial(http.server.SimpleHTTPRequestHandler, directory=wk)
+    h.log_message = lambda *x: None
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), h)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    page = f"http://127.0.0.1:{srv.server_address[1]}/p/myco-notes-entities-gateway.html"
+    tiles = []
+    with sync_playwright() as p:
+        b = p.chromium.launch(executable_path=a.chromium) if a.chromium else p.chromium.launch()
+        for th in ("light", "dark"):
+            pg = b.new_page(viewport={"width": 1280, "height": 760})
+            pg.goto(page + "?theme=" + th)
+            pg.wait_for_timeout(800)
+            tiles.append(Image.open(__import__("io").BytesIO(pg.screenshot())).convert("RGB").resize((720, 428), Image.LANCZOS))
+        b.close()
+    g = Image.new("RGB", (720 * 2 + 4, 428), (128, 128, 128))
+    g.paste(tiles[0], (0, 0))
+    g.paste(tiles[1], (724, 0))
+    out = os.path.join(HERE, "wiki-layout.webp")
+    g.save(out, quality=82)
+    print("wrote", out, os.path.getsize(out) // 1024, "KB")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--chromium", default=None)
+    ap.add_argument("--only", choices=("all", "wiki"), default="all", help="wiki: only wiki-layout.webp (the animation is a few MB and changes on every recording)")
     a = ap.parse_args()
     from playwright.sync_api import sync_playwright
     from PIL import Image
@@ -27,6 +56,9 @@ def main():
     demo = os.path.join(tmp, "demo")
     subprocess.run([sys.executable, os.path.join(REPO, "examples", "demo", "build_demo.py"), demo], check=True, capture_output=True)
     mp = os.path.join(demo, "myco-notes", "map")
+    wiki_shot(a, demo, tmp, Image, sync_playwright)
+    if a.only == "wiki":
+        return
     h = functools.partial(http.server.SimpleHTTPRequestHandler, directory=mp)
     h.log_message = lambda *x: None
     srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), h)
