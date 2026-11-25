@@ -220,6 +220,65 @@ def layer_checks(b, base):
     ctx.close()
 
 
+def turn_checks(b, base):
+    """Turning by itself is off unless asked for; the performance overlay; the GPU thread layer (when this Chromium has WebGL 2)."""
+    print("the idle turn, the performance overlay and the GPU thread layer")
+    errs = []
+    top = lambda pg: float(pg.inner_text("#perf").split("view turned ")[1].split(" rad")[0])   # how far the view has turned about its upright axis
+    moved = lambda a, c: abs(a - c) > .05
+    ctx = b.new_context(viewport={"width": 1000, "height": 650})
+    pg = ctx.new_page()
+    pg.on("pageerror", lambda e: errs.append(str(e)[:160]))
+    pg.goto(base + "map/graph.html?theme=dark&perf=1")
+    pg.wait_for_timeout(6000)   # the first fit of the camera glides for a while
+    first = top(pg)
+    pg.wait_for_timeout(5000)
+    check("by default the network stays still when left alone, and the Spin button is off",
+          not moved(first, top(pg)) and pg.get_attribute("#hold", "aria-pressed") == "false" and "turning by itself off" in pg.inner_text("#perf"), f"{first} {top(pg)}")
+    pg.click("#hold")
+    pg.wait_for_timeout(500)
+    pg.reload()
+    pg.wait_for_timeout(2500)
+    first = top(pg)
+    pg.wait_for_timeout(6500)
+    check("the Spin button turns it on, the choice is kept after a reload, and the network turns by itself",
+          pg.get_attribute("#hold", "aria-pressed") == "true" and moved(first, top(pg)) and "turning by itself on" in pg.inner_text("#perf"), f"{first} {top(pg)}")
+    pg.click("#hold")
+    check("the button turns it off again", pg.get_attribute("#hold", "aria-pressed") == "false")
+    ctx.close()
+    ctx = b.new_context(viewport={"width": 1000, "height": 650})
+    pg = ctx.new_page()
+    pg.on("pageerror", lambda e: errs.append(str(e)[:160]))
+    pg.goto(base + "map/graph.html?theme=dark&perf=1")
+    pg.wait_for_timeout(3500)
+    txt = pg.inner_text("#perf")
+    check("?perf=1 shows the frame rate, where the time goes, the settings and the thread layer's coverage, and a Copy button",
+          all(k in txt for k in ("fps", "own work per frame", "simulation", "threads", "notes", "pixel density", "thread layer paints")) and pg.locator("#perf button").count() == 1 and not errs, txt + str(errs))
+    cov2d = float(txt.split("thread layer paints ")[1].split("%")[0])
+    ctx.close()
+    ctx = b.new_context(viewport={"width": 1000, "height": 650})
+    pg = ctx.new_page()
+    pg.on("pageerror", lambda e: errs.append(str(e)[:160]))
+    pg.on("console", lambda m: errs.append(m.text[:160]) if m.type == "error" else None)
+    pg.goto(base + "map/graph.html?theme=dark&perf=1&gl=1")
+    pg.wait_for_timeout(3500)
+    txt = pg.inner_text("#perf")
+    if "GPU threads" in txt:
+        cov = float(txt.split("thread layer paints ")[1].split("%")[0])
+        check("?gl=1: the card draws the threads (a layer of its own, shown, no error) and they cover about what the 2D drawing covers",
+              pg.evaluate("!document.getElementById('g').hidden") and not errs and cov2d > 1 and .6 * cov2d < cov < 1.6 * cov2d, f"gl {cov} 2d {cov2d} {errs}")
+        pg.select_option("#theme-pick", "matrix")
+        pg.wait_for_timeout(1500)
+        t2 = pg.inner_text("#perf")
+        check("a digital theme falls back to the 2D drawing, and back again", "2D (theme not supported" in t2 and pg.evaluate("document.getElementById('g').hidden") and not errs, t2)
+        pg.select_option("#theme-pick", "dark")
+        pg.wait_for_timeout(1500)
+        check("and the card draws again after it", "GPU threads" in pg.inner_text("#perf") and pg.evaluate("!document.getElementById('g').hidden") and not errs, pg.inner_text("#perf"))
+    else:
+        check("?gl=1 without WebGL 2 (this Chromium): the 2D drawing is used, says so, and there is no error", "2D (WebGL 2 not available)" in txt and not errs, txt + str(errs))
+    ctx.close()
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--chromium", default=None, help="a Chromium or headless-shell binary, if Playwright's own is not installed")
@@ -424,6 +483,7 @@ def main():
             check("interactive=0: no error, and the canvas takes no pointer or touch", not errs and st[0] == "none" and st[1] == "auto", f"{st} {errs}")
             pg.close()
             layer_checks(b, base)
+            turn_checks(b, base)
             wiki_checks(b, base, site, demo)
             b.close()
         srv.shutdown()

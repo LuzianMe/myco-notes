@@ -112,8 +112,9 @@ This map holds the text of your notes (for the search), unlike the graph, so kee
 
 ![The same demo notes in six themes: Mycelium, Matrix, Amber terminal, Deep sea, Fruit and Paper](.github/assets/graph-themes.webp)
 
-- **A colony:** the read-order notes sit in the middle and every other note grows outward by how many links it is from them; mentions are threads in the colour of the note that writes them. In depth it is a ball you can turn any way; left alone it turns by itself (&#10074;&#10074; holds it still).
+- **A colony:** the read-order notes sit in the middle and every other note grows outward by how many links it is from them; mentions are threads in the colour of the note that writes them. In depth it is a ball you can turn any way; it stays still until you drag it (a **Spin** button, or `?spin=1`, makes it turn by itself when left alone).
 - **Alive:** recently changed notes glow, notes past a review date wilt, a missing reference ends in a `?`, a selected note's threads fire like neurons, and **Replay** (Space) grows the network commit by commit.
+- **Light on a budget device:** on a slow machine the drawing steps down by itself (less pixel density, fewer redraws, plain threads). `?gl=1` lets the graphics card draw the threads (WebGL 2, opt-in for now) and `?perf=1` shows the frame rate and where the time goes, so the two can be compared on your own machine ([options](skills/myco-notes/docs/REFERENCE.md#63-options-of-the-full-view)).
 - **For everyone:** nine themes checked for readable contrast, a screensaver, phone, keyboard and screen-reader use, reduced motion respected. Only titles, paths, counts and commit subjects go into the page, never a note's text.
 - **On a website:** `?embed=1` shows only the network on a transparent page, and `build-notes-map.py --public` writes a copy that holds only the labels you approve ([example](https://luzianme.github.io/myco-notes/embed.html), [how](skills/myco-notes/docs/REFERENCE.md#6-the-mycelium-view-on-a-website)).
 

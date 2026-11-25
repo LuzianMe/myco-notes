@@ -10,7 +10,9 @@
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;overflow:hidden;background:radial-gradient(ellipse at 50% 45%,var(--bg2),var(--bg) 70%);color:var(--fg);font:14px/1.45 var(--font)}
 canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
-#t{pointer-events:none;cursor:default}canvas.hover{cursor:pointer}canvas.drag{cursor:grabbing}
+#perf{position:fixed;left:12px;bottom:12px;z-index:30;font:11px/1.4 ui-monospace,Menlo,Consolas,monospace;background:rgba(10,14,12,.82);color:#e6efe8;padding:8px 10px;border-radius:8px;max-width:min(440px,calc(100vw - 24px));white-space:pre-wrap;pointer-events:none}
+#perf button{font:inherit;margin-top:6px;padding:2px 8px;border:1px solid #6b8;border-radius:6px;background:transparent;color:#cfe;cursor:pointer;pointer-events:auto}
+#g,#t{pointer-events:none;cursor:default}#g[hidden]{display:none}canvas.hover{cursor:pointer}canvas.drag{cursor:grabbing}
 .box{position:fixed;background:var(--panel);border:1px solid var(--line);border-radius:12px;backdrop-filter:blur(8px)}
 #left{position:fixed;top:12px;left:12px;width:min(330px,calc(100vw - 24px));max-height:calc(100vh - 24px);overflow-y:auto;display:flex;flex-direction:column;gap:10px;pointer-events:none;scrollbar-width:none}
 #left>.box{position:static;pointer-events:auto}
@@ -102,13 +104,13 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 %%THEME_HEAD%%
 </head>
 <body>
-<canvas id="t" aria-hidden="true"></canvas><canvas id="c" role="img" aria-label="Graph of the notes: each note is a node, each mention between notes is a thread. The list of all notes follows for keyboard and screen reader use."></canvas>
+<canvas id="g" aria-hidden="true" hidden></canvas><canvas id="t" aria-hidden="true"></canvas><canvas id="c" role="img" aria-label="Graph of the notes: each note is a node, each mention between notes is a thread. The list of all notes follows for keyboard and screen reader use."></canvas>
 <div id="empty">No notes to draw yet.</div>
 <div id="hint" role="status"></div>
 <div id="left"><div id="head" class="box"><button id="fold" type="button" aria-expanded="true" aria-controls="head" title="Hide the search and the legend">&minus;</button><h1>%%TITLE%%</h1><p id="stats"></p>
 <input id="q" type="search" placeholder="Find a note..." aria-label="Find a note"><div id="legend" role="group" aria-label="Show or hide a group of notes"></div></div>
 <div id="time" class="box" hidden><button id="tfold" type="button" aria-expanded="true" aria-controls="time" title="Hide the timeline">&minus;</button><button id="play" type="button">Replay</button><span id="when"></span><input id="slide" type="range" min="0" value="0" aria-label="Position in the history of the notes"><div id="what"></div><label id="speedl"><span class="lbl">Speed </span><select id="speed" aria-label="Replay speed"><option value="0.5">0.5x</option><option value="1" selected>1x</option><option value="2">2x</option><option value="4">4x</option></select></label></div></div>
-<div id="tools" class="box"><button id="find" type="button" aria-expanded="false" aria-controls="head">Find</button><a href="index.html">Map</a><button id="fit" type="button" title="Fit the whole network in view">Fit</button><button id="depth" type="button" aria-pressed="true" title="Depth: the colony as a ball that grows outward from the read-order notes; recently changed notes reach a little further out. Turn the view by dragging (one finger); move it sideways with Shift-drag or right-drag, or two fingers moved together; Fit turns it back.">Depth</button><button id="hold" type="button" aria-pressed="false" title="Hold still: stop the network turning by itself, to look at one place for longer">&#10074;&#10074;</button><button id="saver" type="button" aria-pressed="false" title="Screensaver: hide the panels, centre the network and let it turn">&#9790;</button>%%THEME_PICKER%%</div>
+<div id="tools" class="box"><button id="find" type="button" aria-expanded="false" aria-controls="head">Find</button><a href="index.html">Map</a><button id="fit" type="button" title="Fit the whole network in view">Fit</button><button id="depth" type="button" aria-pressed="true" title="Depth: the colony as a ball that grows outward from the read-order notes; recently changed notes reach a little further out. Turn the view by dragging (one finger); move it sideways with Shift-drag or right-drag, or two fingers moved together; Fit turns it back.">Depth</button><button id="hold" type="button" aria-pressed="false" title="Let the network turn by itself when left alone">Spin</button><button id="saver" type="button" aria-pressed="false" title="Screensaver: hide the panels, centre the network and let it turn">&#9790;</button>%%THEME_PICKER%%</div>
 <aside id="panel" class="box" hidden aria-live="polite"></aside>
 <nav class="sr" aria-label="All notes"><ul>%%LINKS%%</ul></nav>
 <script id="data" type="application/json">%%DATA%%</script>
@@ -127,7 +129,7 @@ var cv=document.getElementById("c"),cx=cv.getContext("2d");
 /* the quiet threads are drawn into this second canvas, a layer under the main one (#t), and reused until something changes (the
    view, the layout, the focus, the theme); while the network turns by itself they are redrawn about 20 times a second, the notes on
    top every frame. A layer of its own means the browser composes the two, and no full-screen copy is made in every frame. */
-var tc=document.getElementById("t"),tcx=tc.getContext("2d"),gc=document.createElement("canvas"),gcx=gc.getContext("2d"),tKey="",tLast=0,busyNow=false,tcache={},spikes=[],ambT=0;   /* gc: the threads' glow at half resolution (soft, and a quarter of the pixels) */
+var tc=document.getElementById("t"),tcx=tc.getContext("2d"),gc=document.createElement("canvas"),gcx=gc.getContext("2d"),tKey="",tLast=0,busyNow=false,tcache={},spikes=[],ambT=0;   /* gc: the threads' glow at quarter resolution (soft, and a sixteenth of the pixels) */
 var reduce=window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches;
 var NODES=D.nodes,NN=NODES.length,NC=D.commits.length;
 var root=document.documentElement;
@@ -175,7 +177,7 @@ D.edges.forEach(function(e,k){
 });
 var cur=NC;                                   /* commits applied: 0..NC */
 var hov=-1,sel=-1,match=null,alpha=1,playing=false,acc=0,ripples=[];
-var cam={x:0,y:0,k:1,tx:0,ty:0,tk:1},autoFit=true,W=0,H=0,DPR=1,lastT=0,VS=1,DPRCAP=EMBED?1.5:2,slowT=0,runT=0,TCAD=3;   /* DPRCAP: most device pixels per pixel; lowered once, to 1.5, when frames stay slow (see governor) */
+var cam={x:0,y:0,k:1,tx:0,ty:0,tk:1},autoFit=true,W=0,H=0,DPR=1,lastT=0,VS=1,DPRCAP=EMBED?1.5:2,slowT=0,runT=0,TCAD=3,LITE=false,FOGLO=0,FOGHI=0;   /* DPRCAP: most device pixels per pixel; lowered once, to 1.5, when frames stay slow (see governor) */
 function gcol(g){var c=GCI[g]||[0,g],p=c[0]?T.quiet:T.pal;return p[c[1]%p.length]}
 
 /* ---------- depth ----------
@@ -299,7 +301,7 @@ function project(now,dt){
   var kk=Math.max(.7,Math.min(T.nodes?2.6:1.6,cam.k)),   /* the digital themes' notes grow further when zoomed in, so their facets and pads can be seen */lo=1e9,hi=-1e9;
   NODES.forEach(function(n){var q=proj(n.x,n.y,n.z);n.px=q[0];n.py=q[1];n.ps=q[2];n.pz=q[3];n.wx=q[4];n.wy=q[5];n.pr=n.r*kk*q[2];
     if(n.vis){lo=Math.min(lo,n.pz);hi=Math.max(hi,n.pz)}});
-  NODES.forEach(function(n){n.fz=hi>lo?depthAmt*(n.pz-lo)/(hi-lo):0});   /* fog by the distance from the viewer, not by age, so it stays right from any side */
+  FOGLO=lo;FOGHI=hi;NODES.forEach(function(n){n.fz=hi>lo?depthAmt*(n.pz-lo)/(hi-lo):0});   /* fog by the distance from the viewer, not by age, so it stays right from any side */
   /* crowding: the distance on screen to the nearest other note, so a glow never spreads far over its neighbours (a small screen packs the notes close) */
   var gc=48,grid={};
   NODES.forEach(function(n){if(!n.vis||n.ap<=0)return;var k=Math.floor(n.px/gc)+","+Math.floor(n.py/gc);(grid[k]||(grid[k]=[])).push(n)});
@@ -588,16 +590,6 @@ function budRGB(n){
     shades[k]=(T.dark?[r*.72,g*.72,b*.72]:[r+(255-r)*.3,g+(255-g)*.3,b+(255-b)*.3]).map(Math.round).join(",")}
   return shades[k];
 }
-function twigOK(){return !EMBED&&T.style!=="smooth"&&!busyNow&&cam.k>(cam.fk||cam.k)*.7}   /* no side branches while the reader moves the view, or zoomed far out */
-function twigs(e,w,col){var ga=cx.globalAlpha;cx.strokeStyle=col;cx.lineWidth=Math.max(.5,w*.35);cx.globalAlpha=ga*.5;cx.beginPath();twigPath(e);cx.stroke();cx.globalAlpha=ga}
-function twigPath(e){   /* faint side branches on long threads: decoration only (on a circuit: a short stub at a corner) */
-  if(!e.W||e.L*cam.k<150)return;
-  if((T.style==="circuit"||T.style==="fractal")){if(!e.cs||!e.cs.length)return;var c=e.cs[Math.floor(hash(e.k)*e.cs.length)],l=6+6*hash(e.k+1),hz=hash(e.k+2)<.5;cx.moveTo(c[0],c[1]);cx.lineTo(c[0]+(hz?l:0),c[1]+(hz?0:l));return}var nb=e.L*cam.k>260?2:1;
-  for(var b=0;b<nb;b++){var t=.3+.4*hash(e.k+b*3.3),i=Math.round(t*(e.W.length-1)),p0=e.W[i],p1=e.W[Math.min(e.W.length-1,i+1)],
-    tx=p1[0]-p0[0],ty=p1[1]-p0[1],tl=Math.hypot(tx,ty)||1,sg=hash(e.k+b*5.1)<.5?-1:1,an=sg*(.5+.4*hash(e.k+b)),
-    c=Math.cos(an),sn=Math.sin(an),vx=(tx*c-ty*sn)/tl,vy=(tx*sn+ty*c)/tl,len=e.L*(.1+.08*hash(e.k+b*2.2)),f=frac(e.k*9.1+b,8);
-    for(var j=0;j<=8;j++){var u=j/8,o=f[j]*len*.25,q=proj(p0[0]+vx*len*u-vy*o,p0[1]+vy*len*u+vx*o,p0[2]);if(j)cx.lineTo(q[0],q[1]);else cx.moveTo(q[0],q[1])}}
-}
 /* A thread has the colour of the note it comes from, mixed toward the theme's thread colour; two notes that mention each other
    are joined by a thread that fades from one note's colour to the other's. */
 function threadRGB(n){var c=n.due?T.wilt:gcol(n.g),k=T.id+c;if(!tcache[k]){var v=parseInt(c.slice(1),16),h=T.hypha.split(",").map(Number),m=.42;
@@ -610,7 +602,7 @@ function along(e,t){
   var W=e.W;if(!W||W.length<2){var p=curve(e,t);return proj(p.x,p.y,e.a.z+(e.b.z-e.a.z)*t)}   /* a point on the wavy thread, 0 at a, 1 at b */
   var f=t*(W.length-1),i=Math.min(W.length-2,Math.floor(f)),u=f-i,A=W[i],B=W[i+1];return proj(A[0]+(B[0]-A[0])*u,A[1]+(B[1]-A[1])*u,A[2]+(B[2]-A[2])*u)}
 function hypha(e,w,grow,al,tipA){
-  var P=hyphaPath(e);if(P.length<2)return;var col=threadFill(e,P,al);if(grow>=1&&twigOK())twigs(e,w,col);
+  var P=hyphaPath(e);if(P.length<2)return;var col=threadFill(e,P,al);
   var tot=0,i;for(i=1;i<P.length;i++)tot+=Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1]);
   if(tot<2)return;
   var tr=.9+w*.9;cx.fillStyle=col;if((T.style==="circuit"||T.style==="fractal"))return digiHypha(e,P,w,grow,col,tipA,tot,tr);
@@ -656,13 +648,13 @@ function drawSpikes(now){
 }
 function quietThreads(list){   /* into the cache: one fill per colour (the theme's glow, the thread, the buds), fused threads with their fade */
   var keep=cx;cx=tcx;cx.setTransform(1,0,0,1,0,0);cx.clearRect(0,0,tc.width,tc.height);cx.setTransform(DPR,0,0,DPR,0,0);
-  var tw=twigOK(),groups={},fused=[],dig=(T.style==="circuit"||T.style==="fractal"),lite=EMBED;   /* embed: plain lines, no glow, fused threads in one colour: a fraction of the work */
+  var groups={},fused=[],dig=(T.style==="circuit"||T.style==="fractal"),lite=EMBED||LITE;   /* embed, or a machine too slow for the rest: plain lines, no glow, fused threads in one colour: a fraction of the work */
   list.forEach(function(e){var a=Math.min(e.a.ap,e.b.ap),d=Math.min(dim(e.a),dim(e.b)),w=Math.min(2.6,.6+Math.sqrt(e.w)*.45)*Math.min(1.4,cam.k+.3),al=.26*Math.min(1,a*2)*Math.max(d,.35);
     var ef=(fogOf(e.a)+fogOf(e.b))/2;w*=(e.a.ps+e.b.ps)/2;al*=1-.7*ef;
     if(e.dir===0&&!lite){fused.push([e,w,a,al]);return}
     var P=hyphaPath(e);if(P.length<2)return;var src=e.dir>=0?e.a:e.b,ab=Math.round(al*25)/25,wb=dig||lite?Math.round(w*2)/2:0,k=threadRGB(src)+"|"+ab+"|"+wb;
     (groups[k]||(groups[k]={rgb:threadRGB(src),bud:budRGB(src),al:ab,w:wb,it:[]})).it.push([e.dir>=0?P:P.slice().reverse(),w,a,e])});
-  cx=gcx;cx.setTransform(1,0,0,1,0,0);cx.clearRect(0,0,gc.width,gc.height);cx.setTransform(DPR/2,0,0,DPR/2,0,0);   /* a soft glow in the theme's thread colour, drawn small and scaled up */
+  cx=gcx;cx.setTransform(1,0,0,1,0,0);cx.clearRect(0,0,gc.width,gc.height);cx.setTransform(DPR/4,0,0,DPR/4,0,0);   /* a soft glow in the theme's thread colour, drawn small and scaled up */
   if(!lite)Object.keys(groups).forEach(function(k){var g=groups[k];
     if(dig){cx.strokeStyle="rgba("+T.hypha+","+(g.al*.4*T.tglow).toFixed(3)+")";cx.lineWidth=Math.max(1.5,g.w*3);cx.lineJoin="miter";cx.beginPath();g.it.forEach(function(x){if(x[2]<1)return;var P=x[0],e=x[3];var cs=e.cs||[];linePath([P[0]].concat(e.dir<0?cs.slice().reverse():cs,[P[P.length-1]]))});cx.stroke();return}   /* the glow follows the trace's main route only: a blur needs no zigzag */
     cx.fillStyle="rgba("+T.hypha+","+(g.al*.4*T.tglow).toFixed(3)+")";cx.beginPath();g.it.forEach(function(x){strandPath(x[0],plen(x[0])*x[2],x[1]*2.2,x[1]*.6)});cx.fill()});
@@ -672,11 +664,9 @@ function quietThreads(list){   /* into the cache: one fill per colour (the theme
       g.it.forEach(function(x){var Q=polyUpto(x[0],plen(x[0])*x[2]);linePath(Q);ends.push([Q[Q.length-1],.9+x[1]*.9])});cx.stroke();
       cx.fillStyle="rgba("+g.rgb+","+g.al+")";cx.beginPath();g.it.forEach(function(x){if(x[2]>=1)pads(x[3],x[1])});cx.fill();
       cx.fillStyle="rgba("+g.bud+","+Math.min(1,g.al*3).toFixed(3)+")";cx.beginPath();ends.forEach(function(t){var r=t[1];if(dig)cx.rect(t[0][0]-r,t[0][1]-r,2*r,2*r);else{cx.moveTo(t[0][0]+r,t[0][1]);cx.arc(t[0][0],t[0][1],r,0,6.3)}});cx.fill();
-      if(tw){cx.strokeStyle="rgba("+g.rgb+","+(g.al*.5).toFixed(3)+")";cx.lineWidth=.6;cx.beginPath();g.it.forEach(function(x){twigPath(x[3])});cx.stroke()}
       return}
     var ci=(T.style==="circuit"||T.style==="fractal");cx.fillStyle="rgba("+g.rgb+","+g.al+")";cx.beginPath();g.it.forEach(function(x){var end=strandPath(x[0],plen(x[0])*x[2],ci?x[1]*.7:x[1]*1.15,ci?x[1]*.7:x[1]*.12);if(end)ends.push([end,.9+x[1]*.9]);if(ci&&x[2]>=1)pads(x[3],x[1])});cx.fill();
     cx.fillStyle="rgba("+g.bud+","+Math.min(1,g.al*3).toFixed(3)+")";cx.beginPath();ends.forEach(function(t){var r=t[1];if(ci)cx.rect(t[0][0]-r,t[0][1]-r,2*r,2*r);else{cx.moveTo(t[0][0]+r,t[0][1]);cx.arc(t[0][0],t[0][1],r,0,6.3)}});cx.fill();
-    if(tw){cx.strokeStyle="rgba("+g.rgb+","+(g.al*.5).toFixed(3)+")";cx.lineWidth=.6;cx.beginPath();g.it.forEach(function(x){twigPath(x[3])});cx.stroke()}
   });
   fused.forEach(function(f){hypha(f[0],f[1],f[2],f[3].toFixed(3),Math.min(1,f[3]*3).toFixed(3))});
   cx=keep;
@@ -740,11 +730,15 @@ function draw(now){
   var focus=sel>=0?sel:hov,t=now;
   /* hyphae: the quiet ones from the cache, the ones of the focused note live on top */
   var hotE=[],coldE=[];
-  E.forEach(function(e){if(!edgeVis(e)||Math.min(e.a.ap,e.b.ap)<=0)return;(focus>=0&&(e.a.i===focus||e.b.i===focus)?hotE:coldE).push(e)});
+  E.forEach(function(e){e._g=0;if(!edgeVis(e)||Math.min(e.a.ap,e.b.ap)<=0)return;if(focus>=0&&(e.a.i===focus||e.b.i===focus))hotE.push(e);else{coldE.push(e);e._g=1}});
   busyNow=!!(drag||pinch)||now-spin.last<400;
   var mk=match?Object.keys(match).length+":"+Object.keys(match)[0]:"",settling=alpha>0||NODES.some(function(n){return n.vis&&(n.ap<1||Math.abs(n.zt-n.z)>.003)});
-  var key=[W,H,DPR,cam.x.toFixed(2),cam.y.toFixed(2),cam.k.toFixed(4),cyw.toFixed(4),syw.toFixed(4),cpt.toFixed(4),spt.toFixed(4),depthAmt.toFixed(3),focus,mk,T.id,cur,coldE.length,twigOK(),settling?now:0].join("|");
-  tLast++;if(key!==tKey&&!(spin.on&&!playing&&!busyNow&&tLast<TCAD)){tKey=key;tLast=0;quietThreads(coldE)}   /* turning by itself: every third frame */
+  var key=[W,H,DPR,cam.x.toFixed(2),cam.y.toFixed(2),cam.k.toFixed(4),cyw.toFixed(4),syw.toFixed(4),cpt.toFixed(4),spt.toFixed(4),depthAmt.toFixed(3),focus,mk,T.id,cur,coldE.length,settling?now:0].join("|");
+  var tT=PERF?performance.now():0,gon=glActive();
+  if(gon!==glWas){glWas=gon;gcv.hidden=!gon;tKey="";if(gon)tcx.clearRect(0,0,tc.width,tc.height);else glClear()}
+  if(gon)glThreads();   /* the card draws every thread every frame, from the layout's coordinates */
+  else{tLast++;if(key!==tKey&&!(spin.on&&!playing&&!busyNow&&tLast<TCAD)){tKey=key;tLast=0;quietThreads(coldE)}}
+  if(PERF){PF.thr+=performance.now()-tT;tT=performance.now()}   /* turning by itself: every third frame */
   if(depthAmt>0)hotE.sort(function(p,q){return (q.a.pz+q.b.pz)-(p.a.pz+p.b.pz)});
   hotE.forEach(function(e){
     var a=Math.min(e.a.ap,e.b.ap),w=Math.min(2.6,.6+Math.sqrt(e.w)*.45)*1.5*Math.min(1.4,cam.k+.3),al=.85*Math.min(1,a*2);
@@ -753,10 +747,11 @@ function draw(now){
     if(!reduce&&a>=1)fire(e,t,Math.max(1,hotE.length/2.5));   /* a lit thread fires now and then, like a neuron */
   });
   /* now and then, in standby, a faint spike runs along a random thread */
-  if(!reduce&&sel<0&&hov<0&&spin.on&&!playing&&coldE.length){if(!ambT)ambT=t+1500;
+  if(!reduce&&sel<0&&hov<0&&t-spin.last>IDLE&&!playing&&coldE.length){if(!ambT)ambT=t+1500;
     if(t>=ambT){if(spikes.filter(function(s){return s.amb&&!s.hop}).length<2&&spikes.length<MAXFLY)launch(pickEdge(coldE),true,t);ambT=t+1000+Math.random()*1000}}else ambT=0;
   drawSpikes(t);
   /* notes */
+  if(PERF)tT=performance.now();
   var order=NODES.filter(function(n){return n.vis&&n.ap>0}).sort(function(a,b){return depthAmt>0?b.pz-a.pz:(a.hub?1:0)-(b.hub?1:0)});   /* with depth: back to front */
   order.forEach(function(n){
     var rec=recency(n),pulse=reduce||playing?1:1+.1*Math.sin(t/650+n.i)*rec,d=dim(n),sc=ease(n.ap),r=n.pr*sc*pulse,x=n.px,y=n.py,fz=fogOf(n),fog=1-.68*fz;   /* further back: fainter, a softer wider glow, no shine */
@@ -786,6 +781,154 @@ function draw(now){
     cx.strokeStyle=gcol(n.g);cx.globalAlpha=(1-p)*(rp.born?.9:.55);cx.lineWidth=rp.born?2.4:1.4;
     cx.beginPath();ringPath(x,y,(n.r*Math.max(.7,cam.k)+8+p*(rp.born?46:26))*n.ps);cx.stroke();cx.globalAlpha=1;   /* in the shape of the theme's notes */
   });
+  if(PERF)PF.notes+=performance.now()-tT;
+}
+
+/* ---------- the GPU thread layer (?gl=1) ----------
+   The quiet threads (every thread that is not the selected note's) drawn by the graphics card instead of the processor. A thread is
+   32 steps of a path in the layout's own coordinates; those points go into a texture once, and again only when a note moves. Every frame
+   the card turns them with the same arithmetic as proj(), makes a ribbon of each (tapering from the note that writes the mention,
+   or an even fused one, with the soft glow as a wider ribbon underneath, and a bud at its end) and fades it with the depth. The processor
+   only sends a few numbers per thread (colour, strength, width). Nothing is rebuilt while the network turns, so the threads move with
+   the notes. Notes, labels, spikes and the selected note's threads stay on the 2D canvas. Without WebGL 2, or for the digital themes
+   (Matrix, Amber terminal: traces on a grid), or in an embed, the 2D drawing above is used as before. */
+var gcv=document.getElementById("g"),GLR=null,glSg=-1,glT="",glZ=0,glPathDirty=true,glWas=false,GN=32,GT=7,RGBV={};
+var GL_COMMON="#version 300 es\nprecision highp float;precision highp int;precision highp sampler2D;\n"+
+"uniform sampler2D u_path;uniform sampler2D u_edge;uniform vec4 u_c;uniform vec4 u_p;uniform vec4 u_cam;uniform vec4 u_v;uniform vec2 u_fog;uniform vec3 u_glow;\n"+
+"const int N=32;\n"+
+"vec4 proj(vec3 w){float ax=w.x,ay=w.y,sc=1.,Z2=0.;\n"+
+" if(u_p.w>0.){float X=w.x-u_p.x,Y=(w.y-u_p.y)*u_cam.w,Z=(w.z-u_p.z)*u_v.z*u_p.w,X1=X*u_c.x+Z*u_c.y,Z1=Z*u_c.x-X*u_c.y,Y1=Y*u_c.z-Z1*u_c.w,f=u_v.z*1.6;\n"+
+"  Z2=Z1*u_c.z+Y*u_c.w;sc=f/max(f*.3,f+Z2);ax=u_p.x+X1*sc;ay=u_p.y+Y1*sc/u_cam.w;}\n"+
+" return vec4((ax-u_cam.x)*u_cam.z+u_v.x*.5,(ay-u_cam.y)*u_cam.z*u_cam.w+u_v.y*.5,sc,Z2);}\n"+
+"vec4 ed(int e,int k){return texelFetch(u_edge,ivec2(k,e),0);}\n"+
+"vec3 pathAt(int e,float t,bool rev){if(rev)t=1.-t;float f=clamp(t,0.,1.)*float(N);int i=min(int(floor(f)),N-1);float u=f-float(i);\n"+
+" return mix(texelFetch(u_path,ivec2(i,e),0).xyz,texelFetch(u_path,ivec2(i+1,e),0).xyz,u);}\n"+
+"float fogOf(float z){return u_p.w>0.?clamp((z-u_fog.x)*u_fog.y,0.,1.)*u_p.w:0.;}\n"+
+"vec4 clip(vec2 p){return vec4(p.x/u_v.x*2.-1.,1.-p.y/u_v.y*2.,0.,1.);}\n";
+var GL_VS_RIBBON=GL_COMMON+
+"out vec4 v_col;out vec2 v_d;out vec2 v_k;\n"+
+"void main(){int e=gl_InstanceID;int vi=gl_VertexID>>1;float side=float((gl_VertexID&1)*2-1);\n"+
+" vec4 c0=ed(e,0),c1=ed(e,1),g=ed(e,2),m=ed(e,3),ga=ed(e,5);bool glow=u_v.w>.5;float a=glow?c1.a:c0.a;\n"+
+" if(a<=.002){gl_Position=vec4(2.,2.,2.,1.);v_col=vec4(0.);v_d=vec2(0.);v_k=vec2(0.);return;}\n"+
+" bool rev=m.y<0.;float t0=g.z,span=max(1.-g.z-g.w,1e-4),te=t0+span*m.x;float u=float(vi)/float(N),t=t0+(te-t0)*u;\n"+
+" vec4 q=proj(pathAt(e,t,rev));float dt=.5/float(N);\n"+
+" vec4 qa=proj(pathAt(e,max(0.,t-dt),rev)),qb=proj(pathAt(e,min(1.,t+dt),rev));\n"+
+" vec2 dir=qb.xy-qa.xy;float l=length(dir);dir=l>1e-4?dir/l:vec2(1.,0.);vec2 n=vec2(-dir.y,dir.x);\n"+
+" float hw=(glow?mix(ga.x,ga.y,u):mix(g.x,g.y,u))*q.z;float ext=glow?max(hw,.5):hw+.75;\n"+
+" gl_Position=clip(q.xy+n*side*ext);\n"+
+" vec3 col=glow?u_glow:mix(c0.rgb,c1.rgb,(t-t0)/span);\n"+
+" v_col=vec4(col,a*(1.-.7*fogOf(q.w)));v_d=vec2(side*ext,ext);v_k=vec2(hw,glow?1.:0.);}\n";
+var GL_FS_RIBBON="#version 300 es\nprecision highp float;in vec4 v_col;in vec2 v_d;in vec2 v_k;out vec4 o;\n"+
+"void main(){float d=abs(v_d.x);float cov=v_k.y>.5?pow(max(0.,1.-d/max(v_d.y,.001)),2.):clamp(v_k.x-d+.5,0.,1.);float a=v_col.a*cov;o=vec4(v_col.rgb*a,a);}\n";
+var GL_VS_TIP=GL_COMMON+
+"out vec4 v_col;out vec2 v_d;out vec2 v_k;\n"+
+"void main(){int inst=gl_InstanceID;int e=inst>>1;int end=inst&1;vec4 g=ed(e,2),m=ed(e,3),tc=ed(e,end==0?4:6);\n"+
+" if(tc.a<.5||m.w<=.002){gl_Position=vec4(2.,2.,2.,1.);v_col=vec4(0.);v_d=vec2(0.);v_k=vec2(0.);return;}\n"+
+" bool rev=m.y<0.;float t0=g.z,span=max(1.-g.z-g.w,1e-4),te=t0+span*m.x;vec4 q=proj(pathAt(e,end==0?t0:te,rev));\n"+
+" float R=m.z;vec2 corner=vec2(float(gl_VertexID&1)*2.-1.,float(gl_VertexID>>1)*2.-1.);float ext=R+1.;\n"+
+" gl_Position=clip(q.xy+corner*ext);v_col=vec4(tc.rgb,min(1.,m.w*(1.-.7*fogOf(q.w))));v_d=corner*ext;v_k=vec2(R,0.);}\n";
+var GL_FS_TIP="#version 300 es\nprecision highp float;in vec4 v_col;in vec2 v_d;in vec2 v_k;out vec4 o;\n"+
+"void main(){float cov=clamp(v_k.x-length(v_d)+.5,0.,1.);float a=v_col.a*cov;o=vec4(v_col.rgb*a,a);}\n";
+function glProgram(gl,vs,fs){
+  function sh(t,src){var o=gl.createShader(t);gl.shaderSource(o,src);gl.compileShader(o);if(!gl.getShaderParameter(o,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(o));return o}
+  var p=gl.createProgram();gl.attachShader(p,sh(gl.VERTEX_SHADER,vs));gl.attachShader(p,sh(gl.FRAGMENT_SHADER,fs));gl.linkProgram(p);
+  if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p));
+  var u={};["u_path","u_edge","u_c","u_p","u_cam","u_v","u_fog","u_glow"].forEach(function(k){u[k]=gl.getUniformLocation(p,k)});return {p:p,u:u};
+}
+function glTex(gl,w,h){var t=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA32F,w,h,0,gl.RGBA,gl.FLOAT,null);return t}
+function initGL(){
+  if(QS.get("gl")!=="1"||EMBED||!E.length)return;
+  try{
+    var gl=gcv.getContext("webgl2",{alpha:true,premultipliedAlpha:true,antialias:false,depth:false,stencil:false,powerPreference:"high-performance"});
+    if(!gl)return;
+    var R={gl:gl,rib:glProgram(gl,GL_VS_RIBBON,GL_FS_RIBBON),tip:glProgram(gl,GL_VS_TIP,GL_FS_TIP),n:E.length};
+    R.path=glTex(gl,GN+1,R.n);R.edge=glTex(gl,GT,R.n);R.pdata=new Float32Array((GN+1)*R.n*4);R.edata=new Float32Array(GT*R.n*4);
+    gcv.addEventListener("webglcontextlost",function(ev){ev.preventDefault();GLR=null;glWas=false;gcv.hidden=true;tKey=""});
+    GLR=R;
+  }catch(e){GLR=null;try{console.warn("WebGL 2 is not available, the threads are drawn by the processor:",e&&e.message||e)}catch(_){}}
+}
+function glActive(){return !!GLR&&!EMBED&&(T.style==="organic"||T.style==="smooth")}
+function rgbv(str){var v=RGBV[str];if(!v){v=RGBV[str]=str.split(",").map(function(x){return (+x)/255})}return v}
+function glPaths(){   /* the 33 points of every thread in the layout's coordinates (what hyphaPath makes before it projects them) */
+  var R=GLR,buf=R.pdata,am=T.style==="smooth"?0:.11;
+  E.forEach(function(e){
+    if(!e.fx){e.fx=frac(e.k*3.1+.7,GN);e.fz=frac(e.k*5.7+1.3,GN)}
+    var dx=e.b.x-e.a.x,dy=e.b.y-e.a.y,L=Math.hypot(dx,dy)||1,ux=-dy/L,uy=dx/L,o=e.k*(GN+1)*4;
+    for(var s=0;s<=GN;s++){var p=curve(e,s/GN),off=e.fx[s]*L*am;buf[o]=p.x+ux*off;buf[o+1]=p.y+uy*off;buf[o+2]=e.a.z+(e.b.z-e.a.z)*s/GN+(ZS?e.fz[s]*L*am/ZS:0);buf[o+3]=1;o+=4}
+  });
+  var gl=R.gl;gl.bindTexture(gl.TEXTURE_2D,R.path);gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,GN+1,R.n,gl.RGBA,gl.FLOAT,buf);
+}
+function glEdges(){   /* what each thread looks like now: seven texels of four numbers (see the vertex shaders) */
+  var R=GLR,d=R.edata,kc=Math.min(1.4,cam.k+.3);
+  E.forEach(function(e){
+    var o=e.k*GT*4,i;
+    if(!e._g){d[o+3]=0;d[o+7]=0;d[o+19]=0;d[o+27]=0;return}
+    var a=Math.min(e.a.ap,e.b.ap),dm=Math.min(dim(e.a),dim(e.b)),w=Math.min(2.6,.6+Math.sqrt(e.w)*.45)*kc,al=.26*Math.min(1,a*2)*Math.max(dm,.35),
+      src=e.dir>=0?e.a:e.b,dst=e.dir>=0?e.b:e.a,Ls=Math.hypot(e.a.px-e.b.px,e.a.py-e.b.py)||1,
+      tc0=Math.min(.45,(src.pr+1.5)/Ls),tc1=Math.min(.45,(dst.pr+1.5)/Ls),ps=(e.a.ps+e.b.ps)/2,fused=e.dir===0,ca=rgbv(threadRGB(e.a)),cb=fused?rgbv(threadRGB(e.b)):null,cs=fused?ca:rgbv(threadRGB(src));
+    d[o]=cs[0];d[o+1]=cs[1];d[o+2]=cs[2];d[o+3]=al;                                        /* 0: colour at the start, strength */
+    i=fused?cb:cs;d[o+4]=i[0];d[o+5]=i[1];d[o+6]=i[2];d[o+7]=fused?0:al*.4*T.tglow;       /* 1: colour at the end, strength of the glow */
+    d[o+8]=fused?w*.5:w*1.15;d[o+9]=fused?w*.5:w*.12;d[o+10]=tc0;d[o+11]=tc1;               /* 2: half widths (start, end), the rim of the notes */
+    d[o+12]=a;d[o+13]=e.dir;d[o+14]=.9+w*ps*.9;d[o+15]=al*3;                                /* 3: growth, direction, bud radius, bud strength */
+    if(fused){var ba=rgbv(budRGB(e.b)),bb=rgbv(budRGB(e.a));d[o+16]=ba[0];d[o+17]=ba[1];d[o+18]=ba[2];d[o+19]=a>=1?1:0;d[o+24]=bb[0];d[o+25]=bb[1];d[o+26]=bb[2];d[o+27]=a>=1?1:0}
+    else{d[o+19]=0;var bs=rgbv(budRGB(src));d[o+24]=bs[0];d[o+25]=bs[1];d[o+26]=bs[2];d[o+27]=1}   /* 4, 6: the buds at the two ends */
+    d[o+20]=w*2.2;d[o+21]=w*.6;d[o+22]=0;d[o+23]=0;                                         /* 5: half widths of the glow */
+  });
+  var gl=R.gl;gl.bindTexture(gl.TEXTURE_2D,R.edge);gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,GT,R.n,gl.RGBA,gl.FLOAT,d);
+}
+function glThreads(){
+  var R=GLR,gl=R.gl,sg=0;
+  NODES.forEach(function(n){if(n.vis)sg+=n.x*1.37+n.y*2.11+n.z*53.7});
+  if(sg!==glSg||T.id!==glT||Math.abs(ZS-glZ)>.5){glSg=sg;glT=T.id;glZ=ZS;glPaths()}
+  glEdges();
+  gl.viewport(0,0,gcv.width,gcv.height);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);gl.enable(gl.BLEND);gl.blendFunc(gl.ONE,gl.ONE_MINUS_SRC_ALPHA);
+  gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,R.path);gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,R.edge);
+  var hy=T.hypha.split(",").map(Number);
+  function use(pr,pass){var u=pr.u;gl.useProgram(pr.p);gl.uniform1i(u.u_path,0);gl.uniform1i(u.u_edge,1);gl.uniform4f(u.u_c,cyw,syw,cpt,spt);
+    if(P&&depthAmt>0)gl.uniform4f(u.u_p,P.x,P.y,P.z,depthAmt);else gl.uniform4f(u.u_p,0,0,0,0);
+    gl.uniform4f(u.u_cam,cam.x,cam.y,cam.k,VS);gl.uniform4f(u.u_v,W,H,ZS,pass);gl.uniform2f(u.u_fog,FOGLO,FOGHI>FOGLO?1/(FOGHI-FOGLO):0);gl.uniform3f(u.u_glow,hy[0]/255,hy[1]/255,hy[2]/255)}
+  use(R.rib,1);gl.drawArraysInstanced(gl.TRIANGLE_STRIP,0,2*(GN+1),R.n);   /* the glow, then the threads, then the buds */
+  use(R.rib,0);gl.drawArraysInstanced(gl.TRIANGLE_STRIP,0,2*(GN+1),R.n);
+  use(R.tip,0);gl.drawArraysInstanced(gl.TRIANGLE_STRIP,0,4,R.n*2);
+}
+function glClear(){if(!GLR)return;var gl=GLR.gl;gl.viewport(0,0,gcv.width,gcv.height);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT)}
+function glSize(){if(!GLR)return;gcv.width=cv.width;gcv.height=cv.height}
+
+/* ---------- the performance overlay (?perf=1) ----------
+   Frame rate, how long a frame's own work took, and where it went, with the settings that decide the cost, so two ways of drawing (?gl=1 and
+   the default) can be compared on the same machine. "Copy" puts the numbers in the clipboard as one line. */
+var PERF=QS.get("perf")==="1",PF={t:0,n:0,work:0,sim:0,thr:0,notes:0,long:0,worst:0,last:0,ivs:0,fr:0,cn:0,cov:-1,el:null,tx:null,gpu:"",line:""};
+function perfGpu(){try{var c=document.createElement("canvas"),g=c.getContext("webgl2")||c.getContext("webgl");if(!g)return "no WebGL";var x=g.getExtension("WEBGL_debug_renderer_info");return x?String(g.getParameter(x.UNMASKED_RENDERER_WEBGL)):"unknown"}catch(e){return "unknown"}}
+function perfInit(){
+  if(!PERF)return;
+  var d=document.createElement("div");d.id="perf";PF.tx=document.createElement("div");d.appendChild(PF.tx);
+  var b=document.createElement("button");b.type="button";b.textContent="Copy numbers";b.addEventListener("click",function(ev){ev.stopPropagation();
+    try{navigator.clipboard.writeText(PF.line).then(function(){b.textContent="Copied"},function(){window.prompt("Copy this line",PF.line)})}catch(e){window.prompt("Copy this line",PF.line)}
+    setTimeout(function(){b.textContent="Copy numbers"},1500)});
+  d.appendChild(b);document.body.appendChild(d);PF.el=d;PF.gpu=perfGpu();PF.t=performance.now();
+}
+function perfFrame(now){   /* the time between two frames */
+  if(!PERF)return;
+  if(PF.last){var iv=now-PF.last;PF.ivs+=iv;PF.fr++;if(iv>34)PF.long++;if(iv>PF.worst)PF.worst=iv}PF.last=now;
+}
+function perfCoverage(){   /* the share of the screen the thread layer paints (percent), read back in the first three seconds only: it checks that the two ways of drawing show the same */
+  try{var k=0,i,w,h;
+    if(glActive()){var gl=GLR.gl,px;w=gcv.width;h=gcv.height;px=new Uint8Array(w*h*4);gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,px);for(i=3;i<px.length;i+=4)if(px[i]>8)k++}
+    else{w=tc.width;h=tc.height;var d=tcx.getImageData(0,0,w,h).data;for(i=3;i<d.length;i+=4)if(d[i]>8)k++}
+    return Math.round(1000*k/Math.max(1,w*h))/10}catch(e){return -1}
+}
+function perfShow(){
+  if(!PERF||!PF.n)return;var t=performance.now();if(t-PF.t<1000)return;
+  var n=PF.n,fr=Math.max(1,PF.fr),fps=1000*fr/Math.max(1,PF.ivs),f=function(x){return (x/n).toFixed(1)},mode=glActive()?"GPU threads (WebGL 2)":QS.get("gl")==="1"?(GLR?"2D (theme not supported by the GPU path)":"2D (WebGL 2 not available)"):"2D";
+  var o={mode:glActive()?"gl":"2d",fps:+fps.toFixed(1),frameMs:+(PF.ivs/fr).toFixed(1),worstMs:+PF.worst.toFixed(0),slowPct:+(100*PF.long/fr).toFixed(0),workMs:+f(PF.work),simMs:+f(PF.sim),threadsMs:+f(PF.thr),notesMs:+f(PF.notes),
+    notes:NN,edges:E.length,dpr:+DPR.toFixed(2),cap:DPRCAP,canvas:cv.width+"x"+cv.height,theme:T.id,cadence:TCAD,lite:LITE,spin:!held,turn:+rot.y.toFixed(2),gpu:PF.gpu,ua:navigator.userAgent.slice(0,90)};
+  if(PF.cn<3){PF.cn++;PF.cov=perfCoverage()}o.threadCover=PF.cov;
+  PF.line=JSON.stringify(o);
+  PF.tx.textContent="Myco graph performance\n"+mode+"\nfps "+o.fps+"   frame "+o.frameMs+" ms   worst "+o.worstMs+" ms   over 33 ms: "+o.slowPct+"%\nown work per frame "+o.workMs+" ms (simulation "+o.simMs+", threads "+o.threadsMs+", notes "+o.notesMs+")\n"+
+    o.notes+" notes, "+o.edges+" threads   canvas "+o.canvas+" (pixel density "+o.dpr+", cap "+o.cap+")\ntheme "+o.theme+"   redraw every "+(glActive()?"1":o.cadence)+" frames"+(o.lite?", plain lines":"")+"   turning by itself "+(o.spin?"on":"off")+" (view turned "+o.turn+" rad)\nthe thread layer paints "+o.threadCover+"% of the screen\n"+o.gpu;
+  PF.t=t;PF.n=0;PF.work=PF.sim=PF.thr=PF.notes=0;PF.long=0;PF.worst=0;PF.ivs=0;PF.fr=0;
 }
 
 /* ---------- loop ---------- */
@@ -799,7 +942,7 @@ function fitBar(){   /* phone: the title leaves room for the buttons beside it, 
 function resize(){
   var had=W>0&&H>0;
   DPR=Math.min(DPRCAP,window.devicePixelRatio||1);W=innerWidth;H=innerHeight;VS=W>700?1:Math.max(1,Math.min(1.7,(H-(EMBED?24:176))/(W-(EMBED?24:32))*.9));   /* embed: at most 1.5 device pixels per pixel, to spare phone batteries */   /* tall phone screen: the picture is stretched vertically (positions only, nodes stay round) so the network fills the height */
-  cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);tc.width=cv.width;tc.height=cv.height;gc.width=Math.ceil(cv.width/2);gc.height=Math.ceil(cv.height/2);tKey="";fitBar();
+  cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);tc.width=cv.width;tc.height=cv.height;glSize();gc.width=Math.ceil(cv.width/4);gc.height=Math.ceil(cv.height/4);tKey="";fitBar();
   if(!had&&W>0&&H>0&&started&&autoFit){cam.fit=false;fitTarget();cam.x=cam.tx;cam.y=cam.ty;cam.k=cam.tk}   /* the first real size (a hidden iframe or tab shown): fit at once */
 }
 /* the loop: one frame at a time while nothing pauses it (the page hidden, or the host page's {type:"myco-pause"}); an error in a
@@ -813,7 +956,7 @@ var lastStep=0;
 function frame(now){
   raf=0;
   if(EMBED&&!drag&&!pinch&&!playing&&now-lastStep<30&&W>0){loop();return}   /* embed: about 30 frames a second, except while the reader drags or pinches */
-  lastStep=now;
+  lastStep=now;perfFrame(now);
   try{step(now)}catch(e){fail(e,true)}
   loop();
 }
@@ -822,6 +965,7 @@ function step(now){
   if(W<=0||H<=0){lastT=now;return}
   var dt=Math.min(64,now-(lastT||now));lastT=now;
   governor(now);
+  var pt0=PERF?performance.now():0;
   if(playing){
     acc+=dt;var iv=Math.max(45,Math.min(700,24000/Math.max(NC,1)))/parseFloat(document.getElementById("speed").value);
     while(acc>=iv&&playing){acc-=iv;if(cur>=NC){stopPlay();break}setStep(cur+1,true)}
@@ -835,23 +979,26 @@ function step(now){
   var k=playing?.045:.1;cam.x+=(cam.tx-cam.x)*k;cam.y+=(cam.ty-cam.y)*k;cam.k+=(cam.tk-cam.k)*k;
   project(now,dt);
   updateLabels(now,dt);
+  if(PERF)PF.sim+=performance.now()-pt0;
   draw(now);
+  if(PERF){PF.work+=performance.now()-pt0;PF.n++;perfShow()}
   if(!readySent){readySent=true;tell("myco-ready")}
 }
-/* Governor for a slow machine. Two steps, each taken once and never undone (so nothing can flicker), the second only if the first was not
+/* Governor for a slow machine. Steps, each taken once and never undone (so nothing can flicker), the next only if the one before was not
    enough: (1) on a screen with more than 1.5 device pixels per pixel, the density drops to 1.5 (a little softer, 44% fewer pixels); (2) while
-   the network turns by itself its threads are redrawn every 6th frame instead of every 3rd (the turning is a little steppier). Each step
-   follows three seconds of frames spaced more than 40 ms apart (under 25 a second), counted after the first five seconds. It does nothing
-   when frames are fast, during a replay, or for step (1) at 1x, at 1.5x and in embed mode. */
+   the network turns by itself its threads are redrawn every 6th frame instead of every 3rd (the turning is a little steppier); (3) the threads
+   become plain lines without glow (the way an embedded graph draws them). Each step follows three seconds of frames spaced more than 40 ms
+   apart (under 25 a second), counted after the first five seconds. It does nothing when frames are fast or during a replay; step (1) is
+   skipped at 1x, at 1.5x and in embed mode, steps (2) and (3) when the GPU draws the threads (?gl=1). */
 var govLast=0;
 function governor(now){
   var dt=govLast?Math.min(1000,now-govLast):0;govLast=now;   /* the real time between frames (the animation's own step is capped at 64 ms) */
   if(playing||!dt)return;
-  var dense=DPRCAP>1.5&&(window.devicePixelRatio||1)>1.5;
-  if(!dense&&TCAD>=6)return;
+  var dense=DPRCAP>1.5&&(window.devicePixelRatio||1)>1.5,more=!EMBED&&!glActive()&&(TCAD<6||!LITE);
+  if(!dense&&!more)return;
   runT+=dt;if(runT<5000)return;
   slowT=dt>40?slowT+dt:Math.max(0,slowT-dt*2);
-  if(slowT>3000){slowT=0;if(dense){DPRCAP=1.5;resize()}else{TCAD=6}}
+  if(slowT>3000){slowT=0;if(dense){DPRCAP=1.5;resize()}else if(TCAD<6){TCAD=6}else{LITE=true;tKey=""}}
 }
 function startPlay(){
   if(cur>=NC){setStep(0,false);alpha=.1}
@@ -963,16 +1110,20 @@ document.getElementById("tfold").addEventListener("click",function(){var f=!docu
 setTFold(pref("time")==="fold");
 /* Screensaver: the panels go, the network is centred at the current zoom, labels are off, and it turns by itself; dragging and
    zooming still work and it starts turning again soon after. The same button (or Escape) brings everything back. */
-var saverOn=false,saverK=1,held=false;
-/* Hold still: the network stops turning by itself (and so the standby spikes stop) until the button is pressed again;
-   dragging still turns it by hand. The screensaver lets go of the hold. */
-function setHold(on){held=on;var b=document.getElementById("hold");b.setAttribute("aria-pressed",on?"true":"false");
-  b.title=on?"Let the network turn by itself again":"Hold still: stop the network turning by itself, to look at one place for longer";
-  if(on){spin.on=false;spin.vy=spin.vx=0}else spin.last=performance.now()}
+var saverOn=false,saverK=1,held=!EMBED&&QS.get("spin")!=="1"&&pref("spin")!=="on";   /* held: no turning by itself (the default; the Spin button, ?spin=1 or an embed turns it on) */
+/* Spin: the network turns by itself when left alone for a few seconds. Off by default (a still view feels more responsive, and the threads
+   keep up with the notes); the choice is kept in this browser, ?spin=1 turns it on for one visit, an embedded graph always turns, and the
+   screensaver turns it for as long as it is on. Dragging turns the network by hand either way; with turning off, a drag still coasts to a stop. */
+function setHold(on,temp){held=on;var b=document.getElementById("hold");b.setAttribute("aria-pressed",on?"false":"true");
+  b.title=on?"Let the network turn by itself when left alone":"Stop the network turning by itself";
+  if(!temp)pref("spin",on?"off":"on");
+  if(on){spin.on=false;if(!temp)spin.vy=spin.vx=0}else spin.last=performance.now()}
 document.getElementById("hold").addEventListener("click",function(ev){ev.stopPropagation();setHold(!held)});
+setHold(held,true);
 function setSaver(on){saverOn=on;root.classList.toggle("saver",on);var b=document.getElementById("saver");b.setAttribute("aria-pressed",on?"true":"false");
   b.title=on?"Leave the screensaver (or press Escape)":"Screensaver: hide the panels, centre the network and let it turn";
-  autoFit=true;if(on){if(held)setHold(false);saverK=cam.tk;select(-1);spin.on=depthOn&&!reduce;spin.node=-1;spin.last=performance.now()-IDLE}}
+  autoFit=true;if(on){if(held)setHold(false,true);saverK=cam.tk;select(-1);spin.on=depthOn&&!reduce;spin.node=-1;spin.last=performance.now()-IDLE}
+  else if(!EMBED&&QS.get("spin")!=="1"&&pref("spin")!=="on")setHold(true,true)}
 document.getElementById("saver").addEventListener("click",function(ev){ev.stopPropagation();setSaver(!saverOn)});
 function setPanelFull(f){panelFull=f;panel.classList.toggle("min",!f);var m=document.getElementById("more");if(m){m.textContent=f?"Less":"More";m.setAttribute("aria-expanded",f?"true":"false")}}
 function select(i){
@@ -1073,6 +1224,7 @@ function showHint(){
 }
 
 /* ---------- start ---------- */
+initGL();perfInit();
 readTheme();resize();
 if(NN===0){document.getElementById("empty").style.display="flex"}
 document.getElementById("time").hidden=NC<2;root.classList.toggle("notime",NC<2);
