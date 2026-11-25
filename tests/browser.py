@@ -262,7 +262,7 @@ def turn_checks(b, base):
     pg.wait_for_timeout(3500)
     txt = pg.inner_text("#perf")
     check("?perf=1 shows the frame rate, where the time goes, the settings and the thread layer's coverage, and a Copy button",
-          all(k in txt for k in ("fps", "own work per frame", "simulation", "threads", "notes", "pixel density", "thread layer paints", "2D canvas test")) and pg.locator("#perf button").count() == 2 and not errs, txt + str(errs))
+          all(k in txt for k in ("fps", "own work per frame", "simulation", "threads", "notes", "pixel density", "thread layer paints")) and pg.locator("#perf button").count() == 2 and not errs, txt + str(errs))
     cov2d = float(txt.split("thread layer paints ")[1].split("%")[0])
     ctx.close()
     ctx = b.new_context(viewport={"width": 1000, "height": 650})
