@@ -50,6 +50,17 @@ codex plugin add myco-notes@myco-notes
 
 Then ask: *"start a Myco Notes repository for my project"*. The agent asks its set-up questions in one message (where the notes live, name and owner, time zone, data folders; "defaults" accepts them all) and creates the repository.
 
+## Updating
+
+Update the kit, then refresh the copy of the tools and docs that each notes repository keeps. In Claude Code, `/plugin marketplace update myco-notes`, then update the plugin from the `/plugin` menu (or `claude plugin update myco-notes@myco-notes` in a terminal); in Codex, `codex plugin marketplace upgrade`. Then ask your agent *"update this notes repository to the new Myco Notes version"*, or do it yourself from the kit (on a clean git repository):
+
+```bash
+python3 <KIT>/tools/relocate.py --root ~/projects/my-project           # dry run: lists what it would copy
+python3 <KIT>/tools/relocate.py --root ~/projects/my-project --apply
+```
+
+It copies only new and changed files in `myco-notes/tools/` and `myco-notes/docs/` and moves `KIT_VERSION` in `.myco-notes.conf`; your notes and `AGENTS.md` are never touched. The documents in `myco-notes/docs/` are the kit's own and are replaced on every refresh, so keep your own text elsewhere. It also tells the agent about features your project has not turned on (the wiki layout, the `reviews/` folder), which it offers in one line each and enables only on your yes. Then run the lint, rebuild the map and commit with `notes-commit`. What changed in each version: [CHANGELOG.md](CHANGELOG.md).
+
 ## What you say, what happens
 
 | You say | What happens |
@@ -80,9 +91,24 @@ At the start of each session the agent reads a short briefing (`resume`) and tel
 
 Its owner's verdict: a versioned project memory with traceable evidence, clear pending work and reviewable changes. And its limit, which the notes state themselves: they are a reference, not proof that the systems are healthy.
 
+## The wiki layout
+
+`build-notes-map.py --layout wiki` (or `"layout": "wiki"` in `.myco-notes-map.json`) turns the notes into a static wiki site you can open from a double-click, with nothing loaded from the network. The classic map stays the default. [Live demo](https://luzianme.github.io/myco-notes/wiki/).
+
+![A note page of the wiki layout in its Light and Dark themes: the tree of groups on the left, breadcrumbs, the note's summary and header, its links and what links to it](.github/assets/wiki-layout.webp)
+
+- **Read like a wiki:** a tree of the groups with a filter, breadcrumbs, the article with a sticky "On this page" outline, previous and next within the group, and a "Recently changed" page from git. `[[wiki links]]`, relative links and file names written in the text are real links.
+- **See where a note stands:** each page's header shows its summary, a freshness status (confirmed, review due, superseded, expired) and its last edit from git; a passed follow-up date or a missing reference marks the note "needs a look" in the tree and on the front page. "What links here" and "Mentions" list each note with its title and summary.
+- **Search the text:** one search across everything the notes say (`/` focuses it; a static index, loaded only when you search).
+- **Long notes stay readable:** a 100 KB master record gets short headings with the rest of a long one tucked under them, long paragraphs and cells that expand on demand, folded sections, and a card per row for wide tables on a phone.
+- **A theme of your own:** colours for the Light and Dark themes, a font and a corner radius under `"theme"` in `.myco-notes-map.json`, with a contrast check; or pick one of the nine built-in themes.
+- **Notes are text, not web pages:** a tag written in a note (`Saved: <title>`) is shown as text, so one stray tag cannot break its page. `pip install markdown` gives the formatted view; without it a note is shown as plain text with the same links.
+
+This map holds the text of your notes (for the search), unlike the graph, so keep it as private as the notes; it is written to the gitignored map folder. Details: [REFERENCE.md section 7](skills/myco-notes/docs/REFERENCE.md#7-the-wiki-layout-of-the-map).
+
 ## The mycelium view
 
-`build-notes-map.py` writes a searchable map of the notes and `graph.html`, the notes as a living network: one self-contained page, no server, no network. `--layout wiki` lays the map out like a wiki site (group tree, breadcrumbs, outline, "what links here", recent changes, search across the text, a theme of your own; [how](skills/myco-notes/docs/REFERENCE.md#7-the-wiki-layout-of-the-map)).
+`graph.html`, written by `build-notes-map.py` next to the map, shows the notes as a living network: one self-contained page, no server, no network.
 
 ![The same demo notes in six themes: Mycelium, Matrix, Amber terminal, Deep sea, Fruit and Paper](.github/assets/graph-themes.webp)
 
@@ -149,4 +175,4 @@ Built from scratch by a person and an AI agent on a real project, then compared 
 - **[AGENTS.md](https://agents.md)** and **[Agent Skills](https://agentskills.io/specification)**: following these open conventions makes the notes and the skill work with any agent.
 
 ## Tests, contributing, license
-`python3 tests/native.py` (Linux, macOS, Windows), `bash tests/smoke.sh` (Linux, macOS) and `python3 tests/browser.py` (the mycelium view in Chromium) run on every push in GitHub Actions. They copy only the skill folder, bootstrap a notes repository from it and exercise every tool. `python3 tests/behaviour/run.py --agent "<your agent's non-interactive command>"` checks what an agent following the skill does in a few scenarios (a quick note, a secret, a new root folder, a review, a question); without `--agent` it checks the scenarios themselves. Contributing: see [AGENTS.md](AGENTS.md). License: Apache 2.0, see [LICENSE](LICENSE) and [NOTICE](NOTICE).
+`python3 tests/native.py` (Linux, macOS, Windows), `bash tests/smoke.sh` (Linux, macOS), `python3 tests/wiki.py` (the wiki layout, with and without the `markdown` package) and `python3 tests/browser.py` (the mycelium view and the wiki layout in Chromium) run on every push in GitHub Actions. They copy only the skill folder, bootstrap a notes repository from it and exercise every tool. `python3 tests/behaviour/run.py --agent "<your agent's non-interactive command>"` checks what an agent following the skill does in a few scenarios (a quick note, a secret, a new root folder, a review, a question); without `--agent` it checks the scenarios themselves. Contributing: see [AGENTS.md](AGENTS.md). License: Apache 2.0, see [LICENSE](LICENSE) and [NOTICE](NOTICE).

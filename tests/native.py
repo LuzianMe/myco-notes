@@ -88,6 +88,14 @@ def main():
         check("baseline commit exists", "Baseline" in git(proj, "log", "--oneline")[1])
         check("placeholders filled", all("{{" not in read(os.path.join(proj, f)) for f in ("AGENTS.md", ".myco-notes.conf", ".gitignore", ".github/CODEOWNERS", ".github/pull_request_template.md"))
               and "{{TOOLS_DIR}}" not in read(os.path.join(proj, ".github", "workflows", "notes-check.yml")))
+        sys.path.insert(0, os.path.join(SKILL, "tools"))
+        import _myco
+        bad = []
+        for d in ("FORMAT", "METHODOLOGY", "REFERENCE", "TEAM"):   # the kit's documents are notes in the map: they carry a header like any note (method 10.1)
+            fm, end = _myco.frontmatter(read(os.path.join(proj, MY, "docs", d + ".md")))
+            if not (0 < len(fm.get("summary", ("",))[0]) <= _myco.SUMMARY_MAX) or fm.get("area", ("",))[0] != "Kit documents" or not end:
+                bad.append(d)
+        check("the kit's four documents start with a header: a summary of at most 200 characters, and the area Kit documents", not bad, str(bad))
         check("hooks path is versioned", git(proj, "config", "core.hooksPath")[1].strip() == T + "/hooks")
         check("bootstrap launcher not copied", not os.path.exists(os.path.join(proj, MY, "tools", "bootstrap.py")))
         check("team files present", all(os.path.exists(os.path.join(proj, p)) for p in (".github/workflows/notes-check.yml", MY + "/docs/TEAM.md", ".gitattributes")))

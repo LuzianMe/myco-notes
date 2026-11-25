@@ -1,3 +1,7 @@
+---
+summary: The method: how a project's knowledge is kept in versioned notes that stay accurate, and why each rule exists; read to understand or change how the notes are run
+area: Kit documents
+---
 # Myco Notes: the method
 
 Version 3.1 (general edition), 2026-11-13. It is project-independent and is written for engineers and teams (and for AI coding agents working with them) who run long, large or fast-changing projects: infrastructure, software platforms, data and ML systems, research, hardware, operations. Together with `FORMAT.md` next to it (what the notes look like on disk, precisely enough for another tool to read, write and check them), it is the Myco Notes framework. The tools, skill and template in this kit are its reference implementation; a skill, a template repository or a team convention can be built from the two documents alone.

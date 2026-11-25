@@ -1,3 +1,7 @@
+---
+summary: The kit's tools, the folder layout, new folders and the configuration; read to find a tool, a flag or a setting
+area: Kit documents
+---
 # Myco Notes reference: the tools, the layout, new folders and the configuration
 
 A quick reference to the kit's reference implementation. The method is in `METHODOLOGY.md`, the format of the notes in `FORMAT.md`, working as a team in `TEAM.md`.

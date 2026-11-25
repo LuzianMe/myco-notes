@@ -1,3 +1,7 @@
+---
+summary: What a Myco Notes repository looks like on disk, precisely enough for a program to read or write it; read when building or checking a tool
+area: Kit documents
+---
 # The Myco Notes format
 
 Format 1.2, 2026-11-25 (1.1: 2026-11-16, 1.0: 2026-11-13). This document says what a Myco Notes repository looks like on disk, precisely enough that a program or an agent that has never seen this kit can read one, write to one without breaking it, and check one. It is the contract; section 12 adds what an implementation offers on top of it. Together with `METHODOLOGY.md`, which says why the rules exist and how to work with them, it makes up the Myco Notes framework. The kit this document ships with (the tools, the agent skill and the starter notes) is the reference implementation; other implementations are welcome, and notes that follow this document need none of the kit's code.

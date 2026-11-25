@@ -1,3 +1,7 @@
+---
+summary: Working with the notes as a team on GitHub or similar: set-up, daily routine and review; read before sharing a notes repository
+area: Kit documents
+---
 # Myco Notes for a team (GitHub, GitHub Enterprise and similar)
 
 The notes live in a git repository, so a team shares it like code. This page is the set-up and the working routine. The reasons are in `METHODOLOGY.md` section 18.
