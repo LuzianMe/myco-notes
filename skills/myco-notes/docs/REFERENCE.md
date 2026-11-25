@@ -96,6 +96,16 @@ Interaction in embed mode (unless `interactive=0`): drag with the mouse or one f
 
 Drawing pauses while the page is hidden (`visibilitychange`) and while the host page asks for it.
 
+### 6.3 Options of the full view
+
+| URL option | Effect |
+|---|---|
+| `?spin=1` | The network turns by itself when left alone, for this visit. Off by default: the **Spin** button in the tool bar turns it on (and off), and the choice is kept in the browser. An embedded graph always turns by itself; the screensaver turns it while it is on. A drag still turns the network by hand either way. |
+| `?perf=1` | A small panel with the frame rate, how long a frame's own work takes and where it goes (simulation, threads, notes), the pixel density, the settings that decide the cost, the graphics card and how much of the screen the thread layer paints. **Copy numbers** puts them in the clipboard as one line, to compare two ways of drawing on the same machine. |
+| `?gl=1` | The quiet threads are drawn by the graphics card (WebGL 2): their paths go into a texture once and are turned, widened, faded with the depth and given their glow and buds by a shader in every frame, so nothing is rebuilt while the view moves. Notes, labels, spikes and the selected note's threads stay on the 2D canvas. Not used for Matrix and Amber terminal (traces on a grid), in an embed, or where WebGL 2 is missing; the 2D drawing then runs as before (`?perf=1` says which is in use). Opt-in for now. |
+
+On a slow machine the 2D drawing steps down by itself, one step at a time and never back: a screen with 2 device pixels per pixel drops to 1.5, then the threads are redrawn less often while the view turns, then they become plain lines.
+
 **Messages** (`window.postMessage`). The page accepts these only from its parent window (`event.source === window.parent`) and ignores anything else:
 
 | From the host page | Effect |
