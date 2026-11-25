@@ -1,6 +1,6 @@
 # The Myco Notes format
 
-Format 1.1, 2026-11-16 (1.0: 2026-11-13). This document says what a Myco Notes repository looks like on disk, precisely enough that a program or an agent that has never seen this kit can read one, write to one without breaking it, and check one. It is the contract; section 12 adds what an implementation offers on top of it. Together with `METHODOLOGY.md`, which says why the rules exist and how to work with them, it makes up the Myco Notes framework. The kit this document ships with (the tools, the agent skill and the starter notes) is the reference implementation; other implementations are welcome, and notes that follow this document need none of the kit's code.
+Format 1.2, 2026-11-25 (1.1: 2026-11-16, 1.0: 2026-11-13). This document says what a Myco Notes repository looks like on disk, precisely enough that a program or an agent that has never seen this kit can read one, write to one without breaking it, and check one. It is the contract; section 12 adds what an implementation offers on top of it. Together with `METHODOLOGY.md`, which says why the rules exist and how to work with them, it makes up the Myco Notes framework. The kit this document ships with (the tools, the agent skill and the starter notes) is the reference implementation; other implementations are welcome, and notes that follow this document need none of the kit's code.
 
 What belongs here and what belongs in the method: **if a tool reads it, it is format; if only people read it, it is method.** The sync-log line, the inbox heading and the review statuses are read by tools, so they are specified here; the changelog, how-to, incident and decision templates are written for people and adapted by each project, so they stay in the method (section 4).
 
@@ -68,7 +68,8 @@ Paths are relative to the repository root, written with forward slashes. Other k
 - Every `.md` file is a note, except in the record folders and the machinery folders.
 - **Record folders:** `inbox/`, `imported/` and `sources/` always, plus each folder in `HISTORY_DIRS` (default `archive/`, `logs/`). A file in one of them, at any depth, is a record.
 - **Machinery folders:** `TOOLS_DIR`, `DOCS_DIR` and `MAP_DIR` when they lie inside the notes folder. They are not notes and not records.
-- **Plans:** `plans/` holds plans, decisions and review files (7). Plans are notes; review files are notes with their own grammar.
+- **Plans:** `plans/` holds plans, decisions and session handoffs. Plans are notes.
+- **Reviews:** `reviews/` holds review files (7), notes with their own grammar. Format 1.0 and 1.1 kept them in `plans/`; a reader MUST accept both places (7.1).
 - `scripts/` and `verification/` hold artifacts; their `.md` files (bundle READMEs) are notes.
 - A reader SHOULD skip `.git/`, the folders in `DATA_DIRS`, and folders of other tools (`.obsidian/`, `.trash/`, `node_modules/`).
 
@@ -160,7 +161,7 @@ The zone is `UTC`, an offset (`+01:00`) or an abbreviation; `Tags` and `Related`
 ## 7. Review files
 
 ### 7.1 Name and place
-`<notes folder>/plans/review-YYYY-MM-DD.md`, with a suffix (`review-YYYY-MM-DD-b.md`) for a second review on the same day. Any file in `plans/` whose name starts with `review-` and ends with `.md` is a review file.
+`<notes folder>/reviews/review-YYYY-MM-DD.md`, with a suffix (`review-YYYY-MM-DD-b.md`) for a second review on the same day. Any file in `reviews/` whose name starts with `review-` and ends with `.md` is a review file. Up to format 1.1 review files lived in `plans/`: a reader MUST treat a file there with the same name pattern as a review file too, and a writer SHOULD put new reviews in `reviews/` and MAY offer to move the old ones (the move is a rename plus the path references to it; it changes no content, and an earlier review's scope baseline, 7.5, is the commit that last changed its content, not the commit that moved it).
 
 ### 7.2 Header
 
@@ -200,7 +201,7 @@ The `Status:` line is the last line of the proposal's fields and takes one of:
 A writer MUST NOT apply a proposal whose status is waiting, and MUST NOT change a proposal's fix after it is applied or declined. An answered review file is a record of a decision even though it lives among the notes.
 
 ### 7.5 Scope
-For a review of scope `changed since <commit>`, the base commit is the last commit that touched the newest review file whose scope is not `source …`. "Newest" is by the commit that added the file. A full review is due when the repository has no review file, has no full one, or its newest full one was added more than `REVIEW_FULL_DAYS` days ago. Which notes a changed review reads is left to the method (section 21.5); the format fixes only the base and the due rule, so that two tools agree on them.
+For a review of scope `changed since <commit>`, the base commit is the last commit that changed the content of the newest review file whose scope is not `source …`; a commit that only moved the file (from `plans/` to `reviews/`, 7.1) does not count. "Newest" is by the commit that first added the file, whatever its place then. A full review is due when the repository has no review file, has no full one, or its newest full one was added more than `REVIEW_FULL_DAYS` days ago. Which notes a changed review reads is left to the method (section 21.5); the format fixes only the base and the due rule, so that two tools agree on them.
 
 ## 8. Sources
 
@@ -234,7 +235,7 @@ What counts as "secret-looking" is a set of patterns that will change faster tha
 
 ## 10. Versions and change
 - The format has its own version, `MAJOR.MINOR`, separate from the kit's version and the method's edition. A notes repository states the version it follows in `FORMAT_VERSION`; without it, 1.0.
-- A **minor** version only adds: a new optional key, a new sync-log kind, a new record folder, a new check that warns. A reader of 1.x MUST read any 1.y repository, ignoring what it does not know.
+- A **minor** version only adds: a new optional key, a new sync-log kind, a new record folder, a new place a file may live (the old place stays valid), a new check that warns. A reader of 1.x MUST read any 1.y repository, ignoring what it does not know.
 - A **major** version may change a meaning or make something required. A notes repository moves to it through an upgrade review (method 21.4), never silently.
 - Records are never rewritten to match a newer version. A checker MUST NOT report a record, or an older sync-log line, for using an older form.
 

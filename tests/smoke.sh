@@ -203,7 +203,7 @@ chk "ci-check fails when the lint cannot run" "! myco-notes/tools/ci-check $base
 git switch -q main; git branch -q -D feat-crash
 
 echo "0.12: restore verdicts, mirror scope and results, narrower commits, kit version, doctor"
-chk "new repositories record the kit and format versions"  "grep -q '^KIT_VERSION=[0-9]' .myco-notes.conf && grep -q '^FORMAT_VERSION=1.1' .myco-notes.conf && grep -q '^MIRROR_SCOPE=tracked' .myco-notes.conf"
+chk "new repositories record the kit and format versions"  "grep -q '^KIT_VERSION=[0-9]' .myco-notes.conf && grep -q '^FORMAT_VERSION=1.2' .myco-notes.conf && grep -q '^MIRROR_SCOPE=tracked' .myco-notes.conf"
 mkdir -p "$tmp/home"
 chk "every map theme meets the WCAG contrast minimums" "python3 $repo/tests/contrast.py"
 chk "doctor reports a healthy repository"     "myco-notes/tools/doctor --home $tmp/home | grep -q 'doctor: healthy'"
@@ -284,7 +284,7 @@ mkdir -p $tmp/flat/.claude/skills/myco-notes/docs; echo old > $tmp/flat/.claude/
 chk "relocate refreshes a skill copy under .claude/skills" "\"$kit/tools/relocate\" --root $tmp/flat --apply >/dev/null && cmp -s $kit/SKILL.md $tmp/flat/.claude/skills/myco-notes/SKILL.md && [ -f $tmp/flat/.claude/skills/myco-notes/docs/METHODOLOGY.md ] && [ -f $tmp/flat/.claude/skills/myco-notes/tools/bootstrap.py ]"
 
 echo "demo notes (README screenshots and the live demo)"
-chk "build_demo makes the repository, its map and the mycelium view" "python3 $repo/examples/demo/build_demo.py $tmp/demo | grep -q 'graph: 59 nodes' && [ -f $tmp/demo/myco-notes/map/graph.html ] && [ \"\$(git -C $tmp/demo rev-list --count HEAD)\" -ge 20 ]"
+chk "build_demo makes the repository, its map and the mycelium view" "python3 $repo/examples/demo/build_demo.py $tmp/demo | grep -q 'graph: 60 nodes' && [ -f $tmp/demo/myco-notes/map/graph.html ] && [ \"\$(git -C $tmp/demo rev-list --count HEAD)\" -ge 20 ]"
 chk "the demo notes is lint-clean apart from its two staged warnings" "(cd $tmp/demo && myco-notes/tools/notes-lint.py --quiet | grep -q ' 0 errors, 2 warnings')"
 
 chk "no .gitattributes in the kit rewrites file contents (the plugin directory refuses it)" "! git -C $repo ls-files -z '*.gitattributes' '.gitattributes' | xargs -0 -I{} grep -h -v '^#' $repo/{} | grep -q -E 'eol=|filter|export-|(^| )text( |=|$)'"

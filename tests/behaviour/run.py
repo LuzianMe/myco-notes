@@ -188,14 +188,14 @@ def check_new_folder(c):
 
 
 def review_ok(root):
-    write(root, MY + "/plans/review-2026-11-17.md", "---\nsummary: Full review of 2026-11-17: one contradiction, waiting for an answer\n"
+    write(root, MY + "/reviews/review-2026-11-17.md", "---\nsummary: Full review of 2026-11-17: one contradiction, waiting for an answer\n"
           "scope: full\nopen: 1\n---\n# Review 2026-11-17\n\nRead every note; one finding.\n\n"
           "## 1. The backup start time differs\nKind: contradiction\nWhere: `nas.md` line 6, `backup-job.md` line 6\n"
           "Found: `nas.md` says 02:00, `backup-job.md` says 03:30.\nProposed fix: after checking the job's schedule live, "
           "change the wrong one.\nStatus: proposed\n")
-    rc, out = tool(root, "notes-commit", "--only", MY + "/plans/review-2026-11-17.md", "Review 2026-11-17: one proposal")
+    rc, out = tool(root, "notes-commit", "--only", MY + "/reviews/review-2026-11-17.md", "Review 2026-11-17: one proposal")
     assert rc == 0, out
-    return "Review written to myco-notes/plans/review-2026-11-17.md:\n1. The backup start time differs (nas.md vs backup-job.md)\nAnswer yes, no or a change."
+    return "Review written to myco-notes/reviews/review-2026-11-17.md:\n1. The backup start time differs (nas.md vs backup-job.md)\nAnswer yes, no or a change."
 
 
 def review_wrong(root):
@@ -206,7 +206,7 @@ def review_wrong(root):
 
 
 def check_review(c):
-    reviews = [p for p in c.committed() if re.fullmatch(MY + r"/plans/review-[^/]*\.md", p)]
+    reviews = [p for p in c.committed() if re.fullmatch(MY + r"/(?:reviews|plans)/review-[^/]*\.md", p)]
     text = "\n".join(read(c.root, p) for p in reviews)
     rc, lint = tool(c.root, "lint")
     lint_errors = [l for l in lint.splitlines() if l.startswith("ERROR") and "review-" in l]

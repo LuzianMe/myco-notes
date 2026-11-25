@@ -4,8 +4,8 @@ import re
 import subprocess
 import sys
 
-VERSION = "0.43.1"   # the kit version these tools come from; moves with plugin.json and SKILL.md (tests check it)
-FORMAT_VERSION = "1.1"   # the version of docs/FORMAT.md that new repositories follow; bootstrap writes it, relocate adds it when missing
+VERSION = "0.44.0"   # the kit version these tools come from; moves with plugin.json and SKILL.md (tests check it)
+FORMAT_VERSION = "1.2"   # the version of docs/FORMAT.md that new repositories follow; bootstrap writes it, relocate adds it when missing
 AGENT_SKILL_DIRS = (".claude/skills", ".agents/skills")   # a copy of the skill kept in a notes repository for agents (a cloud session loads it from there): not notes, so the lint and the map leave it out
 
 IS_WINDOWS = os.name == "nt"
@@ -124,7 +124,28 @@ LOG_KINDS = ("change", "note", "ingest", "answer", "review", "audit", "import", 
 LOG_LINE = re.compile(r"^- \*\*\d{4}-\d{2}-\d{2} (" + "|".join(LOG_KINDS) + r")( \([^)]*\))?:\*\*\s+\S")
 
 
-REVIEW_FILE = re.compile(r"^review-.*\.md$")   # <notes>/plans/review-YYYY-MM-DD.md (method 21.2)
+REVIEW_FILE = re.compile(r"^review-.*\.md$")   # <notes>/reviews/review-YYYY-MM-DD.md (method 21.2); before format 1.2 in <notes>/plans/
+
+
+def review_dirs(lay):
+    """The folders that may hold review files (FORMAT.md 7.1), the current one first: reviews/, and plans/ for repositories made before 0.44.0."""
+    return [lay["reviews"], lay["notes"] + "/plans"]
+
+
+def is_review_path(lay, rel):
+    """True when the repository-relative path is a review file (in either place)."""
+    d, _, f = rel.rpartition("/")
+    return d in review_dirs(lay) and bool(REVIEW_FILE.match(f))
+
+
+def review_paths(root, lay):
+    """Repository-relative paths of the review files that exist on disk, in both places, sorted by file name."""
+    out = []
+    for d in review_dirs(lay):
+        p = os.path.join(root, *d.split("/"))
+        if os.path.isdir(p):
+            out += [d + "/" + f for f in os.listdir(p) if REVIEW_FILE.match(f) and os.path.isfile(os.path.join(p, f))]
+    return sorted(out, key=lambda r: (r.rsplit("/", 1)[1], r))
 
 
 def review_proposals(text):
@@ -241,6 +262,7 @@ def layout(root, conf=None):
         "docs": pick("DOCS_DIR", "docs", my + "/docs"),
         "map": pick("MAP_DIR", "notes-map", my + "/map"),
         "state": _rel(conf.get("STATE_FILE")) or "state.md",
+        "reviews": pick("NOTES_DIR", "notes", my) + "/reviews",
         "data": [d for d in (_rel(x) for x in conf.get("DATA_DIRS", "").split()) if d],
         "history": list(dict.fromkeys([d for d in (_rel(x) for x in conf.get("HISTORY_DIRS", "archive logs").split()) if d] + ["inbox", "imported", "sources"])),   # the inbox (19.1), imported originals (20) and sources (22) are always records
     }

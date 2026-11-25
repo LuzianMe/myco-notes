@@ -55,7 +55,7 @@ def citing(root, lay, names):
     import notes_index
     found = {n: [] for n in names}
     for rel, _, _, is_hist in notes_index.collect(root, lay):
-        if is_hist or (rel.startswith(lay["notes"] + "/plans/") and _myco.REVIEW_FILE.match(os.path.basename(rel))):
+        if is_hist or _myco.is_review_path(lay, rel):
             continue
         text = open(os.path.join(root, *rel.split("/")), encoding="utf-8", errors="replace").read()
         fm, _ = _myco.frontmatter(text)

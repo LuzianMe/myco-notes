@@ -12,6 +12,10 @@ Before 0.6.0 a notes repository had notes/, tools/, docs/ and notes-map/ at the 
 themselves, tools/, docs/ and map/ inside one folder (default myco-notes/), so the root stays free for the project's own folders.
 The same command renames the folder when the repository already uses it (--myco-dir new-name).
 
+Review files (format 1.2): `relocate.py --root PROJECT --move-reviews [--apply]` moves the review files that older repositories kept in
+<notes>/plans/ into <notes>/reviews/ (git mv) and rewrites the paths that name them in the notes (never in the history folders); the dry run lists
+both. It also sets FORMAT_VERSION=1.2. It does not commit, and it does not touch AGENTS.md or the map's own configuration: it tells you what to propose.
+
 Dry run by default: it prints the moves and the text changes and touches nothing. With --apply it
   1. moves the folders (git mv for tracked files), keeping the folder names you use (a docs folder called myco-docs stays myco-docs)
   2. rewrites path references in .md, .yml, .yaml and .json files, the conf, .gitignore and CODEOWNERS, but only where the text names a
@@ -89,6 +93,7 @@ def main():
     ap.add_argument("--myco-dir", default="myco-notes")
     ap.add_argument("--apply", action="store_true")
     ap.add_argument("--no-refresh", action="store_true")
+    ap.add_argument("--move-reviews", action="store_true", help="move the review files from <notes>/plans/ to <notes>/reviews/ (format 1.2) and rewrite the paths that name them")
     a = ap.parse_args()
 
     root = _myco.toplevel(os.path.abspath(a.root) if a.root else HERE)
@@ -106,6 +111,9 @@ def main():
              f"  python <kit>\\tools\\relocate.py --root \"{root}\" --apply")
     if a.apply and _myco.git("-C", root, "status", "--porcelain", "--untracked-files=no").stdout.strip():
         fail("the working tree has uncommitted changes; commit or stash them first so the move is one reviewable change")
+
+    if a.move_reviews:
+        return move_reviews(root, old, conf, a)
 
     umbrella = bool(old["myco"]) and all(under(old[k], old["myco"]) for k in ("notes", "tools", "docs", "map"))
     if umbrella:
@@ -265,6 +273,80 @@ relocate: done, nothing committed. Next:
     return 0
 
 
+def move_reviews(root, lay, conf, a):
+    """Review files from <notes>/plans/ to <notes>/reviews/ (FORMAT.md 7.1), with the paths that name them. Dry run unless --apply."""
+    old_dir = lay["notes"] + "/plans"
+    moves = [(r, lay["reviews"] + "/" + r.rsplit("/", 1)[1]) for r in _myco.review_paths(root, lay) if r.startswith(old_dir + "/")]
+    print(f"relocate: move reviews, {'APPLYING' if a.apply else 'dry run (nothing is changed; add --apply to do it)'}")
+    print(f"  project: {root}")
+    if not moves:
+        print(f"  no review files in {old_dir}/ ; nothing to move.")
+        return 0
+    taken = [d for _s, d in moves if os.path.exists(absp(root, d))]
+    if taken:
+        fail("these already exist in " + lay["reviews"] + "/ : " + ", ".join(taken) + "; look at them first (same name in both places)")
+    skip = {lay["map"], lay["tools"], lay["docs"], *lay["data"], *_myco.AGENT_SKILL_DIRS,
+            *(lay["notes"] + "/" + h for h in lay["history"])}
+    names = sorted({s.rsplit("/", 1)[1] for s, _d in moves}, key=lambda n: -len(n))
+    pat = re.compile(r"(?<![\w~-])((?:\.\./)*)(?:" + re.escape(lay["notes"]) + r"/)?plans/(" + "|".join(re.escape(n) for n in names) + r")(?![\w-])")
+    edits = {}
+    for dp, dn, fn in os.walk(root):
+        reldir = os.path.relpath(dp, root).replace(os.sep, "/")
+        dn[:] = sorted(d for d in dn if d not in SKIP_NAMES and (d if reldir == "." else reldir + "/" + d) not in skip)
+        for f in sorted(fn):
+            if not f.endswith(".md"):
+                continue
+            rel = f if reldir == "." else reldir + "/" + f
+            full = os.path.join(dp, f)
+            if os.path.getsize(full) > MAX_TEXT:
+                continue
+            with open(full, encoding="utf-8", errors="surrogateescape", newline="") as fh:
+                text = fh.read()
+            new, n = pat.subn(lambda m: m.group(0)[:m.start(2) - m.start(0) - len("plans/")] + "reviews/" + m.group(2), text)
+            if n:
+                edits[rel] = (n, new)
+    print(f"  review files to move ({len(moves)}), plans/ to reviews/:" + "".join(f"\n    {s} -> {d}" for s, d in moves[:60]) + ("\n    ..." if len(moves) > 60 else ""))
+    print(f"  path references to rewrite: {sum(n for n, _ in edits.values())} in {len(edits)} files" + "".join(f"\n    ~ {k} ({v[0]})" for k, v in sorted(edits.items())[:40]))
+    print("  Not rewritten: the history folders (logs, archive, inbox, sources, imported), the tools, docs and map folders.")
+    fv = conf.get("FORMAT_VERSION", "1.0").strip().strip("\"'") or "1.0"
+    if _myco.vkey(fv) < _myco.vkey(_myco.FORMAT_VERSION):
+        print(f"  .myco-notes.conf: FORMAT_VERSION {fv} -> {_myco.FORMAT_VERSION}")
+    print(f"  lint before: {lint_summary(root, lay['tools'])}")
+    if a.apply:
+        os.makedirs(absp(root, lay["reviews"]), exist_ok=True)
+        for s, d in moves:
+            if _myco.git("-C", root, "mv", s, d).returncode != 0:         # not tracked yet: a plain rename
+                os.rename(absp(root, s), absp(root, d))
+        for rel, (_n, new) in edits.items():
+            rel = next((d for s, d in moves if s == rel), rel)             # a moved review file is edited at its new place
+            with open(absp(root, rel), "w", encoding="utf-8", errors="surrogateescape", newline="") as fh:
+                fh.write(new)
+        cp = os.path.join(root, ".myco-notes.conf")
+        with open(cp, encoding="utf-8", newline="") as fh:
+            ctext = fh.read()
+        if _myco.vkey(fv) < _myco.vkey(_myco.FORMAT_VERSION):
+            with open(cp, "w", encoding="utf-8", newline="") as fh:
+                fh.write(_myco.set_conf_key(ctext, "FORMAT_VERSION", _myco.FORMAT_VERSION))
+        print(f"  lint after : {lint_summary(root, lay['tools'])}")
+    print("\nrelocate: " + ("done, nothing committed. Next:" if a.apply else "this was a dry run. With --apply it does the above, then:"))
+    print(f"  1. git status; run {lay['tools']}/notes-lint.py (a relative link between a moved review and a plan may need a fix) and rebuild the map.")
+    print(f"  2. Commit: {lay['tools']}/notes-commit \"Move the review files to {lay['reviews']}/\"; add a sync-log line (kind upgrade).")
+    tips = ["AGENTS.md: the review line should say " + lay["reviews"] + "/review-<date>.md (the kit's template/AGENTS.md has it); propose the change to the owner, do not edit the entry point unasked."]
+    try:
+        with open(os.path.join(root, ".myco-notes-map.json"), encoding="utf-8") as fh:
+            mc = json.load(fh)
+    except (OSError, ValueError):
+        mc = {}
+    if isinstance(mc, dict) and any(isinstance(g, dict) and any(str(p).rstrip("/") == old_dir for p in g.get("prefixes", [])) for g in mc.get("groups", [])):
+        tips.append(f".myco-notes-map.json has a group with the prefix {old_dir}/ : the moved reviews fall out of it. Ask the owner whether to add a group "
+                    f"(for example id reviews, name Reviews, prefix {lay['reviews']}/) or add the prefix to that group.")
+    for i, tip in enumerate(tips, 3):
+        print(f"  {i}. {tip}")
+    if a.apply:
+        print("  Undo before committing: git restore --staged --worktree . ; the moved files return to plans/.")
+    return 0
+
+
 def same_text(a, b):
     """Files are the same when their bytes match, ignoring a Windows checkout's CRLF line endings."""
     try:
@@ -363,6 +445,12 @@ def refresh_only(root, old, conf, a, self_run):
         tips.append("New since 0.43.0: the notes map has an optional wiki layout (a tree of the groups, breadcrumbs, an outline, 'what links here' with summaries, recent changes, search across the text, and a theme of the project's own). "
                     "Tell the owner in one line and offer it; on a yes add \"layout\": \"wiki\" to .myco-notes-map.json (create the file if it is missing; keep its other keys), rebuild the map and show the owner the result. "
                     "Without a yes the classic map stays. Optional colours, fonts and radius: \"theme\" (docs/REFERENCE.md section 7).")
+    waiting = [r for r in _myco.review_paths(root, _myco.layout(root)) if r.startswith(_myco.layout(root)["notes"] + "/plans/")]
+    if waiting:
+        lay0 = _myco.layout(root)
+        tips.append(f"New since 0.44.0 (format 1.2): review files have their own folder, {lay0['reviews']}/. {len(waiting)} still sit in {lay0['notes']}/plans/ among the plans. "
+                    f"Tell the owner in one line and offer to move them: `python3 <kit>/tools/relocate.py --root {root} --move-reviews` is a dry run that lists the renames and the "
+                    "paths it would rewrite; add --apply only on a yes, then lint and commit. Until then everything keeps working (the tools read both places), and new reviews go to the new folder.")
     tips.append(f"Offer the owner an upgrade review (method 21.4): {old['tools']}/index --missing lists the notes without a summary; propose summaries in batches of about 20 and apply only what the owner confirms. Records (logs, archive, inbox, older sync-log lines) keep their form.")
     print("\nrelocate: " + ("done, nothing committed. Next:" if a.apply else "this was a dry run. With --apply it copies the files above, then:"))
     print(f"  1. git status and git diff --stat; run {old['tools']}/notes-lint.py and python3 {old['tools']}/build-notes-map.py (it writes the graph view too).")

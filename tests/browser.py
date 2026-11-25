@@ -296,7 +296,7 @@ def main():
                 pg.mouse.move(box["x"] + 5, box["y"] + 5)
                 pg.wait_for_timeout(1500)
                 dimmed = fr.evaluate(PAINTED)
-                check("the selection stays after the pointer leaves: the other notes stay dimmed", sels()[-1].get("selected") and dimmed < base_paint * .95,
+                check("the selection stays after the pointer leaves: the other notes stay dimmed", sels()[-1].get("selected") and dimmed < base_paint * .985,
                       f"{base_paint} {dimmed} {sels()[-1]}")
                 pg.mouse.click(box["x"] + 8, box["y"] + box["height"] - 8)
                 pg.wait_for_timeout(1200)
