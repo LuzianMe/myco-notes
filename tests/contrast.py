@@ -8,6 +8,7 @@ Checks, for the note pages and index and for the mycelium view:
   links     the accent colour (links, and the view's links in its panel) on the background and the panels: at least 4.5:1
   nodes     every group colour, quiet colour and the wilt colour on the view's background: at least 3:1 (large graphics, UI)
   labels    node label text on its halo: at least 4.5:1
+  wiki      the wiki layout's own colours: text on the tint of the current note and of a hover (4.5:1), the warning colour against the panel and the page (3:1)
 A translucent panel is blended over the background (and over the lighter centre of the view's gradient) before it is measured.
 Prints the failures (--all: every ratio). Exit 0 when every theme passes, 1 otherwise.
 """
@@ -21,33 +22,7 @@ import map_themes  # noqa: E402
 TEXT, GRAPHIC = 4.5, 3.0
 
 
-def rgba(c):
-    c = c.strip()
-    if c.startswith("#"):
-        v = int(c[1:], 16)
-        return (v >> 16 & 255, v >> 8 & 255, v & 255, 1.0)
-    parts = c[c.index("(") + 1:c.index(")")].split(",")
-    return (int(parts[0]), int(parts[1]), int(parts[2]), float(parts[3]) if len(parts) > 3 else 1.0)
-
-
-def over(top, under):
-    """`top` (may be translucent) painted over the opaque colour `under`."""
-    r, g, b, a = rgba(top)
-    R, G, B, _ = rgba(under)
-    return "#%02x%02x%02x" % tuple(round(x * a + y * (1 - a)) for x, y in ((r, R), (g, G), (b, B)))
-
-
-def lum(c):
-    def ch(v):
-        v /= 255
-        return v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4
-    r, g, b, _ = rgba(c)
-    return 0.2126 * ch(r) + 0.7152 * ch(g) + 0.0722 * ch(b)
-
-
-def ratio(a, b):
-    la, lb = sorted((lum(a), lum(b)), reverse=True)
-    return (la + 0.05) / (lb + 0.05)
+rgba, over, lum, ratio = map_themes.rgba, map_themes.over, map_themes.lum, map_themes.ratio   # the same maths the wiki layout uses to warn about a project's own colours
 
 
 def checks(t):
@@ -61,6 +36,14 @@ def checks(t):
             out.append((f"page {fgk} on {bgk}", p[fgk], p[bgk], TEXT))
     for bgk in ("bg", "panel"):
         out.append((f"page link/accent on {bgk}", p["accent"], p[bgk], TEXT))
+    x = map_themes.wiki_extra(t)
+    for fgk in ("fg", "accent"):
+        out.append((f"wiki {fgk} on the tint of the current note", p[fgk], x["soft"], TEXT))
+        out.append((f"wiki {fgk} on a hovered row", p[fgk], x["hover"], TEXT))
+    out.append(("wiki muted on a hovered row", p["muted"], x["hover"], TEXT))
+    out.append(("wiki muted on a selected search result", p["muted"], x["soft"], TEXT))
+    for bgk in ("bg", "panel"):
+        out.append((f"wiki warning mark on {bgk}", x["warn"], p[bgk], GRAPHIC))
     for base in ("bg", "bg2"):
         panel = over(g["panel"], g[base])
         for fgk in ("fg", "muted", "accent"):

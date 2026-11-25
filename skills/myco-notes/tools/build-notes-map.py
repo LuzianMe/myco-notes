@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """build-notes-map: generate a navigable static view of the notes (index, one page per note, backlinks, git history).
 
-  tools/build-notes-map.py [--root DIR] [--out DIR]        default out: the map folder of .myco-notes.conf (myco-notes/map, or notes-map in older repositories; gitignored, rebuilt on demand)
+  tools/build-notes-map.py [--root DIR] [--out DIR] [--layout classic|wiki]        default out: the map folder of .myco-notes.conf (myco-notes/map, or notes-map in older repositories; gitignored, rebuilt on demand)
   tools/build-notes-map.py --public [--labels FILE] [--title TEXT] --out DIR
                             only DIR/graph.html, a public mycelium view to embed on a website: no note name, title, path, size or commit
                             subject, only the labels of FILE ({"note-name": "Label shown"}, keyed by the file name without .md); every
                             other note is an unlabelled dot. It opens in embed mode. Other files in DIR are left alone.
 
-What it produces
+What it produces (the classic layout; --layout wiki, or "layout": "wiki" in .myco-notes-map.json, makes the wiki layout of map_wiki.py from the
+same data: group tree, breadcrumbs, outline, "what links here", recently changed, search across the text; it also writes recent.html and assets/)
   index.html        notes grouped by purpose, live search, the 15 latest commits
   p/<slug>.html     each note rendered, with table of contents, 'mentions' and 'mentioned by' chips and its recent git history
   raw/<slug>.md     the original files
@@ -19,12 +20,14 @@ It refuses to build if any note contains a secret-looking string (publication ga
 The output folder is emptied and rebuilt, so --out must not be the repository or a folder that contains it, and must be empty,
 missing, or a map this tool built (it leaves a .myco-notes-map marker there).
 Two notes whose paths give the same page name (a/b.md and a-b.md) keep apart: the later one gets a short hash of its path.
-Optional config: .myco-notes-map.json  {"title": "...", "groups": [{"id","name","blurb","prefixes":["myco-notes/plans/"]}], "hints": {"myco-notes/state.md": "one line"}}
+Optional config: .myco-notes-map.json  {"title": "...", "groups": [{"id","name","blurb","prefixes":["myco-notes/plans/"]}], "hints": {"myco-notes/state.md": "one line"},
+        "layout": "wiki", "theme": {"light": {"accent": "#7a3e00"}, "dark": {"accent": "#ffb454"}, "font": "Georgia, serif", "mono": "monospace", "radius": "4px"}}
+        (theme: the wiki layout's own colours for its Light and Dark themes, a font, a code font and a corner radius; see tools/map_themes.py project_theme)
         (a hint replaces the note's own one-line `summary` from its header, method 10.1; without either, the first paragraph is shown)
 Folders: the notes folder, docs folder and map folder come from .myco-notes.conf (see tools/_myco.py layout); DATA_DIRS (project data that is not notes) are left out.
 Needs only the Python standard library; if the 'markdown' package is installed pages are rendered nicely, otherwise as preformatted text.
 """
-import argparse, datetime, html, json, os, re, shutil, subprocess, sys
+import argparse, datetime, html, json, os, re, shutil, subprocess, sys, types
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.dont_write_bytecode = True
@@ -34,10 +37,12 @@ import notes_graph  # noqa: E402
 import secret_scan  # noqa: E402
 import hashlib  # noqa: E402
 import map_themes  # noqa: E402
+import map_wiki  # noqa: E402
 
 SKIP_DIRS = {".git", "site", "notes-map", "node_modules", "__pycache__", ".obsidian", ".trash"}
 MARKER = ".myco-notes-map"   # marks a folder this tool made, so it may empty and rebuild it
-MAP_FILES = {"index.html", "graph.html", "p", "raw", MARKER}
+MAP_FILES = {"index.html", "graph.html", "p", "raw", "recent.html", "assets", MARKER}
+LAYOUTS = ("classic", "wiki")
 
 
 def default_groups(lay):
@@ -109,6 +114,21 @@ HEAD = map_themes.head_script()   # applies the stored theme before the first pa
 PICK = map_themes.picker()        # the theme picker, the same on every page
 
 
+def group_items(groups, info):
+    """[(id, name, blurb, [notes in the order shown])] for the groups that have notes: the method's order inside a group with prefixes, else by path."""
+    out = []
+    for gid, gname, blurb, prefixes in groups:
+        items = [d for d in info.values() if d["group"] == gid]
+        if prefixes and gid != "other":
+            order = {p: i for i, p in enumerate(prefixes)}
+            items.sort(key=lambda d: (order.get(d["rel"], 99), d["rel"]))
+        else:
+            items.sort(key=lambda d: d["rel"])
+        if items:
+            out.append((gid, gname, blurb, items))
+    return out
+
+
 def sh(args, cwd):
     try:
         return subprocess.run(args, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30).stdout
@@ -129,6 +149,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--root", default=".")
     ap.add_argument("--out", default=None)
+    ap.add_argument("--layout", choices=LAYOUTS, default=None, help="classic (default) or wiki: the same notes laid out like a wiki site (see above); \"layout\" in .myco-notes-map.json sets it for the project")
     ap.add_argument("--public", action="store_true", help="write only <out>/graph.html, a public graph for a website (see above)")
     ap.add_argument("--labels", default=None, help="with --public: the approved labels, a JSON object {\"note-name\": \"Label shown\"}")
     ap.add_argument("--title", default=None, help="with --public: a title for the page (default: none)")
@@ -164,6 +185,15 @@ def main():
     if os.path.exists(cp):
         cfg = json.load(open(cp, encoding="utf-8"))
     title = cfg.get("title") or (os.path.basename(root) + " notes")
+    layout = a.layout or cfg.get("layout") or "classic"
+    if layout not in LAYOUTS:
+        sys.exit(f'REFUSING to build: "layout" in .myco-notes-map.json must be "classic" or "wiki" (got {layout!r})')
+    try:
+        project = map_themes.project_theme(cfg.get("theme"))
+    except ValueError as e:
+        sys.exit(f"REFUSING to build: .myco-notes-map.json: {e}")
+    if project and layout != "wiki" and not a.public:
+        print('note: "theme" in .myco-notes-map.json applies to the wiki layout only (--layout wiki)', file=sys.stderr)
     hints = cfg.get("hints", {})
     groups = [(g["id"], g["name"], g.get("blurb", ""), g.get("prefixes", [])) for g in cfg["groups"]] if "groups" in cfg else default_groups(lay)
     try:
@@ -215,6 +245,7 @@ def main():
     for rel, d in info.items():
         by_name.setdefault(d["name"], []).append(rel)
     linkable = {n: v[0] for n, v in by_name.items() if len(v) == 1 and n != "README.md"}
+    name_re = None
     if linkable:
         name_re = re.compile(r"(?<![\w./-])(" + "|".join(re.escape(n) for n in sorted(linkable, key=len, reverse=True)) + r")(?![\w-])")
         for rel, d in info.items():
@@ -223,9 +254,9 @@ def main():
                 if tgt != rel:
                     info[tgt]["inn"][d["id"]] = info[tgt]["inn"].get(d["id"], 0) + 1
                     d["out"][info[tgt]["id"]] = d["out"].get(info[tgt]["id"], 0) + 1
-    index = _myco.LinkIndex(list(info))          # wiki links and relative Markdown links count as mentions too (method 9)
+    link_index = _myco.LinkIndex(list(info))     # wiki links and relative Markdown links count as mentions too (method 9)
     for rel, d in info.items():
-        for tgt in {index.resolve(k, t, rel) for k, t, _ in _myco.links(d["text"])}:
+        for tgt in {link_index.resolve(k, t, rel) for k, t, _ in _myco.links(d["text"])}:
             if tgt and tgt != rel and tgt in info and info[tgt]["id"] not in d["out"]:
                 info[tgt]["inn"][d["id"]] = info[tgt]["inn"].get(d["id"], 0) + 1
                 d["out"][info[tgt]["id"]] = 1
@@ -248,6 +279,19 @@ def main():
     shutil.rmtree(out, ignore_errors=True)
     os.makedirs(os.path.join(out, "p")); os.makedirs(os.path.join(out, "raw"))
     open(os.path.join(out, MARKER), "w").write("Built by build-notes-map.py; this folder is emptied and rebuilt on each build.\n")
+    built = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    today = datetime.date.today().isoformat()
+    if layout == "wiki":                           # the same notes, relations and groups, laid out by map_wiki.py
+        for w in map_themes.contrast_warnings(project):
+            print("warning: " + w, file=sys.stderr)
+        stale = _myco.load_conf(root).get("STALE_DAYS", "365")
+        map_wiki.build(types.SimpleNamespace(
+            root=root, lay=lay, out=out, title=title, info=info, byid=byid, sections=group_items(groups, info), linkable=linkable, name_re=name_re,
+            link_index=link_index, md_lib=md_lib, project=project, log_rows=log_rows, sh=sh, built=built, today=today,
+            stale_days=float(stale) if re.fullmatch(r"\d+(\.\d+)?", stale or "") else 365.0))
+        gn, ge, gc = notes_graph.build(root, lay, info, groups, out, title, sh, today, built)
+        print(f"notes map (wiki layout): {len(info)} notes, {sum(len(d['out']) for d in info.values())} relations -> {out}/index.html; graph: {gn} nodes, {ge} links, {gc} commits -> {out}/graph.html")
+        return
     for rel, d in info.items():
         if md_lib:
             m = md_lib.Markdown(extensions=["tables", "fenced_code", "toc", "sane_lists"])
@@ -273,25 +317,16 @@ def main():
 
     recent = log_rows(["-n", "15", "--format=%h\t%as\t%s"])
     sections = []
-    for gid, gname, blurb, prefixes in groups:
-        items = [d for d in info.values() if d["group"] == gid]
-        if prefixes and gid != "other":
-            order = {p: i for i, p in enumerate(prefixes)}
-            items.sort(key=lambda d: (order.get(d["rel"], 99), d["rel"]))
-        else:
-            items.sort(key=lambda d: d["rel"])
-        if not items:
-            continue
+    for gid, gname, blurb, items in group_items(groups, info):
         rows = "".join(f'<a class="note" href="p/{d["id"]}.html" data-s="{html.escape((d["rel"]+" "+d["title"]+" "+d["hint"]).lower())}"><b>{html.escape(d["name"])}</b> &middot; {html.escape(d["title"])}<small>{html.escape(d["rel"])} &mdash; {html.escape(d["hint"])}</small></a>' for d in items)
         sections.append(f'<section class="grp"><h2>{html.escape(gname)} ({len(items)})</h2><p>{html.escape(blurb)}</p>{rows}</section>')
     rec = ("<div class='recent'><h2>Recent changes</h2><ul>%s</ul></div>" % "".join(f"<li><code>{h}</code> {dt} &middot; {html.escape(s)}</li>" for h, dt, s in recent)) if recent else ""
-    built = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     index = (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(title)}</title><style>{CSS}</style>{HEAD}</head><body><div class="wrap">'
              f'<div class="top"><h1>{html.escape(title)}</h1>{PICK}</div><p class="sub">{len(info)} notes. Built {built}. Search filters the list; open a note to see what it mentions, what mentions it and how it changed. <a href="graph.html">Open the mycelium view</a> (graph and timeline).</p>'
              f'<p><input id="q" type="search" placeholder="Search names, titles, hints..." aria-label="Search notes"></p>{"".join(sections)}{rec}</div>'
              "<script>const q=document.getElementById('q');q.addEventListener('input',()=>{const t=q.value.toLowerCase();document.querySelectorAll('.note').forEach(n=>{n.style.display=n.dataset.s.includes(t)?'':'none'});document.querySelectorAll('.grp').forEach(g=>{g.style.display=[...g.querySelectorAll('.note')].some(n=>n.style.display!=='none')?'':'none'})})</script></body></html>")
     open(os.path.join(out, "index.html"), "w", encoding="utf-8").write(index)
-    gn, ge, gc = notes_graph.build(root, lay, info, groups, out, title, sh, datetime.date.today().isoformat(), built)
+    gn, ge, gc = notes_graph.build(root, lay, info, groups, out, title, sh, today, built)
     print(f"notes map: {len(info)} notes, {sum(len(d['out']) for d in info.values())} relations -> {out}/index.html; graph: {gn} nodes, {ge} links, {gc} commits -> {out}/graph.html")
 
 

@@ -82,7 +82,7 @@ Its owner's verdict: a versioned project memory with traceable evidence, clear p
 
 ## The mycelium view
 
-`build-notes-map.py` writes a searchable map of the notes and `graph.html`, the notes as a living network: one self-contained page, no server, no network.
+`build-notes-map.py` writes a searchable map of the notes and `graph.html`, the notes as a living network: one self-contained page, no server, no network. `--layout wiki` lays the map out like a wiki site (group tree, breadcrumbs, outline, "what links here", recent changes, search across the text, a theme of your own; [how](skills/myco-notes/docs/REFERENCE.md#7-the-wiki-layout-of-the-map)).
 
 ![The same demo notes in six themes: Mycelium, Matrix, Amber terminal, Deep sea, Fruit and Paper](.github/assets/graph-themes.webp)
 

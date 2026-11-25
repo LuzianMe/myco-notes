@@ -25,11 +25,12 @@ DUE = re.compile(r"\b(after|about|due|review-by|waiting until|on or after)\s+(\d
 ILLUSTRATIVE = " *<>{}$|()[]"
 
 
-def due_count(text, today):
-    """Follow-up dates that have passed on lines not marked DONE (the same heuristic as notes-lint), plus a passed review_after or valid_until in the header."""
+def due_count(text, today, header=True):
+    """Follow-up dates that have passed on lines not marked DONE (the same heuristic as notes-lint), plus (unless header is False) a passed review_after or valid_until in the header."""
     n, in_code = 0, False
     fm, _ = _myco.frontmatter(text)
-    n += sum(1 for k in ("review_after", "valid_until") if re.fullmatch(r"\d{4}-\d{2}-\d{2}", fm.get(k, ("",))[0]) and fm[k][0] < today)
+    if header:
+        n += sum(1 for k in ("review_after", "valid_until") if re.fullmatch(r"\d{4}-\d{2}-\d{2}", fm.get(k, ("",))[0]) and fm[k][0] < today)
     for line in text.split("\n"):
         if line.strip().startswith("```"):
             in_code = not in_code
@@ -85,10 +86,25 @@ def commit_history(root, rels, sh):
                 touched.append(final)
                 if st == "A":
                     added.append(final)
-        commits.append({"t": int(head[1]) if head[1].isdigit() else 0, "s": head[2][:110],
+        commits.append({"h": head[0], "t": int(head[1]) if head[1].isdigit() else 0, "s": head[2][:110],
                         "n": sorted({p for p in touched if p in rels}), "a": sorted({p for p in added if p in rels})})
     commits.reverse()
     return commits
+
+
+def prefixes(lay):
+    """(paths whose references are not checked, history folders): the same notes the lint leaves out of these checks."""
+    hist = tuple(lay["notes"] + "/" + h + "/" for h in lay["history"])
+    return (lay["docs"] + "/", "template/", lay["map"] + "/") + hist, hist
+
+
+def attention(root, lay, rel, text, names, today):
+    """What needs a look in one note, as the mycelium view marks it: (follow-up dates passed in the text, missing references).
+    A note in a history folder (archive, logs, inbox...) is a record and has neither."""
+    skip, hist = prefixes(lay)
+    if rel.startswith(hist):
+        return 0, []
+    return due_count(text, today, header=False), missing_refs(root, rel, text, names, skip)
 
 
 def build(root, lay, info, groups, out, title, sh, today, built, public=None):
@@ -104,8 +120,7 @@ def build(root, lay, info, groups, out, title, sh, today, built, public=None):
             last[p] = ci
     uncommitted = max(len(commits) - 1, 0)
     names = {d["name"] for d in info.values()}
-    skip_prefixes = (lay["docs"] + "/", "template/", lay["map"] + "/") + tuple(lay["notes"] + "/" + h + "/" for h in lay["history"])
-    hist_prefixes = tuple(lay["notes"] + "/" + h + "/" for h in lay["history"])
+    skip_prefixes, hist_prefixes = prefixes(lay)
     gids = [g[0] for g in groups]
     hubs = hub_set(info, hist_prefixes)
     nodes = []

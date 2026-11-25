@@ -11,6 +11,8 @@ It builds the demo notes, their full map and a public graph with a small labels 
     {type:"myco-ready"} sent, the device pixel ratio capped at 1.5, the tilt locked;
   - ?interactive=0 takes no pointer input; the host's messages switch the theme and pause and resume the drawing, and the same
     messages from anyone but the parent are ignored.
+  - the wiki layout (build-notes-map.py --layout wiki): the tree and its filter, the search with the keyboard, the outline's current
+    heading, the kept theme, and on a phone the menu, no sideways scrolling and no console error.
 Exit 0 = all passed (or Playwright missing), 1 = a check failed.
 """
 import argparse
@@ -52,6 +54,97 @@ BLOBS = ("(function(){var c=document.getElementById('c'),d=c.getContext('2d').ge
          "return Object.keys(g).map(function(k){var b=g[k];return [b.x/b.n/c.width*innerWidth,b.y/b.n/c.height*innerHeight,b.n]}).sort(function(a,b){return b[2]-a[2]})})()")
 PAINTED = ("(function(){var c=document.getElementById('c'),d=c.getContext('2d').getImageData(0,0,c.width,c.height).data,k=0;"
            "for(var i=3;i<d.length;i+=4)if(d[i])k++;return k})()")
+
+
+def wiki_checks(b, base, site, demo):
+    """The wiki layout (build-notes-map.py --layout wiki) in a real browser: the tree, the search, the menu on a phone, the outline, the theme."""
+    subprocess.run([sys.executable, os.path.join(demo, "myco-notes", "tools", "build-notes-map.py"), "--root", demo, "--layout", "wiki",
+                    "--out", os.path.join(site, "wiki")], check=True, capture_output=True)
+    page = base + "wiki/p/myco-notes-state.html"
+
+    def open_page(ctx, url):
+        errs = []
+        pg = ctx.new_page()
+        pg.on("pageerror", lambda e: errs.append("pageerror: " + str(e)[:160]))
+        pg.on("console", lambda m: errs.append("console: " + m.text[:160]) if m.type == "error" else None)
+        pg.goto(url)
+        pg.wait_for_timeout(500)
+        return pg, errs
+
+    print("wiki layout, desktop")
+    ctx = b.new_context(viewport={"width": 1280, "height": 800})
+    pg, errs = open_page(ctx, page)
+    check("wiki: no console error; the tree is built, the current note is marked and its group is open",
+          not errs and pg.locator("#tree a[aria-current=page]").count() == 1 and pg.locator("#tree details[open] a[aria-current=page]").count() == 1, str(errs))
+    check("wiki: the outline is shown on a wide screen, the inline one is not", pg.locator("#outline").is_visible() and not pg.locator(".otoc-inline").is_visible())
+    check("wiki: the tree filter narrows the list and opens the groups that match", (pg.fill("#filter", "backup"), pg.wait_for_timeout(100),
+          0 < pg.locator("#tree li").count() < 20 and pg.locator("#tree details[open]").count() >= 1)[2])
+    pg.fill("#filter", "zzzzqqq")
+    check("wiki: a filter with no match says so", "No note matches" in pg.locator("#tree").inner_text())
+    pg.fill("#filter", "")
+    pg.keyboard.press("Escape")
+    pg.locator("body").click(position={"x": 700, "y": 400})
+    pg.keyboard.press("/")
+    check("wiki: the / key focuses the search", pg.evaluate("document.activeElement.id") == "gsearch")
+    pg.keyboard.type("backup")
+    pg.wait_for_timeout(700)
+    check("wiki: searching the text lists notes with a marked snippet", pg.locator("#results li[role=option]").count() >= 3 and pg.locator("#results mark").count() >= 1
+          and pg.locator("#gsearch").get_attribute("aria-expanded") == "true")
+    pg.keyboard.press("ArrowDown")
+    pg.keyboard.press("ArrowDown")
+    check("wiki: the arrow keys move through the results", pg.locator("#results li[aria-selected=true]").count() == 1 and bool(pg.locator("#gsearch").get_attribute("aria-activedescendant")))
+    first = pg.locator("#results li[aria-selected=true] a").evaluate("a => a.href")
+    pg.keyboard.press("Enter")
+    pg.wait_for_timeout(800)
+    check("wiki: Enter opens the selected note", pg.url == first, f"{pg.url} {first}")
+    pg.goto(page)
+    pg.keyboard.press("/")
+    pg.keyboard.type("backup")
+    pg.wait_for_timeout(600)
+    pg.keyboard.press("Escape")
+    check("wiki: Escape closes the results", pg.locator("#results").is_hidden())
+    pg.goto(page)
+    pg.evaluate("window.scrollTo(0, 1400)")
+    pg.wait_for_timeout(300)
+    check("wiki: the outline marks the heading being read", pg.locator("#outline .toc a.active").count() == 1)
+    pg.select_option("#theme-pick", "dark")
+    pg.reload()
+    pg.wait_for_timeout(300)
+    check("wiki: the theme choice is kept after a reload", pg.evaluate("document.documentElement.getAttribute('data-theme')") == "dark"
+          and pg.evaluate("getComputedStyle(document.body).backgroundColor") == "rgb(18, 23, 27)")
+    pg.close()
+    pg, errs = open_page(ctx, base + "wiki/index.html")
+    check("wiki: the home page keeps its list filter, and no error", not errs and (pg.fill("#q", "gateway"), pg.wait_for_timeout(100),
+          0 < pg.locator(".note:visible").count() < 10)[2], str(errs))
+    pg.close()
+    pg, errs = open_page(ctx, base + "wiki/recent.html")
+    check("wiki: the recently changed page opens without error", not errs and pg.locator(".log li").count() > 3, str(errs))
+    pg.close()
+    ctx.close()
+
+    print("wiki layout, phone")
+    ctx = b.new_context(viewport={"width": 390, "height": 800}, has_touch=True, is_mobile=True)
+    for name in ("p/myco-notes-state.html", "p/myco-notes-runbook.html", "index.html"):
+        pg, errs = open_page(ctx, base + "wiki/" + name)
+        wide = pg.evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth")
+        check(f"wiki phone {name}: no sideways scrolling and no error", wide <= 0 and not errs, f"{wide} {errs}")
+        if name.startswith("p/myco-notes-state"):
+            check("wiki phone: the tree is hidden until the menu is opened, the outline column is not shown, the inline one is",
+                  not pg.locator("#sidebar").is_visible() and not pg.locator("#outline").is_visible() and pg.locator(".otoc-inline").is_visible())
+            pg.tap("#menu")
+            pg.wait_for_timeout(400)
+            check("wiki phone: the menu shows the tree and moves focus to its filter", pg.locator("#sidebar").is_visible() and pg.evaluate("document.activeElement.id") == "filter"
+                  and pg.locator("#menu").get_attribute("aria-expanded") == "true")
+            pg.keyboard.press("Escape")
+            pg.wait_for_timeout(400)
+            check("wiki phone: Escape closes it and gives the focus back to the button", not pg.locator("#sidebar").is_visible() and pg.evaluate("document.activeElement.id") == "menu")
+            pg.tap("#menu")
+            pg.wait_for_timeout(300)
+            pg.tap("#tree a:not([aria-current])")
+            pg.wait_for_timeout(900)
+            check("wiki phone: a note chosen in the menu opens", "/p/" in pg.url and "myco-notes-state" not in pg.url, pg.url)
+        pg.close()
+    ctx.close()
 
 
 def main():
@@ -240,6 +333,7 @@ def main():
             st = fr.evaluate("(function(){var c=getComputedStyle(document.getElementById('c'));return [c.pointerEvents,c.touchAction]})()")
             check("interactive=0: no error, and the canvas takes no pointer or touch", not errs and st[0] == "none" and st[1] == "auto", f"{st} {errs}")
             pg.close()
+            wiki_checks(b, base, site, demo)
             b.close()
         srv.shutdown()
     finally:
