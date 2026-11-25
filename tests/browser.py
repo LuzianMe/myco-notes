@@ -52,8 +52,8 @@ BLOBS = ("(function(){var c=document.getElementById('c'),d=c.getContext('2d').ge
          "for(var y=0;y<c.height;y++)for(var x=0;x<c.width;x++)if(d[(y*c.width+x)*4+3]>=250){var k=Math.floor(x/(6*r))+','+Math.floor(y/(6*r));"
          "var b=g[k]||(g[k]={n:0,x:0,y:0});b.n++;b.x+=x;b.y+=y}"
          "return Object.keys(g).map(function(k){var b=g[k];return [b.x/b.n/c.width*innerWidth,b.y/b.n/c.height*innerHeight,b.n]}).sort(function(a,b){return b[2]-a[2]})})()")
-PAINTED = ("(function(){var c=document.getElementById('c'),d=c.getContext('2d').getImageData(0,0,c.width,c.height).data,k=0;"
-           "for(var i=3;i<d.length;i+=4)k+=d[i];return k})()")   # the sum of the alpha values: dimming fades what is drawn, it does not remove it, and the sum moves little while the view turns
+PAINTED = ("(function(){var k=0;['c','t'].forEach(function(id){var c=document.getElementById(id);if(!c||!c.width||!c.height)return;"   # the notes' canvas and the threads' layer under it
+           "var d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;for(var i=3;i<d.length;i+=4)k+=d[i]});return k})()")   # the sum of the alpha values: dimming fades what is drawn, it does not remove it, and the sum moves little while the view turns
 
 
 def wiki_checks(b, base, site, demo):
