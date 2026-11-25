@@ -86,14 +86,17 @@ def _block(sel, t, values, font):
     return sel + "{color-scheme:" + ("dark" if t["dark"] else "light") + ";" + "".join(f"--{k}:{v};" for k, v in values.items()) + f"--font:{font}}}"
 
 
-def _css(kind):
+def _css(kind, themes=None, extra=None):
+    """themes: the table to use (default THEMES); extra: a function adding more variables to each theme's page colours (the wiki layout's)."""
     page = kind == "page"
-    vals = (lambda t: {k: v for k, v in t["page"].items() if k != "bg2"}) if page else graph_vars
+    themes = themes or THEMES
+    by = {t["id"]: t for t in themes}
+    vals = (lambda t: {**{k: v for k, v in t["page"].items() if k != "bg2"}, **(extra(t) if extra else {})}) if page else graph_vars
     font = (lambda t: t["font"]) if page else (lambda t: t.get("graph_font", t["font"]))
-    base, other = (BY_ID["light"], BY_ID["dark"]) if page else (BY_ID["dark"], BY_ID["light"])   # pages start light, the view dark
+    base, other = (by["light"], by["dark"]) if page else (by["dark"], by["light"])   # pages start light, the view dark
     out = [_block(":root", base, vals(base), font(base)),
            "@media (prefers-color-scheme:" + ("dark" if page else "light") + "){" + _block(":root:not([data-theme])", other, vals(other), font(other)) + "}"]
-    out += [_block(f':root[data-theme="{t["id"]}"]', t, vals(t), font(t)) for t in THEMES]
+    out += [_block(f':root[data-theme="{t["id"]}"]', t, vals(t), font(t)) for t in themes]
     out.append("@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}")
     return "\n".join(out)
 
@@ -101,6 +104,124 @@ def _css(kind):
 def page_css():
     """CSS variables of every theme for the note pages and the index (Auto: light, or dark when the system asks for it)."""
     return _css("page")
+
+
+# ---- colour maths (WCAG 2), used by the wiki layout's derived colours, its warning about a project's own colours and tests/contrast.py ----
+def rgba(c):
+    c = c.strip()
+    if c.startswith("#"):
+        v = int(c[1:], 16)
+        return (v >> 16 & 255, v >> 8 & 255, v & 255, 1.0)
+    parts = c[c.index("(") + 1:c.index(")")].split(",")
+    return (int(parts[0]), int(parts[1]), int(parts[2]), float(parts[3]) if len(parts) > 3 else 1.0)
+
+
+def over(top, under):
+    """`top` (may be translucent) painted over the opaque colour `under`, as #rrggbb."""
+    r, g, b, a = rgba(top)
+    R, G, B, _ = rgba(under)
+    return "#%02x%02x%02x" % tuple(round(x * a + y * (1 - a)) for x, y in ((r, R), (g, G), (b, B)))
+
+
+def lum(c):
+    def ch(v):
+        v /= 255
+        return v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4
+    r, g, b, _ = rgba(c)
+    return 0.2126 * ch(r) + 0.7152 * ch(g) + 0.0722 * ch(b)
+
+
+def ratio(a, b):
+    la, lb = sorted((lum(a), lum(b)), reverse=True)
+    return (la + 0.05) / (lb + 0.05)
+
+
+# ---- the wiki layout (build-notes-map.py --layout wiki) ----
+WIKI_COLOURS = ("bg", "panel", "fg", "muted", "line", "accent", "code")
+FONT_OK = r"[A-Za-z0-9 ,.'\"_-]{1,200}"
+RADIUS_OK = r"\d{1,2}(\.\d+)?(px|rem|em)"
+THEME_KEYS = {"light", "dark", "font", "mono", "radius"}
+
+
+def wiki_extra(t):
+    """The wiki layout's own variables, worked out per theme so that their contrast can be tested: soft = a tint of the accent (the current note,
+    badges), hover = a tint of the text colour, warn = the colour of a warning's border and mark (the view's 'past its date' colour)."""
+    p = t["page"]
+    return dict(soft=over(_rgba(p["accent"], .13), p["panel"]), hover=over(_rgba(p["fg"], .07), p["panel"]), warn=t["wilt"])
+
+
+def project_theme(raw):
+    """The `theme` setting of .myco-notes-map.json, checked: {"light": {colour: "#rrggbb"}, "dark": {...}, "font": "...", "mono": "...", "radius": "6px"}.
+    The colours change the Light and Dark themes (so Auto too); the picker's other themes stay the kit's own. Returns the cleaned dict or raises ValueError."""
+    import re
+    if raw in (None, {}):
+        return {}
+    if not isinstance(raw, dict):
+        raise ValueError('"theme" must be an object such as {"light": {"accent": "#7a3e00"}, "radius": "4px"}')
+    bad = sorted(set(raw) - THEME_KEYS)
+    if bad:
+        raise ValueError(f'unknown key {bad[0]!r} in "theme" (allowed: {", ".join(sorted(THEME_KEYS))})')
+    out = {}
+    for side in ("light", "dark"):
+        vals = raw.get(side) or {}
+        if not isinstance(vals, dict):
+            raise ValueError(f'"theme.{side}" must be an object of colours')
+        out[side] = {}
+        for k, v in vals.items():
+            if k not in WIKI_COLOURS:
+                raise ValueError(f'"theme.{side}.{k}" is not a colour name (allowed: {", ".join(WIKI_COLOURS)})')
+            m = re.fullmatch(r"#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})", str(v).strip())
+            if not m:
+                raise ValueError(f'"theme.{side}.{k}" must be a colour like #1a2b3c (got {v!r})')
+            h = m.group(1)
+            out[side][k] = "#" + (h if len(h) == 6 else "".join(c * 2 for c in h)).lower()
+    for k in ("font", "mono"):
+        if k in raw and not re.fullmatch(FONT_OK, str(raw[k])):
+            raise ValueError(f'"theme.{k}" must be a font list such as "Georgia, serif" (letters, digits, spaces, commas, quotes; got {raw[k]!r})')
+        if k in raw:
+            out[k] = str(raw[k]).strip()
+    if "radius" in raw:
+        if not re.fullmatch(RADIUS_OK, str(raw["radius"])):
+            raise ValueError(f'"theme.radius" must be a length such as 6px or 0.4rem (got {raw["radius"]!r})')
+        out["radius"] = str(raw["radius"])
+    return out
+
+
+def project_themes(project):
+    """THEMES with the project's colours and font laid over Light and Dark."""
+    out = []
+    for t in THEMES:
+        if t["id"] in ("light", "dark") and project:
+            t = dict(t, page={**t["page"], **project.get(t["id"], {})}, font=project.get("font", t["font"]))
+        out.append(t)
+    return out
+
+
+def contrast_warnings(project):
+    """Messages for the project's colours that fall under the WCAG minimum for text (4.5:1) in Light or Dark; empty when fine."""
+    msgs = []
+    for t in project_themes(project):
+        if t["id"] not in ("light", "dark") or not project.get(t["id"]):
+            continue
+        p, x = t["page"], wiki_extra(t)
+        for fg, bgs in (("fg", ("bg", "panel", "code")), ("muted", ("bg", "panel")), ("accent", ("bg", "panel"))):
+            for bg in bgs:
+                if ratio(p[fg], p[bg]) < 4.5:
+                    msgs.append(f"theme {t['id']}: {fg} {p[fg]} on {bg} {p[bg]} is {ratio(p[fg], p[bg]):.1f}:1 (text needs 4.5:1)")
+        if ratio(p["accent"], x["soft"]) < 4.5:
+            msgs.append(f"theme {t['id']}: accent {p['accent']} on its tint {x['soft']} is {ratio(p['accent'], x['soft']):.1f}:1 (text needs 4.5:1)")
+    return msgs
+
+
+def wiki_css(project=None):
+    """Variables of every theme for the wiki layout: the page colours (the project's own laid over Light and Dark) plus soft, hover and warn."""
+    return _css("page", project_themes(project), wiki_extra)
+
+
+def project_vars(project):
+    """The project's code font and corner radius as one :root rule (to come after the layout's own defaults), or an empty string."""
+    root = "".join(f"--{k}:{project[k]};" for k in ("mono", "radius") if project and project.get(k))
+    return ":root{" + root + "}" if root else ""
 
 
 def graph_css():

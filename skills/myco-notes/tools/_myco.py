@@ -284,6 +284,7 @@ def human_size(nbytes):
 
 
 WIKI_LINK = re.compile(r"!?\[\[([^\]\n|#]*)(?:#[^\]\n|]*)?(?:\|[^\]\n]*)?\]\]")
+WIKI_PARTS = re.compile(r"(!?)\[\[([^\]\n|#]*)(?:#([^\]\n|]*))?(?:\|([^\]\n]*))?\]\]")   # the same links with their parts: (embed mark, target, heading, text); the map's wiki layout turns them into links
 MD_LINK = re.compile(r"!?\[[^\]\n]*\]\(\s*<?([^)\s>]+)>?(?:\s+\"[^\"]*\")?\s*\)")
 
 

@@ -18,7 +18,7 @@ They live in each notes repository's `myco-notes/tools/`. Each has a launcher wi
 | `ingest` | Keep an outside document as a source; `--list` shows the sources and who cites them. |
 | `notes-lint.py` | References, headings, dates, freshness header, summaries, sync-log format, ledger, sizes, secrets. |
 | `asof DATE [NOTE]` | What the notes said on a date; `--since`, `--grep`, `--history NOTE`. |
-| `build-notes-map.py` | The searchable map with backlinks and history, and `graph.html` (the mycelium view); `--public` writes a public graph for a website (section 6). |
+| `build-notes-map.py` | The searchable map with backlinks and history, and `graph.html` (the mycelium view); `--public` writes a public graph for a website (section 6); `--layout wiki` lays the map out like a wiki site (section 7). |
 | `mirror-push`, `restore-drill` | A second copy, and proof that it can be restored. |
 | `doctor` | Read-only health check: kit version, hook, layout, settings. |
 | `bootstrap` | A new notes repository (`--data-dir`, `--new-folders`), or take over a folder (`--import`, `--adopt`). Run from the kit. |
@@ -56,7 +56,7 @@ Set `NEW_FOLDERS` in `.myco-notes.conf` to apply one answer every time.
 
 ## 5. Configuration
 
-`.myco-notes.conf` (shell syntax): the layout (`MYCO_DIR`, `NOTES_DIR`, `TOOLS_DIR`, `DOCS_DIR`, `MAP_DIR`, `DATA_DIRS`, `HISTORY_DIRS`, `STATE_FILE` for a master record not called `state.md`), the lint limits (`MAX_NOTE_KB`, `ENTRY_WARN_KB`, `STALE_DAYS` for the freshness header, `RESUME_BUDGET` for `resume`, `REVIEW_FULL_DAYS` for how often a review reads every note), `AGENT_TRAILER` (co-author line for commits made by an agent), `SYNC_GLOBS`/`SYNC_CMD` (keep the live copy of executed files equal to the committed copy), `TIMEZONE` (IANA name for the times `capture` writes), `SOLO` (1 = one owner: an agent merges its own pull request after the check passes, method 19.2), `NEW_FOLDERS` (`ask` default, `add`, `ignorelint`, `ignoreall`: what `notes-commit` does with a new root folder or loose file; `notes-commit --folder NAME=MODE` answers for one item, `NAME=*` for all, `later` leaves it out of this commit), `CHECK_SH`/`CHECK_PY`, `MIRROR_TARGET`, `POST_PUSH_CMDS`, `SECRET_ALLOW_FILE`. Optional `.myco-notes-map.json` (groups, hints, title) and `.myco-notes-lint-ignore` (regexes of findings to drop).
+`.myco-notes.conf` (shell syntax): the layout (`MYCO_DIR`, `NOTES_DIR`, `TOOLS_DIR`, `DOCS_DIR`, `MAP_DIR`, `DATA_DIRS`, `HISTORY_DIRS`, `STATE_FILE` for a master record not called `state.md`), the lint limits (`MAX_NOTE_KB`, `ENTRY_WARN_KB`, `STALE_DAYS` for the freshness header, `RESUME_BUDGET` for `resume`, `REVIEW_FULL_DAYS` for how often a review reads every note), `AGENT_TRAILER` (co-author line for commits made by an agent), `SYNC_GLOBS`/`SYNC_CMD` (keep the live copy of executed files equal to the committed copy), `TIMEZONE` (IANA name for the times `capture` writes), `SOLO` (1 = one owner: an agent merges its own pull request after the check passes, method 19.2), `NEW_FOLDERS` (`ask` default, `add`, `ignorelint`, `ignoreall`: what `notes-commit` does with a new root folder or loose file; `notes-commit --folder NAME=MODE` answers for one item, `NAME=*` for all, `later` leaves it out of this commit), `CHECK_SH`/`CHECK_PY`, `MIRROR_TARGET`, `POST_PUSH_CMDS`, `SECRET_ALLOW_FILE`. Optional `.myco-notes-map.json` (groups, hints, title, and for the wiki layout `layout` and `theme`, section 7) and `.myco-notes-lint-ignore` (regexes of findings to drop).
 
 ## 6. The mycelium view on a website
 
@@ -120,3 +120,28 @@ Drawing pauses while the page is hidden (`visibilitychange`) and while the host 
 ```
 
 If the host page sets its own `color-scheme` (for example `dark`), give the iframe `style="color-scheme: normal"`: browsers paint an opaque background behind an iframe whose colour scheme differs from its page's.
+
+## 7. The wiki layout of the map
+
+`build-notes-map.py` makes the classic map by default. `--layout wiki` (or `"layout": "wiki"` in `.myco-notes-map.json`; the option wins over the file) lays out the same notes, relations, groups, freshness and history like a wiki site. `graph.html`, `raw/`, the page names (`index.html`, `p/<name>.html`) and the rules about the output folder, the secret check, `DATA_DIRS` and `--public` are the same; the layout only changes how the pages look and adds `recent.html` and an `assets/` folder (open `index.html` from the folder; nothing is fetched from the network).
+
+- **Every note page:** a left tree of the groups (the current note marked, a filter box; on a phone it opens as a menu), breadcrumbs, a header with the one-line summary, the freshness status (`Review due since...`, `Confirmed...`, `Superseded`, `Expired`) and the header's dates, the last edit from git, the raw file, the follow-up dates that have passed and the missing references; the article with a sticky "On this page" outline on the right (on a narrow screen a collapsed one above the article); then "What links here" and "Mentions" (each linked note with its title, summary and how often it is mentioned), the note's history, and previous and next within its group. A note that needs a look (a passed follow-up date, a missing reference, a review or a validity date that has passed) has a mark in the tree and on the front page.
+- **Links:** wiki links (`[[Note]]`, `[[Note|text]]`, `[[Note#Heading]]`), relative Markdown links and file names written in the text or alone in a code span become links; one that points to something that is not a note is shown as plain text with a dotted line. Without the `markdown` package a page is shown as preformatted text with the same links (and no outline).
+- **Search:** the box in the top bar searches the text of every note (key `/`, arrows and Enter, Escape). The text is in `assets/search.js`, loaded only when someone searches. The text of every note is in `raw/` already, so this shows nothing the folder did not hold; the secret check ran first.
+- **Recently changed:** `recent.html` lists the latest commits that touched a note by day, with the notes they changed.
+- **Theme:** the reader's picker (Auto, Light, Dark and the others) works as before. A project can set its own look in `.myco-notes-map.json` without touching the kit:
+
+```json
+{
+  "layout": "wiki",
+  "theme": {
+    "light": {"accent": "#7a3e00", "bg": "#fbf7f0"},
+    "dark":  {"accent": "#ffb454"},
+    "font": "Georgia, serif",
+    "mono": "ui-monospace, Menlo, monospace",
+    "radius": "4px"
+  }
+}
+```
+
+`light` and `dark` change the colours of the Light and Dark themes (so Auto too; the other themes of the picker stay the kit's own): `bg`, `panel`, `fg`, `muted`, `line`, `accent`, `code`, each as `#rgb` or `#rrggbb`. `font`, `mono` (code) and `radius` are optional; everything else in the layout is a CSS variable (`assets/wiki.css`) derived from these. The build refuses a value that is not what it says, and warns (it still builds) when a colour pair of Light or Dark is under the 4.5:1 contrast for text.

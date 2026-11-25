@@ -26,6 +26,9 @@ jobs:
       - name: Behaviour self-test (each scenario's reference actions pass, a typical mistake is caught)
         if: runner.os == 'Linux'
         run: python tests/behaviour/run.py
+      - name: Wiki layout of the map (links, theme, search data, fallback without the markdown package)
+        if: runner.os == 'Linux'
+        run: pip install markdown && python tests/wiki.py
       - name: Release check (the four version fields agree, CHANGELOG.md has their section)
         run: python scripts/release.py --check
       - name: Smoke test (bash)
@@ -57,6 +60,8 @@ jobs:
           git config --global user.email "ci@example.invalid"
       - name: Native test on Python 3.8
         run: python tests/native.py
+      - name: Wiki layout test on Python 3.8
+        run: pip install markdown && python tests/wiki.py
       - name: Smoke test on Python 3.8
         run: |
           mkdir -p "$RUNNER_TEMP/py38" && ln -sf "$(command -v python)" "$RUNNER_TEMP/py38/python3"
@@ -73,7 +78,7 @@ jobs:
         run: |
           git config --global user.name "CI"
           git config --global user.email "ci@example.invalid"
-      - run: pip install playwright==1.65.2 && python -m playwright install --with-deps chromium
+      - run: pip install playwright==1.65.2 markdown && python -m playwright install --with-deps chromium
       - run: python tests/browser.py
   pyflakes:
     # Unused imports, undefined names and similar mistakes in the tools, the tests and the demo builder.

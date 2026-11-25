@@ -132,6 +132,12 @@ def main():
         check("lint runs", rc in (0, 1) and "notes-lint:" in out, out)
         rc, out = run([sys.executable, os.path.join(proj, MY, "tools", "build-notes-map.py")], proj)
         check("map builds inside the one folder", rc == 0 and os.path.exists(os.path.join(proj, MY, "map", "index.html")), out)
+        check("the classic map is the default: no wiki files", not os.path.exists(os.path.join(proj, MY, "map", "assets")) and not os.path.exists(os.path.join(proj, MY, "map", "recent.html")))
+        rc, out = run([sys.executable, os.path.join(proj, MY, "tools", "build-notes-map.py"), "--layout", "wiki"], proj)
+        check("the project's own copy of the tools builds the wiki layout, with the mycelium view",
+              rc == 0 and all(os.path.isfile(os.path.join(proj, MY, "map", *f.split("/"))) for f in ("index.html", "recent.html", "graph.html", "assets/wiki.css", "assets/wiki.js", "assets/nav.js", "assets/search.js")), out)
+        rc, out = run([sys.executable, os.path.join(proj, MY, "tools", "build-notes-map.py")], proj)
+        check("and the next build without the option is classic again", rc == 0 and not os.path.exists(os.path.join(proj, MY, "map", "assets")), out)
         sys.path.insert(0, os.path.join(proj, MY, "tools"))
         import _myco as _m
         check("STATE_FILE defaults to state.md", _m.layout(proj)["state"] == "state.md")
