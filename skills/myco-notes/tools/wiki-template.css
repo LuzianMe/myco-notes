@@ -93,6 +93,32 @@ pre.plain{white-space:pre-wrap;font:13.5px/1.5 var(--mono);margin:16px 0}
 .doc th,.doc td{border:1px solid var(--line);padding:6px 10px;text-align:left;vertical-align:top}
 .doc th{background:var(--code)}
 .doc a.mention code,.doc code a{text-decoration:underline}
+/* long headings: the start is the heading, the parenthesis a quieter line below it */
+.hsub{display:block;margin-top:3px;font-size:13.5px;font-weight:400;line-height:1.4;color:var(--muted);letter-spacing:0}
+/* long notes (wiki.js adds the buttons and the folds; without the script everything shows in full) */
+.js .clip:not(.open)>.clipbox{max-height:7.4em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 62%,transparent);mask-image:linear-gradient(#000 62%,transparent)}
+.js td.clip:not(.open)>.clipbox{max-height:6.2em}
+.clipbox{display:block}
+.more{display:block;margin:2px 0 0;padding:1px 0;border:0;background:none;color:var(--accent);font:inherit;font-size:12.5px;cursor:pointer;text-decoration:underline}
+.doc td .more{margin-top:4px}
+.fold{margin:.4em 0 1.2em;border:1px solid var(--line);border-radius:var(--radius);padding:0 14px;background:var(--bg)}
+.fold>summary{cursor:pointer;padding:9px 0;font-weight:600;color:var(--accent)}
+.fold[open]>summary{border-bottom:1px solid var(--line);margin-bottom:6px}
+.foldall{margin:10px 0 0;font-size:13px;color:var(--muted)}
+.foldall button{border:0;background:none;color:var(--accent);font:inherit;cursor:pointer;text-decoration:underline;padding:0 6px 0 0}
+.doc td:first-child,.doc th:first-child{position:sticky;left:0;z-index:1}
+.doc td:first-child{background:var(--panel)}
+/* a table with three or more columns becomes one card per row on a phone: each cell has its column's name above it */
+@media(max-width:600px){
+  .doc table.stack,.doc table.stack tbody{display:block;min-width:0}.doc table.stack thead{display:none}
+  .doc table.stack tr{display:block;margin:0 0 12px;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel)}
+  .doc table.stack td{display:block;border:0;border-bottom:1px solid var(--line);position:static;background:none;padding:6px 10px}
+  .doc table.stack td:last-child{border-bottom:0}
+  .doc table.stack td::before{content:attr(data-label);display:block;font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-bottom:1px}
+  .doc table.stack td:first-child{font-weight:600;background:var(--code)}
+  .doc table.stack td:empty{display:none}
+}
+@media print{.js .clip:not(.open)>.clipbox{max-height:none;-webkit-mask-image:none;mask-image:none}.more,.foldall{display:none}}
 .nolink{border-bottom:1px dashed var(--muted);cursor:help}
 .wikilink{text-decoration-style:solid}
 
@@ -127,7 +153,7 @@ pre.plain{white-space:pre-wrap;font:13.5px/1.5 var(--mono);margin:16px 0}
 #outline h2{font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
 .toc ul{list-style:none;margin:0;padding:0}
 .toc ul ul{padding-left:12px}
-.toc a{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;padding:3px 0 3px 10px;border-left:2px solid var(--line);color:var(--muted);text-decoration:none;line-height:1.35}
+.toc a{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;padding:3px 0 3px 10px;border-left:2px solid var(--line);color:var(--muted);text-decoration:none;line-height:1.35}
 .toc a:hover{color:var(--accent)}
 .toc a.active{color:var(--fg);border-left-color:var(--accent);font-weight:600}
 .more-links{list-style:none;margin:16px 0 0;padding:12px 0 0;border-top:1px solid var(--line)}

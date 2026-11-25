@@ -149,6 +149,37 @@ class Linker:
         return re.sub(r"\x00(\d+)\x00", lambda m: held[int(m.group(1))], text)
 
 
+HEAD_SPLIT = 60          # a heading longer than this (visible characters) with a " (" after a short start shows the start as the heading and the rest below it
+
+
+def _plain_len(html):
+    return len(re.sub(r"<[^>]*>", "", html))
+
+
+def _split_at(html):
+    """(main, rest) when the heading's HTML has a ' (' after at least 8 characters of plain start and no tag before it, else None."""
+    i = html.find(" (")
+    if i < 8 or "<" in html[:i] or _plain_len(html) <= HEAD_SPLIT:
+        return None
+    return html[:i], html[i + 1:]
+
+
+def split_heading(html):
+    """A long heading such as '1. Current state (each row carries its own check date; ...)': the start is the heading, the parenthesis a quieter line
+    under it (the anchor and the text are unchanged, so every link to the section still works)."""
+    s = _split_at(html)
+    return html if not s else f'<span class="hmain">{s[0]}</span> <span class="hsub">{s[1]}</span>'
+
+
+def short_link(href, html):
+    """An outline entry: the heading's start only, the whole heading as the tooltip, when it is long."""
+    if _plain_len(html) <= HEAD_SPLIT:
+        return f'<a href="{href}">{html}</a>'
+    s = _split_at(html)
+    full = re.sub(r"<[^>]*>", "", html).replace('"', "&quot;")
+    return f'<a href="{href}" title="{full}">{s[0] if s else html}</a>'
+
+
 def render(c, d, linker):
     """(article HTML, outline HTML) of one note."""
     rel, src = d["rel"], d["shown"]
@@ -162,6 +193,8 @@ def render(c, d, linker):
         body = re.sub(r"<pre>", '<pre tabindex="0">', body)
         body = re.sub(r"<table>", '<div class="tablewrap" tabindex="0" role="region" aria-label="Table"><table>', body).replace("</table>", "</table></div>")
         toc = m.toc if re.search(r"<li>", m.toc or "") else ""
+        body = re.sub(r'(<h([1-4]) id="[^"]*">)(.*?)(<a class="headerlink")', lambda x: x.group(1) + split_heading(x.group(3)) + x.group(4), body)
+        toc = re.sub(r'<a href="(#[^"]*)">(.*?)</a>', lambda x: short_link(x.group(1), x.group(2)), toc)
     else:
         body, toc = '<pre class="plain" tabindex="0">' + linker.plain(rel, src) + "</pre>", ""
     return body, toc
