@@ -199,7 +199,7 @@ def layer_checks(b, base):
     errs = []
     pg = ctx.new_page()
     pg.on("pageerror", lambda e: errs.append(str(e)[:160]))
-    pg.goto(base + "map/graph.html?theme=dark")
+    pg.goto(base + "map/graph.html?theme=dark&gl=0")
     pg.wait_for_timeout(2500)
     info = pg.evaluate("""(function(){var t=document.getElementById('t'),c=document.getElementById('c'),a=function(k){var d=k.getContext('2d').getImageData(0,0,k.width,k.height).data,s=0;for(var i=3;i<d.length;i+=4)s+=d[i];return s};
       return {order:!!(t.compareDocumentPosition(c)&Node.DOCUMENT_POSITION_FOLLOWING),pe:getComputedStyle(t).pointerEvents,same:t.width===c.width&&t.height===c.height,threads:a(t),notes:a(c)}})()""")
@@ -249,7 +249,7 @@ def turn_checks(b, base):
     ctx = b.new_context(viewport={"width": 1000, "height": 650})
     pg = ctx.new_page()
     pg.on("pageerror", lambda e: errs.append(str(e)[:160]))
-    pg.goto(base + "map/graph.html?theme=dark&perf=1")
+    pg.goto(base + "map/graph.html?theme=dark&perf=1&gl=0")
     pg.wait_for_timeout(3500)
     txt = pg.inner_text("#perf")
     check("?perf=1 shows the frame rate, where the time goes, the settings and the thread layer's coverage, and a Copy button",
@@ -260,12 +260,12 @@ def turn_checks(b, base):
     pg = ctx.new_page()
     pg.on("pageerror", lambda e: errs.append(str(e)[:160]))
     pg.on("console", lambda m: errs.append(m.text[:160]) if m.type == "error" else None)
-    pg.goto(base + "map/graph.html?theme=dark&perf=1&gl=1")
+    pg.goto(base + "map/graph.html?theme=dark&perf=1")
     pg.wait_for_timeout(3500)
     txt = pg.inner_text("#perf")
     if "GPU threads" in txt:
         cov = float(txt.split("thread layer paints ")[1].split("%")[0])
-        check("?gl=1: the card draws the threads (a layer of its own, shown, no error) and they cover about what the 2D drawing covers",
+        check("by default the card draws the threads (a layer of its own, shown, no error) and they cover about what the 2D drawing covers",
               pg.evaluate("!document.getElementById('g').hidden") and not errs and cov2d > 1 and .6 * cov2d < cov < 1.6 * cov2d, f"gl {cov} 2d {cov2d} {errs}")
         pg.select_option("#theme-pick", "matrix")
         pg.wait_for_timeout(1500)
@@ -282,7 +282,7 @@ def turn_checks(b, base):
         pg.wait_for_timeout(1500)
         check("a selected note's threads are drawn by the card too, with no error", not errs and "GPU threads and notes" in pg.inner_text("#perf"), str(errs))
     else:
-        check("?gl=1 without WebGL 2 (this Chromium): the 2D drawing is used, says so, and there is no error", "2D (WebGL 2 not available)" in txt and not errs, txt + str(errs))
+        check("without WebGL 2 (this Chromium) the 2D drawing is used, says so, and there is no error", "2D (WebGL 2 not available)" in txt and not errs, txt + str(errs))
     ctx.close()
 
 
@@ -318,11 +318,12 @@ def main():
             with open(os.path.join(site, name), "w", encoding="utf-8") as fh:
                 fh.write(HOST % (style, src))
 
-        host("hidden.html", "map/graph.html?theme=deepsea", "display:none")
+        host("hidden.html", "map/graph.html?theme=deepsea&gl=0", "display:none")
+        host("hidden-gl.html", "map/graph.html?theme=deepsea", "display:none")
         for th in ("deepsea", "amber"):
             host(f"embed-{th}.html", f"map/graph.html?embed=1&theme={th}")
             host(f"public-{th}.html", f"pub/graph.html?theme={th}")
-        host("select.html", "every/graph.html?theme=deepsea")
+        host("select.html", "every/graph.html?theme=deepsea&gl=0")
         host("still.html", "pub/graph.html?theme=deepsea&interactive=0")
         h = functools.partial(http.server.SimpleHTTPRequestHandler, directory=site)
         h.log_message = lambda *x: None
@@ -352,6 +353,12 @@ def main():
             pg.wait_for_timeout(1500)
             check("shown: it draws, with no error, and says it is ready", fr.evaluate(PAINTED) > 1000 and not errs
                   and pg.evaluate("got").count({"type": "myco-ready"}) == 1, f"{fr.evaluate(PAINTED)} {errs} {pg.evaluate('got')}")
+            pg.close()
+            pg, fr, errs = open_host("hidden-gl.html")
+            pg.evaluate("document.getElementById('f').style.display='block'")
+            pg.wait_for_timeout(2000)
+            check("the same with the GPU drawing (the default): shown, no error, ready, and the card's layer is there when WebGL 2 is",
+                  not errs and pg.evaluate("got").count({"type": "myco-ready"}) == 1 and (fr.evaluate("!document.getElementById('g').hidden") or fr.evaluate("document.getElementById('g').hidden")), f"{errs} {pg.evaluate('got')}")
             pg.close()
 
             for kind in ("embed", "public"):
