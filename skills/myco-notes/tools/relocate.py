@@ -25,6 +25,7 @@ folder is left in place; delete it yourself when you are happy. Undo: git restor
 On Windows run it from the kit folder, not from the project's own tools folder (Windows cannot move a folder it is running from).
 """
 import argparse
+import json
 import os
 import re
 import shutil
@@ -353,6 +354,15 @@ def refresh_only(root, old, conf, a, self_run):
     if new_notes:
         tips.append("The kit's starter notes gained notes this repository does not have: " + "; ".join(f"{r} ({w}, since {v})" for r, v, w in new_notes)
                     + ". Offer each to the owner in one line in the upgrade review; create it from the kit's template/notes/ only on a yes.")
+    try:
+        with open(os.path.join(root, ".myco-notes-map.json"), encoding="utf-8") as fh:
+            map_cfg = json.load(fh)
+    except (OSError, ValueError):
+        map_cfg = {}
+    if _myco.vkey(conf.get("KIT_VERSION", "").strip().strip("\"'")) < _myco.vkey("0.43.0") and not (isinstance(map_cfg, dict) and map_cfg.get("layout")):
+        tips.append("New since 0.43.0: the notes map has an optional wiki layout (a tree of the groups, breadcrumbs, an outline, 'what links here' with summaries, recent changes, search across the text, and a theme of the project's own). "
+                    "Tell the owner in one line and offer it; on a yes add \"layout\": \"wiki\" to .myco-notes-map.json (create the file if it is missing; keep its other keys), rebuild the map and show the owner the result. "
+                    "Without a yes the classic map stays. Optional colours, fonts and radius: \"theme\" (docs/REFERENCE.md section 7).")
     tips.append(f"Offer the owner an upgrade review (method 21.4): {old['tools']}/index --missing lists the notes without a summary; propose summaries in batches of about 20 and apply only what the owner confirms. Records (logs, archive, inbox, older sync-log lines) keep their form.")
     print("\nrelocate: " + ("done, nothing committed. Next:" if a.apply else "this was a dry run. With --apply it copies the files above, then:"))
     print(f"  1. git status and git diff --stat; run {old['tools']}/notes-lint.py and python3 {old['tools']}/build-notes-map.py (it writes the graph view too).")
