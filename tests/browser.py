@@ -262,7 +262,7 @@ def turn_checks(b, base):
     pg.wait_for_timeout(3500)
     txt = pg.inner_text("#perf")
     check("?perf=1 shows the frame rate, where the time goes, the settings and the thread layer's coverage, and a Copy button",
-          all(k in txt for k in ("fps", "own work per frame", "simulation", "threads", "notes", "pixel density", "thread layer paints", "2D canvas test")) and pg.locator("#perf button").count() == 1 and not errs, txt + str(errs))
+          all(k in txt for k in ("fps", "own work per frame", "simulation", "threads", "notes", "pixel density", "thread layer paints", "2D canvas test")) and pg.locator("#perf button").count() == 2 and not errs, txt + str(errs))
     cov2d = float(txt.split("thread layer paints ")[1].split("%")[0])
     ctx.close()
     ctx = b.new_context(viewport={"width": 1000, "height": 650})
@@ -292,6 +292,67 @@ def turn_checks(b, base):
         check("a selected note's threads are drawn by the card too, with no error", not errs and "GPU threads and notes" in pg.inner_text("#perf"), str(errs))
     else:
         check("without WebGL 2 (this Chromium) the 2D drawing is used, says so, and there is no error", "2D (WebGL 2 not available)" in txt and not errs, txt + str(errs))
+    ctx.close()
+
+
+def gpu_scale_checks(b, base):
+    """The card's canvas size (?scale=), the glow switch (?glow=0) and the governor's resolution steps (only where this Chromium has WebGL 2)."""
+    print("the card's resolution and the glow switch")
+    errs = []
+    ctx = b.new_context(viewport={"width": 900, "height": 600})
+    pg = ctx.new_page()
+    pg.on("pageerror", lambda e: errs.append(str(e)[:160]))
+    pg.goto(base + "map/graph.html?theme=dark&perf=1&scale=0.5&glow=0")
+    pg.wait_for_timeout(3500)
+    txt = pg.inner_text("#perf")
+    if "GPU threads" not in txt:
+        check("no WebGL 2 here: ?scale and ?glow do nothing and there is no error", not errs, str(errs))
+        ctx.close()
+        return
+    sz = pg.evaluate("[document.getElementById('g').width, document.getElementById('c').width]")
+    cov = float(txt.split("thread layer paints ")[1].split("%")[0])
+    check("?scale=0.5 draws the card's canvas at half the size and ?glow=0 leaves out the glow; the threads still show, no error",
+          abs(sz[0] * 2 - sz[1]) <= 1 and "GPU canvas 50%, no glow" in txt and cov > 1 and not errs, f"{sz} {cov} {txt} {errs}")
+    ctx.close()
+    ctx = b.new_context(viewport={"width": 900, "height": 600})
+    pg = ctx.new_page()
+    pg.on("pageerror", lambda e: errs.append(str(e)[:160]))
+    cdp = ctx.new_cdp_session(pg)
+    cdp.send("Emulation.setCPUThrottlingRate", {"rate": 20})   # the page's own work must alone make frames slow, whatever the machine
+    pg.goto(base + "map/graph.html?theme=dark&perf=1")
+    pg.wait_for_timeout(1500)
+    pg.evaluate("setInterval(function(){document.dispatchEvent(new Event('keydown'))},400)")   # input keeps the pace at full, as a reader at work would
+    pg.wait_for_timeout(32000)
+    sz = pg.evaluate("[document.getElementById('g').width, document.getElementById('c').width]")
+    check("a slow machine lowers the card's canvas in steps, never below 60%", .55 * sz[1] <= sz[0] < sz[1] and not errs, f"{sz} {errs}")
+    ctx.close()
+
+
+def bench_checks(b, base):
+    """The benchmark (?bench=1&quick=1): it starts by itself, runs every situation, shows a table, offers the file and leaves the page as it was."""
+    print("the benchmark")
+    errs = []
+    ctx = b.new_context(viewport={"width": 900, "height": 600}, accept_downloads=True)
+    pg = ctx.new_page()
+    pg.on("pageerror", lambda e: errs.append(str(e)[:160]))
+    pg.goto(base + "map/graph.html?theme=dark&bench=1&quick=1")
+    got = None
+    try:
+        pg.wait_for_function("window.MYCO_BENCH", timeout=120000)
+        got = pg.evaluate("window.MYCO_BENCH")
+    except Exception as e:   # noqa: BLE001
+        errs.append("timeout " + str(e)[:80])
+    ok = bool(got) and not errs
+    names = [(p["mode"], p["name"]) for p in got["phases"]] if got else []
+    want = [(m, n) for m in (["gpu", "2d"] if got and got["webgl2"] else ["2d"]) for n in ("still", "spin", "hand", "select")]
+    check("the benchmark runs by itself and finishes with every situation, in both ways of drawing where WebGL 2 exists, no error", ok and names == want, f"{names} {errs}")
+    if got:
+        check("every situation has frames and a frame rate, and the file holds no note name",
+              all(p["frames"] > 0 and p["fps"] > 0 for p in got["phases"]) and got["notes"] == 60 and "note" not in " ".join(k for p in got["phases"] for k in p) and got["theme"] == "dark", str(got["phases"][:2]))
+        check("the panel shows the table and the buttons, and the page is back to how it was (still, the card drawing)",
+              pg.locator("#bench #bdl").count() == 1 and pg.locator("#bench table tr").count() == len(want) + 1, "")
+        pg.evaluate("document.getElementById('bcl').click()")
+        check("Close removes the panel", pg.locator("#bench").count() == 0)
     ctx.close()
 
 
@@ -507,6 +568,8 @@ def main():
             pg.close()
             layer_checks(b, base)
             turn_checks(b, base)
+            gpu_scale_checks(b, base)
+            bench_checks(b, base)
             wiki_checks(b, base, site, demo)
             b.close()
         srv.shutdown()
