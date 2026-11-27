@@ -4,9 +4,10 @@ import re
 import subprocess
 import sys
 
-VERSION = "0.46.3"   # the kit version these tools come from; moves with plugin.json and SKILL.md (tests check it)
+VERSION = "0.46.4"   # the kit version these tools come from; moves with plugin.json and SKILL.md (tests check it)
 FORMAT_VERSION = "1.2"   # the version of docs/FORMAT.md that new repositories follow; bootstrap writes it, relocate adds it when missing
 AGENT_SKILL_DIRS = (".claude/skills", ".agents/skills")   # a copy of the skill kept in a notes repository for agents (a cloud session loads it from there): not notes, so the lint and the map leave it out
+SKIP_DIRS = {".git", "site", "notes-map", "node_modules", "__pycache__", ".obsidian", ".trash"}   # folders of git and of other tools, by name: not notes, and nothing in them resolves a reference
 
 IS_WINDOWS = os.name == "nt"
 
@@ -325,6 +326,100 @@ def human_size(nbytes):
         if nbytes < 1024 or unit == "T":
             return f"{nbytes:.0f}{unit}" if unit == "B" else f"{nbytes:.1f}{unit}"
         nbytes /= 1024
+
+
+# ---------- references in code formatting (method 9, FORMAT.md 5): one resolver, so that notes-lint and the map answer alike ----------
+
+def walk(root, skip_rel):
+    """Yield (relative folder, file names), leaving out SKIP_DIRS and the agents' skill folders, and the folders in skip_rel by relative path."""
+    for dp, dn, fn in os.walk(root):
+        reldir = os.path.relpath(dp, root).replace(os.sep, "/")
+        dn[:] = sorted(d for d in dn if d not in SKIP_DIRS and (d if reldir == "." else reldir + "/" + d) not in skip_rel
+                       and (d if reldir == "." else reldir + "/" + d) not in AGENT_SKILL_DIRS)
+        yield reldir, sorted(fn)
+
+
+def join_rel(rel, tok):
+    """tok resolved against the folder of the note `rel`, as a repository path with forward slashes (also on Windows)."""
+    return os.path.normpath(os.path.join(os.path.dirname(rel), tok)).replace(os.sep, "/")
+
+
+def code_refs(line):
+    """The names in code formatting on one line that can be references: not absolute, home, web or dot paths, and not illustrative ones."""
+    for tok in re.findall(r"`([^`\n]+)`", line):
+        tok = tok.lstrip("@")
+        if not (any(c in tok for c in " *<>{}$|()[]") or tok.startswith(("/", "~", "http", "./", "../", "."))):
+            yield tok
+
+
+def missing_note_text(tok):
+    """The lint's words for a note that does not exist; .myco-notes-lint-ignore is matched against them, by the lint and by the map."""
+    return f"reference to missing note `{tok}`"
+
+
+def lint_ignore(root):
+    """The expressions of .myco-notes-lint-ignore, compiled. Raises secret_scan.ScanError for one that is not valid."""
+    import secret_scan   # here, because secret_scan imports this module
+    p = os.path.join(root, ".myco-notes-lint-ignore")
+    if not os.path.exists(p):
+        return []
+    with open(p, encoding="utf-8") as fh:
+        return secret_scan.compile_allow([l.strip() for l in fh if l.strip() and not l.startswith("#")], ".myco-notes-lint-ignore")
+
+
+def ignored(rules, rel, line, text):
+    """Whether .myco-notes-lint-ignore drops the finding `text` at line `line` of `rel`."""
+    s = f"{rel}:{line} {text}"
+    return any(r.search(s) for r in rules)
+
+
+class NoteRefs:
+    """The references of a repository's notes and what they resolve to. Every file counts, project data folders included; the generated
+    map and other tools' folders do not. Names are compared exactly, on every platform. Make it before writing any output."""
+
+    def __init__(self, root, lay, ignore=()):
+        self.paths, self.by_name, self.ignore = set(), {}, list(ignore)
+        for reldir, files in walk(root, {lay["map"]}):
+            for f in files:
+                path = f if reldir == "." else reldir + "/" + f
+                self.paths.add(path)
+                self.by_name.setdefault(f, []).append(path)
+        self.map_prefix = lay["map"] + "/"
+        self.history = history_prefixes(lay)
+        # records are not re-checked; the method's documentation and templates use illustrative names
+        self.unchecked = (lay["docs"] + "/", "template/") + self.history
+
+    def on_line(self, rel, line):
+        """The references on a line of the note `rel` that must resolve (the map folder is generated, so names in it are left alone)."""
+        if rel.startswith(self.unchecked):
+            return []
+        return [t for t in code_refs(line) if not t.startswith(self.map_prefix)]
+
+    def find(self, tok, rel):
+        """The files the reference `tok` in the note `rel` can mean: none when it is broken, several when it is ambiguous."""
+        for path in (tok, join_rel(rel, tok)):
+            if path in self.paths:
+                return [path]
+        return list(self.by_name.get(tok, [])) if os.path.basename(tok) == tok else []
+
+    def missing(self, rel, text):
+        """The notes (`x.md`) that `text` names outside code blocks and that do not exist, each once, in order; ignored findings left out."""
+        out, in_code = [], False
+        for i, line in enumerate(text.split("\n"), 1):
+            if line.strip().startswith("```"):
+                in_code = not in_code
+                continue
+            if in_code:
+                continue
+            for tok in self.on_line(rel, line):
+                if tok.endswith(".md") and tok not in out and not self.find(tok, rel) and not ignored(self.ignore, rel, i, missing_note_text(tok)):
+                    out.append(tok)
+        return out
+
+
+def history_prefixes(lay):
+    """The folders of records, as path prefixes."""
+    return tuple(lay["notes"] + "/" + h + "/" for h in lay["history"])
 
 
 WIKI_LINK = re.compile(r"!?\[\[([^\]\n|#]*)(?:#[^\]\n|]*)?(?:\|[^\]\n]*)?\]\]")

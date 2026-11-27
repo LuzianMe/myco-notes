@@ -328,11 +328,69 @@ def gpu_scale_checks(b, base):
     ctx.close()
 
 
+# counts how the 2D drawing paints the threads' glow: the only canvas outside the page at a quarter of the notes' canvas
+GLOW_PAINT = """(function(){window.GLOW={fill:0,stroke:0,last:""};var P=CanvasRenderingContext2D.prototype;['fill','stroke'].forEach(function(k){var o=P[k];
+P[k]=function(){var c=this.canvas,m=document.getElementById('c');if(m&&!c.isConnected&&c.width===Math.ceil(m.width/4)&&c.height===Math.ceil(m.height/4)){window.GLOW[k]++;window.GLOW.last=k}return o.apply(this,arguments)}})})()"""
+
+
+def drag_glow_checks(b, base):
+    """The 2D drawing paints a cheaper glow (thin lines) while the view is moved by hand, and the full one otherwise."""
+    print("the glow while the view is moved by hand (2D drawing)")
+    errs = []
+    ctx = b.new_context(viewport={"width": 1000, "height": 650})
+    ctx.add_init_script(GLOW_PAINT)
+    pg = ctx.new_page()
+    pg.on("pageerror", lambda e: errs.append(str(e)[:160]))
+    pg.goto(base + "map/graph.html?theme=dark&gl=0")
+    pg.wait_for_timeout(5000)
+    glow = lambda: pg.evaluate("window.GLOW")
+    reset = lambda: pg.evaluate("window.GLOW={fill:0,stroke:0,last:window.GLOW.last}")
+    first = glow()
+    x, y = 960, 420
+    under = pg.evaluate(f"document.elementFromPoint({x},{y}).id")
+    pg.mouse.move(x, y)
+    reset()
+    pg.mouse.down()
+    pg.wait_for_timeout(200)
+    pg.mouse.up()
+    pg.wait_for_timeout(700)
+    click = glow()
+    check("still, and after a click, the glow is the full one (filled shapes), never lines", under == "c" and first["fill"] > 0 and first["stroke"] == 0 and click["stroke"] == 0, f"{under} {first} {click}")
+    pg.mouse.down()
+    pg.mouse.move(x - 20, y)
+    pg.wait_for_timeout(150)
+    reset()
+    for i in range(2, 14):
+        pg.mouse.move(x - 20 * i, y)
+        pg.wait_for_timeout(60)
+    during = glow()
+    check("while dragged the glow is painted as lines only", during["stroke"] > 0 and during["fill"] == 0, str(during))
+    pg.wait_for_timeout(500)   # held still, so the release has no momentum
+    reset()
+    pg.mouse.up()
+    pg.wait_for_timeout(900)
+    after = glow()
+    check("let go without a swing, the full glow comes back although the view no longer moves", after["fill"] > 0 and after["last"] == "fill", str(after))
+    # a swing sent from inside the page, so that its timing does not depend on how fast this machine answers (a release more than 90 ms
+    # after the last move has no momentum)
+    pg.evaluate("""([x,y])=>{var c=document.getElementById('c');c.setPointerCapture=function(){};
+      var ev=function(t,px){c.dispatchEvent(new PointerEvent(t,{pointerId:7,clientX:px,clientY:y,button:0,bubbles:true}))},wait=function(){var t=performance.now();while(performance.now()-t<12);};
+      ev('pointerdown',x);for(var i=1;i<9;i++){wait();ev('pointermove',x-35*i)}ev('pointerup',x-280)}""", [x, y])
+    reset()
+    pg.wait_for_timeout(300)
+    coast = glow()
+    pg.wait_for_timeout(9000)
+    rest = glow()
+    check("after a swing the coasting view keeps the lines, and ends with the full glow", coast["stroke"] > 0 and rest["last"] == "fill" and not errs, f"{coast} {rest} {errs}")
+    ctx.close()
+
+
 def bench_checks(b, base):
     """The benchmark (?bench=1&quick=1): it starts by itself, runs every situation, shows a table, offers the file and leaves the page as it was."""
     print("the benchmark")
     errs = []
     ctx = b.new_context(viewport={"width": 900, "height": 600}, accept_downloads=True)
+    ctx.add_init_script(GLOW_PAINT)
     pg = ctx.new_page()
     pg.on("pageerror", lambda e: errs.append(str(e)[:160]))
     pg.goto(base + "map/graph.html?theme=dark&bench=1&quick=1")
@@ -351,6 +409,7 @@ def bench_checks(b, base):
               all(p["frames"] > 0 and p["fps"] > 0 for p in got["phases"]) and got["notes"] == 60 and "note" not in " ".join(k for p in got["phases"] for k in p) and got["theme"] == "dark", str(got["phases"][:2]))
         check("the panel shows the table and the buttons, and the page is back to how it was (still, the card drawing)",
               pg.locator("#bench #bdl").count() == 1 and pg.locator("#bench table tr").count() == len(want) + 1, "")
+        check("the benchmark's turn by hand is drawn as a real one: the glow as lines", pg.evaluate("window.GLOW.stroke") > 0, str(pg.evaluate("window.GLOW")))
         pg.evaluate("document.getElementById('bcl').click()")
         check("Close removes the panel", pg.locator("#bench").count() == 0)
     ctx.close()
@@ -569,6 +628,7 @@ def main():
             layer_checks(b, base)
             turn_checks(b, base)
             gpu_scale_checks(b, base)
+            drag_glow_checks(b, base)
             bench_checks(b, base)
             wiki_checks(b, base, site, demo)
             b.close()

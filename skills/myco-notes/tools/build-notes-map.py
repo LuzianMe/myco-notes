@@ -25,6 +25,7 @@ Optional config: .myco-notes-map.json  {"title": "...", "groups": [{"id","name",
         (theme: the wiki layout's own colours for its Light and Dark themes, a font, a code font and a corner radius; see tools/map_themes.py project_theme)
         (a hint replaces the note's own one-line `summary` from its header, method 10.1; without either, the first paragraph is shown)
 Folders: the notes folder, docs folder and map folder come from .myco-notes.conf (see tools/_myco.py layout); DATA_DIRS (project data that is not notes) are left out.
+Missing references are the ones notes-lint reports: the same resolver (a file in a data folder counts) and the same .myco-notes-lint-ignore.
 Needs only the Python standard library; if the 'markdown' package is installed pages are rendered nicely, otherwise as preformatted text.
 """
 import argparse, datetime, html, json, os, re, shutil, subprocess, sys, types
@@ -39,7 +40,6 @@ import hashlib  # noqa: E402
 import map_themes  # noqa: E402
 import map_wiki  # noqa: E402
 
-SKIP_DIRS = {".git", "site", "notes-map", "node_modules", "__pycache__", ".obsidian", ".trash"}
 MARKER = ".myco-notes-map"   # marks a folder this tool made, so it may empty and rebuild it
 MAP_FILES = {"index.html", "graph.html", "p", "raw", "recent.html", "assets", MARKER}
 LAYOUTS = ("classic", "wiki")
@@ -204,7 +204,7 @@ def main():
 
     files = []
     for dp, dn, fn in os.walk(root):
-        dn[:] = sorted(d for d in dn if d not in SKIP_DIRS and os.path.relpath(os.path.join(dp, d), root).replace(os.sep, "/") not in skip_rel
+        dn[:] = sorted(d for d in dn if d not in _myco.SKIP_DIRS and os.path.relpath(os.path.join(dp, d), root).replace(os.sep, "/") not in skip_rel
                      and os.path.relpath(os.path.join(dp, d), root).replace(os.sep, "/") not in _myco.AGENT_SKILL_DIRS
                        and not os.path.relpath(os.path.join(dp, d), root).replace(os.sep, "/").startswith("template"))
         for f in sorted(fn):
@@ -233,6 +233,12 @@ def main():
                          hint=hints.get(rel) or (fm["summary"][0] if fm.get("summary", ("",))[0] else "") or (para[:170] + ("..." if len(para) > 170 else "")),
                          mtime=os.path.getmtime(os.path.join(root, rel)), size=len(text.encode("utf-8")))
     groups = area_groups(groups, info, lay)
+    try:
+        ignore = _myco.lint_ignore(root)
+    except secret_scan.ScanError as e:             # the lint stops on this; the map is still worth building
+        ignore = []
+        print(f"warning: {e}; the map leaves the file out and marks every missing reference", file=sys.stderr)
+    refs = _myco.NoteRefs(root, lay, ignore)       # before any output is written, so the map never resolves a reference to its own pages
     taken = {}
     for rel in sorted(info):                       # a/b.md and a-b.md give the same page name: the later one gets a path hash
         pid = info[rel]["id"]
@@ -264,7 +270,7 @@ def main():
     byid = {d["id"]: d for d in info.values()}
     if a.public:
         os.makedirs(out, exist_ok=True)
-        gn, ge, gc = notes_graph.build(root, lay, info, groups, out, a.title or "", sh, datetime.date.today().isoformat(), "", public=labels)
+        gn, ge, gc = notes_graph.build(root, lay, info, groups, out, a.title or "", sh, datetime.date.today().isoformat(), "", refs, public=labels)
         stems = {d["name"][:-3] for d in info.values() if d["name"].endswith(".md")}
         used = sorted(k for k in labels if k in stems)
         print(f"public graph: {gn} notes ({sum(1 for d in info.values() if d['name'][:-3] in labels)} labelled), {ge} links, {gc} commits -> {os.path.join(out, 'graph.html')}")
@@ -288,9 +294,9 @@ def main():
         stale = _myco.load_conf(root).get("STALE_DAYS", "365")
         map_wiki.build(types.SimpleNamespace(
             root=root, lay=lay, out=out, title=title, info=info, byid=byid, sections=group_items(groups, info), linkable=linkable, name_re=name_re,
-            link_index=link_index, md_lib=md_lib, project=project, log_rows=log_rows, sh=sh, built=built, today=today,
+            link_index=link_index, refs=refs, md_lib=md_lib, project=project, log_rows=log_rows, sh=sh, built=built, today=today,
             stale_days=float(stale) if re.fullmatch(r"\d+(\.\d+)?", stale or "") else 365.0))
-        gn, ge, gc = notes_graph.build(root, lay, info, groups, out, title, sh, today, built)
+        gn, ge, gc = notes_graph.build(root, lay, info, groups, out, title, sh, today, built, refs)
         print(f"notes map (wiki layout): {len(info)} notes, {sum(len(d['out']) for d in info.values())} relations -> {out}/index.html; graph: {gn} nodes, {ge} links, {gc} commits -> {out}/graph.html")
         return
     for rel, d in info.items():
@@ -327,7 +333,7 @@ def main():
              f'<p><input id="q" type="search" placeholder="Search names, titles, hints..." aria-label="Search notes"></p>{"".join(sections)}{rec}</div>'
              "<script>const q=document.getElementById('q');q.addEventListener('input',()=>{const t=q.value.toLowerCase();document.querySelectorAll('.note').forEach(n=>{n.style.display=n.dataset.s.includes(t)?'':'none'});document.querySelectorAll('.grp').forEach(g=>{g.style.display=[...g.querySelectorAll('.note')].some(n=>n.style.display!=='none')?'':'none'})})</script></body></html>")
     open(os.path.join(out, "index.html"), "w", encoding="utf-8").write(index)
-    gn, ge, gc = notes_graph.build(root, lay, info, groups, out, title, sh, today, built)
+    gn, ge, gc = notes_graph.build(root, lay, info, groups, out, title, sh, today, built, refs)
     print(f"notes map: {len(info)} notes, {sum(len(d['out']) for d in info.values())} relations -> {out}/index.html; graph: {gn} nodes, {ge} links, {gc} commits -> {out}/graph.html")
 
 

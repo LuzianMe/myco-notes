@@ -416,17 +416,16 @@ def write(path, text):
 
 def build(c):
     """Write the wiki into c.out. c holds: root, lay, out, title, info, byid, sections [(gid, name, blurb, [notes])], linkable, name_re, link_index,
-    md_lib, project (the checked theme setting), log_rows, sh, built, today, stale_days."""
+    refs (the _myco.NoteRefs of the lint), md_lib, project (the checked theme setting), log_rows, sh, built, today, stale_days."""
     info = c.info
-    names = {d["name"] for d in info.values()}
     commits = notes_graph.commit_history(c.root, set(info), c.sh)
-    att = {d["id"]: notes_graph.attention(c.root, c.lay, rel, d["text"], names, c.today) for rel, d in info.items()}
+    att = {d["id"]: notes_graph.attention(c.lay, rel, d["text"], c.refs, c.today) for rel, d in info.items()}
     group_of, seq = {}, {}
     for gid, gname, _, items in c.sections:
         seq[gid] = [d["id"] for d in items]
         for d in items:
             group_of[d["id"]] = (gid, gname)
-    c.hist = notes_graph.prefixes(c.lay)[1]
+    c.hist = _myco.history_prefixes(c.lay)
     c.head = map_themes.head_script()
     c.pick = map_themes.picker()
 

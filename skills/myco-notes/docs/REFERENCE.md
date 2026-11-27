@@ -60,6 +60,8 @@ Set `NEW_FOLDERS` in `.myco-notes.conf` to apply one answer every time.
 
 ## 5. Configuration
 
+**Missing references.** `notes-lint.py` and the map (`graph.html` and the wiki layout) use one resolver (`FORMAT.md` 5.2) and both honour `.myco-notes-lint-ignore` (one regular expression per line, matched against the lint's finding `note.md:12 reference to missing note ...`), so the map marks a note exactly when the lint reports `reference to missing note` in it (a name in code formatting). An ambiguous name, a broken wiki or Markdown link and a missing header target are lint warnings only. If an expression in that file is invalid, the lint stops and the map says so and marks every missing reference.
+
 `.myco-notes.conf` (shell syntax): the layout (`MYCO_DIR`, `NOTES_DIR`, `TOOLS_DIR`, `DOCS_DIR`, `MAP_DIR`, `DATA_DIRS`, `HISTORY_DIRS`, `STATE_FILE` for a master record not called `state.md`), the lint limits (`MAX_NOTE_KB`, `ENTRY_WARN_KB`, `STALE_DAYS` for the freshness header, `RESUME_BUDGET` for `resume`, `REVIEW_FULL_DAYS` for how often a review reads every note), `AGENT_TRAILER` (co-author line for commits made by an agent), `SYNC_GLOBS`/`SYNC_CMD` (keep the live copy of executed files equal to the committed copy), `TIMEZONE` (IANA name for the times `capture` writes), `SOLO` (1 = one owner: an agent merges its own pull request after the check passes, method 19.2), `NEW_FOLDERS` (`ask` default, `add`, `ignorelint`, `ignoreall`: what `notes-commit` does with a new root folder or loose file; `notes-commit --folder NAME=MODE` answers for one item, `NAME=*` for all, `later` leaves it out of this commit), `CHECK_SH`/`CHECK_PY`, `MIRROR_TARGET`, `POST_PUSH_CMDS`, `SECRET_ALLOW_FILE`. Optional `.myco-notes-map.json` (groups, hints, title, and for the wiki layout `layout` and `theme`, section 7) and `.myco-notes-lint-ignore` (regexes of findings to drop).
 
 ## 6. The mycelium view on a website
@@ -109,6 +111,8 @@ Drawing pauses while the page is hidden (`visibilitychange`) and while the host 
 Pacing (0.46.1): a frame is drawn at once while something moves or you are at work and for 1.5 s after any input; at about 30 a second while only spikes, flashes, particles, a selected note's lit threads or the screensaver run; at about 15 a second when only the names and the pulse of recent notes move. Input wakes it at once. This keeps a laptop cool, so its clock speed (and the smoothness of a drag) holds.
 
 On a slow machine the 2D drawing steps down by itself, one step at a time and never back: a screen with 2 device pixels per pixel drops to 1.5, then the threads are redrawn less often while the view turns, then they become plain lines.
+
+While the view is moved by hand (a drag, two fingers, the coast after a swing) the 2D drawing paints the threads' glow as thin lines instead of filled shapes, which is most of the cost of such a frame; the filled glow returns as soon as the movement ends. A click, the idle turn and the scroll wheel do not change it, and neither does the graphics card's drawing.
 
 **Messages** (`window.postMessage`). The page accepts these only from its parent window (`event.source === window.parent`) and ignores anything else:
 

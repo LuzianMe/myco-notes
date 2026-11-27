@@ -29,7 +29,8 @@ Exit:   0 clean, 1 warnings, 2 errors (secrets), 3 the lint could not run (for e
 Ignore: put regular expressions (one per line) in .myco-notes-lint-ignore; a finding whose text matches is dropped.
 Layout (.myco-notes.conf): the generated map folder and DATA_DIRS (project data that is not notes) are not read as notes; the folders in
         HISTORY_DIRS (default "archive logs", inside the notes folder; inbox and imported always) are records, so references, follow-up dates, size and orphans are not
-        checked there (secrets always are).
+        checked there (secrets always are). A reference may name a file of a data folder; the map resolves references the same way and
+        honours the same ignore file (_myco.NoteRefs).
 """
 import argparse, datetime, hashlib, os, re, subprocess, sys
 
@@ -39,7 +40,6 @@ sys.path.insert(0, HERE)
 import _myco  # noqa: E402
 import secret_scan  # noqa: E402
 
-SKIP_DIRS = {".git", "site", "notes-map", "node_modules", "__pycache__", ".obsidian", ".trash"}
 DATE = r"\d{4}-\d{2}-\d{2}"
 
 
@@ -50,31 +50,8 @@ def repo_root(start):
         return os.path.abspath(start)
 
 
-def join_rel(rel, tok):
-    """tok resolved against the folder of the note `rel`, as a repository path with forward slashes (also on Windows)."""
-    return os.path.normpath(os.path.join(os.path.dirname(rel), tok)).replace(os.sep, "/")
-
-
-def walk(root, skip_rel):
-    """Yield (relative folder, file names), leaving out SKIP_DIRS by name and the folders in skip_rel by relative path."""
-    for dp, dn, fn in os.walk(root):
-        reldir = os.path.relpath(dp, root).replace(os.sep, "/")
-        dn[:] = sorted(d for d in dn if d not in SKIP_DIRS and (d if reldir == "." else reldir + "/" + d) not in skip_rel
-                     and (d if reldir == "." else reldir + "/" + d) not in _myco.AGENT_SKILL_DIRS)
-        yield reldir, sorted(fn)
-
-
 def walk_md(root, skip_rel):
-    return [(f if reldir == "." else reldir + "/" + f) for reldir, fn in walk(root, skip_rel) for f in fn if f.endswith(".md")]
-
-
-def all_files(root, skip_rel):
-    names, paths = set(), set()
-    for reldir, fn in walk(root, skip_rel):
-        for f in fn:
-            names.add(f)
-            paths.add(f if reldir == "." else reldir + "/" + f)
-    return names, paths
+    return [(f if reldir == "." else reldir + "/" + f) for reldir, fn in _myco.walk(root, skip_rel) for f in fn if f.endswith(".md")]
 
 
 def num(conf, key, default):
@@ -98,28 +75,21 @@ def main():
     root = repo_root(a.root)
     conf = _myco.load_conf(root)
     lay = _myco.layout(root, conf)
-    docs_prefix, map_prefix = lay["docs"] + "/", lay["map"] + "/"
-    history = tuple(lay["notes"] + "/" + d + "/" for d in lay["history"])
+    docs_prefix = lay["docs"] + "/"
+    history = _myco.history_prefixes(lay)
     max_kb, entry_warn_kb = num(conf, "MAX_NOTE_KB", 100), num(conf, "ENTRY_WARN_KB", 24)
     stale_days = num(conf, "STALE_DAYS", 365)
-    ignore = []
-    ip = os.path.join(root, ".myco-notes-lint-ignore")
-    if os.path.exists(ip):
-        with open(ip, encoding="utf-8") as fh:
-            ignore = secret_scan.compile_allow([l.strip() for l in fh if l.strip() and not l.startswith("#")], ".myco-notes-lint-ignore")
+    ignore = _myco.lint_ignore(root)
     today = datetime.date.today()
     md_files = walk_md(root, {lay["map"], *lay["data"]})
-    names, paths = all_files(root, {lay["map"]})
+    refs = _myco.NoteRefs(root, lay, ignore)
+    names, paths = set(refs.by_name), refs.paths
     top_dirs = {p.split("/")[0] for p in paths if "/" in p}
-    by_name = {}
-    for p in paths:
-        by_name.setdefault(p.rsplit("/", 1)[-1], []).append(p)
     sources_prefix = lay["notes"] + "/sources/"
     findings = []   # (level, file, line, text)
 
     def add(level, f, line, text):
-        s = f"{f}:{line} {text}"
-        if any(r.search(s) for r in ignore):
+        if _myco.ignored(ignore, f, line, text):
             return
         findings.append((level, f, line, text))
 
@@ -151,27 +121,20 @@ def main():
                 add("ERROR", rel, i, f"secret-looking string ({hit[0]}; remove it or store it where the notes say secrets live)")
             if in_code:
                 continue
-            for tok in ([] if is_hist else re.findall(r"`([^`\n]+)`", line)):
-                tok = tok.lstrip("@")
-                if any(c in tok for c in " *<>{}$|()[]") or tok.startswith(("/", "~", "http", "./", "../", ".")):
-                    continue
-                if rel.startswith((docs_prefix, "template/")) or tok.startswith(map_prefix):
-                    continue                      # method documentation and templates use illustrative names; the map is generated
+            for tok in refs.on_line(rel, line):
                 if tok.endswith(".md"):
-                    base = os.path.basename(tok)
-                    ok = (tok in paths or join_rel(rel, tok) in paths
-                          or (base == tok and base in names))
-                    if ok and base == tok and tok not in paths and join_rel(rel, tok) not in paths and len(by_name.get(base, [])) > 1:
-                        add("WARN", rel, i, f"`{tok}` is ambiguous: {len(by_name[base])} files have that name ({', '.join(sorted(by_name[base])[:3])}"
-                            + (", ..." if len(by_name[base]) > 3 else "") + "); write it with its folder")
-                    if ok:
+                    hits = refs.find(tok, rel)
+                    if len(hits) > 1:
+                        add("WARN", rel, i, f"`{tok}` is ambiguous: {len(hits)} files have that name ({', '.join(sorted(hits)[:3])}"
+                            + (", ..." if len(hits) > 3 else "") + "); write it with its folder")
+                    if hits:
                         for other in md_files:
-                            if os.path.basename(other) == base and other != rel:
+                            if os.path.basename(other) == os.path.basename(tok) and other != rel:
                                 mentions[other] += 1
                     else:
-                        add("WARN", rel, i, f"reference to missing note `{tok}`")
+                        add("WARN", rel, i, _myco.missing_note_text(tok))
                 elif "/" in tok and tok.split("/")[0] in top_dirs and re.search(r"\.[A-Za-z0-9]{1,5}$", tok):
-                    if tok not in paths and join_rel(rel, tok) not in paths:
+                    if tok not in paths and _myco.join_rel(rel, tok) not in paths:
                         add("WARN", rel, i, f"reference to missing file `{tok}`")
             if is_hist or re.match(r"^\s*(- \*\*|\d+\.\s+\*\*)\s*\d{4}-\d{2}-\d{2}", line) or "DONE" in line or "~~" in line:
                 pass
@@ -229,7 +192,7 @@ def main():
                 if k not in fm:
                     continue
                 for tok in [t.strip().strip("`") for t in fm[k][0].split(",") if t.strip()]:
-                    if tok in paths or join_rel(rel, tok) in paths or tok in names:
+                    if tok in paths or _myco.join_rel(rel, tok) in paths or tok in names:
                         for other in md_files:
                             if other != rel and (other == tok or os.path.basename(other) == os.path.basename(tok)):
                                 mentions[other] += 1
