@@ -135,6 +135,16 @@ def wiki_checks(b, base, site, demo):
             pg.wait_for_timeout(400)
             check("wiki phone: the menu shows the tree and moves focus to its filter", pg.locator("#sidebar").is_visible() and pg.evaluate("document.activeElement.id") == "filter"
                   and pg.locator("#menu").get_attribute("aria-expanded") == "true")
+            pg.set_viewport_size({"width": 390, "height": 300})   # short enough that the opened tree cannot fit
+            pg.evaluate("document.querySelectorAll('#tree details').forEach(d => d.open = true)")
+            touch = ctx.new_cdp_session(pg)
+            for kind, y in [("touchStart", 250)] + [("touchMove", 250 - 20 * i) for i in range(1, 10)] + [("touchEnd", None)]:
+                touch.send("Input.dispatchTouchEvent", {"type": kind, "touchPoints": [] if y is None else [{"x": 150, "y": y}]})
+                pg.wait_for_timeout(30)
+            pg.wait_for_timeout(400)
+            m = pg.evaluate("(() => { const s = document.getElementById('sidebar'); return [s.clientHeight, s.scrollHeight, s.scrollTop, innerHeight, scrollY]; })()")
+            check("wiki phone: the open menu fits the screen and a swipe scrolls it, not the page", m[0] <= m[3] < m[1] and m[2] > 0 and m[4] == 0, str(m))
+            pg.set_viewport_size({"width": 390, "height": 800})
             pg.keyboard.press("Escape")
             pg.wait_for_timeout(400)
             check("wiki phone: Escape closes it and gives the focus back to the button", not pg.locator("#sidebar").is_visible() and pg.evaluate("document.activeElement.id") == "menu")
