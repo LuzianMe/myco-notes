@@ -132,7 +132,7 @@ var cv=document.getElementById("c"),cx=cv.getContext("2d");
 /* the quiet threads are drawn into this second canvas, a layer under the main one (#t), and reused until something changes (the
    view, the layout, the focus, the theme); while the network turns by itself they are redrawn about 20 times a second, the notes on
    top every frame. A layer of its own means the browser composes the two, and no full-screen copy is made in every frame. */
-var tc=document.getElementById("t"),tcx=tc.getContext("2d"),gc=document.createElement("canvas"),gcx=gc.getContext("2d"),tKey="",tLast=0,busyNow=false,tcache={},spikes=[],ambT=0;   /* gc: the threads' glow at quarter resolution (soft, and a sixteenth of the pixels) */
+var tc=document.getElementById("t"),tcx=tc.getContext("2d"),gc=document.createElement("canvas"),gcx=gc.getContext("2d"),tKey="",tLast=0,busyNow=false,handNow=false,coasting=false,tcache={},spikes=[],ambT=0;   /* gc: the threads' glow at quarter resolution (soft, and a sixteenth of the pixels) */
 var reduce=window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches;
 var NODES=D.nodes,NN=NODES.length,NC=D.commits.length;
 var root=document.documentElement;
@@ -283,7 +283,7 @@ function turnSign(rx){return Math.cos(rx+.2)<0?-1:1}   /* upside down, a sideway
 function turnHome(){rot.home=true}
 function project(now,dt){
   var tg=depthOn?1:0;depthAmt+=(tg-depthAmt)*(reduce?1:Math.min(1,dt/260));if(Math.abs(tg-depthAmt)<.003)depthAmt=tg;
-  tilt.x*=.93;tilt.y*=.93;
+  tilt.x*=.93;tilt.y*=.93;coasting=false;
   if(rot.home){   /* back to the front by the shortest way round */
     var gy=Math.round(rot.y/6.2832)*6.2832,gx=Math.round(rot.x/6.2832)*6.2832,e=reduce?1:Math.min(1,dt/300);rot.y+=(gy-rot.y)*e;rot.x+=(gx-rot.x)*e;
     if(Math.abs(gy-rot.y)<.002&&Math.abs(gx-rot.x)<.002){rot.y=rot.x=0;rot.home=false}
@@ -292,6 +292,7 @@ function project(now,dt){
     var sg=spin.on&&depthOn&&!reduce&&hov<0?spin.dir*SPIN:0;
     spin.vy=sg+(spin.vy-sg)*Math.exp(-dt/(Math.abs(spin.vy)>Math.abs(sg)?700:1600));spin.vx*=Math.exp(-dt/350);
     rot.y+=spin.vy*dt;rot.x+=spin.vx*dt;
+    coasting=Math.abs(spin.vy)>Math.abs(sg)+SPIN/4||Math.abs(spin.vx)>SPIN/4;   /* still faster than the idle pace (or than rest) after a swing */
   }
   var yaw=depthAmt*(rot.y+tilt.y),pitch=depthAmt*(rot.x+tilt.x+.2);
   cyw=Math.cos(yaw);syw=Math.sin(yaw);cpt=Math.cos(pitch);spt=Math.sin(pitch);
@@ -597,6 +598,7 @@ function budRGB(n){
    are joined by a thread that fades from one note's colour to the other's. */
 function threadRGB(n){var c=n.due?T.wilt:gcol(n.g),k=T.id+c;if(!tcache[k]){var v=parseInt(c.slice(1),16),h=T.hypha.split(",").map(Number),m=.42;
   tcache[k]=[v>>16&255,v>>8&255,v&255].map(function(x,i){return Math.round(x*(1-m)+h[i]*m)}).join(",")}return tcache[k]}
+var HANDGLOW=2.15;   /* the width of the hand glow's lines, in average thread widths: about as much ink as the filled shapes */
 function threadFill(e,P,al){if(e.dir!==0)return "rgba("+threadRGB(e.dir>0?e.a:e.b)+","+al+")";
   var g=cx.createLinearGradient(P[0][0],P[0][1],P[P.length-1][0],P[P.length-1][1]);g.addColorStop(0,"rgba("+threadRGB(e.a)+","+al+")");g.addColorStop(1,"rgba("+threadRGB(e.b)+","+al+")");return g}
 function along(e,t){
@@ -649,6 +651,10 @@ function drawSpikes(now){
     return true});
   spikes=kept.concat(spikes);spOld=null;
 }
+function handGlow(g){   /* the same glow as one line per thread through every third point, as wide as the group's threads are on average: it is blurred anyway */
+  var w=0;g.it.forEach(function(x){w+=x[1]});cx.strokeStyle="rgba("+T.hypha+","+(g.al*.4*T.tglow).toFixed(3)+")";cx.lineWidth=w/g.it.length*HANDGLOW;cx.lineCap="round";cx.lineJoin="bevel";cx.beginPath();
+  g.it.forEach(function(x){if(x[2]<1)return;var P=x[0],n=P.length-1,i;cx.moveTo(P[0][0],P[0][1]);for(i=3;i<n;i+=3)cx.lineTo(P[i][0],P[i][1]);cx.lineTo(P[n][0],P[n][1])});cx.stroke();
+}
 function quietThreads(list){   /* into the cache: one fill per colour (the theme's glow, the thread, the buds), fused threads with their fade */
   var keep=cx;cx=tcx;cx.setTransform(1,0,0,1,0,0);cx.clearRect(0,0,tc.width,tc.height);cx.setTransform(DPR,0,0,DPR,0,0);
   var groups={},fused=[],dig=(T.style==="circuit"||T.style==="fractal"),lite=EMBED||LITE;   /* embed, or a machine too slow for the rest: plain lines, no glow, fused threads in one colour: a fraction of the work */
@@ -660,6 +666,7 @@ function quietThreads(list){   /* into the cache: one fill per colour (the theme
   cx=gcx;cx.setTransform(1,0,0,1,0,0);cx.clearRect(0,0,gc.width,gc.height);cx.setTransform(DPR/4,0,0,DPR/4,0,0);   /* a soft glow in the theme's thread colour, drawn small and scaled up */
   if(!lite)Object.keys(groups).forEach(function(k){var g=groups[k];
     if(dig){cx.strokeStyle="rgba("+T.hypha+","+(g.al*.4*T.tglow).toFixed(3)+")";cx.lineWidth=Math.max(1.5,g.w*3);cx.lineJoin="miter";cx.beginPath();g.it.forEach(function(x){if(x[2]<1)return;var P=x[0],e=x[3];var cs=e.cs||[];linePath([P[0]].concat(e.dir<0?cs.slice().reverse():cs,[P[P.length-1]]))});cx.stroke();return}   /* the glow follows the trace's main route only: a blur needs no zigzag */
+    if(handNow){handGlow(g);return}   /* every frame rebuilds this cache while the view is moved: filling the tapered shapes would be about half of the frame */
     cx.fillStyle="rgba("+T.hypha+","+(g.al*.4*T.tglow).toFixed(3)+")";cx.beginPath();g.it.forEach(function(x){strandPath(x[0],plen(x[0])*x[2],x[1]*2.2,x[1]*.6)});cx.fill()});
   cx=tcx;if(!lite){cx.setTransform(1,0,0,1,0,0);cx.drawImage(gc,0,0,tc.width,tc.height)}cx.setTransform(DPR,0,0,DPR,0,0);
   Object.keys(groups).forEach(function(k){var g=groups[k],ends=[];
@@ -739,8 +746,9 @@ function draw(now){
   var hotE=[],coldE=[],gon=glActive(),gn=gon&&!T.nodes&&!!GLR.node;   /* gn: the card draws the notes too (the themes whose notes are plain discs) */
   E.forEach(function(e){e._g=0;if(!edgeVis(e)||Math.min(e.a.ap,e.b.ap)<=0)return;if(focus>=0&&(e.a.i===focus||e.b.i===focus)){hotE.push(e);if(gn)e._g=2}else{coldE.push(e);e._g=1}});
   busyNow=!!(drag||pinch)||now-spin.last<400;
+  handNow=!!(drag&&drag.moved||pinch||coasting||BENCH&&BENCH.drive);   /* the view is moved by hand (a drag, two fingers, the coast after a swing; the benchmark's turn by hand): a cheaper glow */
   var mk=match?Object.keys(match).length+":"+Object.keys(match)[0]:"",settling=settlingNow=alpha>0||NODES.some(function(n){return n.vis&&(n.ap<1||Math.abs(n.zt-n.z)>.003)});
-  var key=[W,H,DPR,cam.x.toFixed(2),cam.y.toFixed(2),cam.k.toFixed(4),cyw.toFixed(4),syw.toFixed(4),cpt.toFixed(4),spt.toFixed(4),depthAmt.toFixed(3),focus,mk,T.id,cur,coldE.length,settling?now:0].join("|");
+  var key=[W,H,DPR,cam.x.toFixed(2),cam.y.toFixed(2),cam.k.toFixed(4),cyw.toFixed(4),syw.toFixed(4),cpt.toFixed(4),spt.toFixed(4),depthAmt.toFixed(3),focus,mk,T.id,cur,coldE.length,settling?now:0,handNow].join("|");
   var tT=PERF?performance.now():0;
   if(gon!==glWas){glWas=gon;gcv.hidden=!gon;tc.hidden=gon;tKey="";if(gon)tcx.clearRect(0,0,tc.width,tc.height);else glClear()}   /* the layer of the 2D threads is not needed while the card draws them */
   if(gon)glThreads();   /* the card draws every thread every frame, from the layout's coordinates */

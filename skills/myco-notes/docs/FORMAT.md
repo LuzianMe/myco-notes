@@ -125,6 +125,7 @@ Text inside fenced code blocks is not scanned for references.
 ### 5.2 Resolution
 - A name with a folder part (`plans/backlog.md`) resolves against the repository root, then against the folder of the file that contains it.
 - A bare name (`runbook.md`) resolves to the file with that name anywhere in the repository. If more than one file has that name, the reference is ambiguous: a checker MUST report it, and the writer adds the folder part (`scripts/backup/README.md`). Several files with the same name are allowed (a `README.md` per bundle); only a bare reference to one of them is not.
+- "The repository" includes the files of `DATA_DIRS`: they are not notes, but a reference may name them. It leaves out `MAP_DIR` and the folders of git and of other tools (3.3). Names are compared exactly, upper and lower case included. A file that git ignores exists only in the copies that have it, so a reference to it can be broken in another clone.
 - A reference in a note that resolves to nothing is broken; a checker MUST report it. References in records are not checked (they were true when written).
 
 ### 5.3 Direction

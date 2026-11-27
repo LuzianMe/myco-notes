@@ -22,7 +22,6 @@ MAX_COMMITS = 2000
 KIT_GROUPS = {"start", "plans", "reviews", "inbox", "logs", "verify", "artifacts", "archive", "imported", "sources", "docs", "other"}   # the kit's own group ids (no project words)
 LABEL_MAX = 60
 DUE = re.compile(r"\b(after|about|due|review-by|waiting until|on or after)\s+(\d{4}-\d{2}-\d{2})\b")
-ILLUSTRATIVE = " *<>{}$|()[]"
 
 
 def due_count(text, today, header=True):
@@ -39,29 +38,6 @@ def due_count(text, today, header=True):
             continue
         n += sum(1 for m in DUE.finditer(line) if m.group(2) < today)
     return n
-
-
-def missing_refs(root, rel, text, names, skip_prefixes):
-    """Backticked note names (`x.md`) that exist nowhere: the same references notes-lint reports as missing."""
-    if rel.startswith(skip_prefixes):
-        return []
-    out, in_code = [], False
-    for line in text.split("\n"):
-        if line.strip().startswith("```"):
-            in_code = not in_code
-            continue
-        if in_code:
-            continue
-        for tok in re.findall(r"`([^`\n]+)`", line):
-            tok = tok.lstrip("@")
-            if not tok.endswith(".md") or any(c in tok for c in ILLUSTRATIVE) or tok.startswith(("/", "~", "http", "./", "../", ".")):
-                continue
-            if tok in names or os.path.basename(tok) in names or os.path.exists(os.path.join(root, *tok.split("/"))) \
-                    or os.path.exists(os.path.join(root, *os.path.dirname(rel).split("/"), *tok.split("/"))):
-                continue
-            if tok not in out:
-                out.append(tok)
-    return out
 
 
 def commit_history(root, rels, sh):
@@ -92,22 +68,16 @@ def commit_history(root, rels, sh):
     return commits
 
 
-def prefixes(lay):
-    """(paths whose references are not checked, history folders): the same notes the lint leaves out of these checks."""
-    hist = tuple(lay["notes"] + "/" + h + "/" for h in lay["history"])
-    return (lay["docs"] + "/", "template/", lay["map"] + "/") + hist, hist
-
-
-def attention(root, lay, rel, text, names, today):
+def attention(lay, rel, text, refs, today):
     """What needs a look in one note, as the mycelium view marks it: (follow-up dates passed in the text, missing references).
-    A note in a history folder (archive, logs, inbox...) is a record and has neither."""
-    skip, hist = prefixes(lay)
-    if rel.startswith(hist):
+    The references are the ones notes-lint reports as missing: refs is the _myco.NoteRefs both use. A note in a history folder
+    (archive, logs, inbox...) is a record and has neither."""
+    if rel.startswith(_myco.history_prefixes(lay)):
         return 0, []
-    return due_count(text, today, header=False), missing_refs(root, rel, text, names, skip)
+    return due_count(text, today, header=False), refs.missing(rel, text)
 
 
-def build(root, lay, info, groups, out, title, sh, today, built, public=None):
+def build(root, lay, info, groups, out, title, sh, today, built, refs, public=None):
     """Write <out>/graph.html. `info` is the map builder's table of notes (rel -> id, title, group, out, inn, size).
     public: None for the full view, or the approved labels {note name without .md: label} for a public graph (see the module docstring)."""
     rels = sorted(info)
@@ -119,8 +89,7 @@ def build(root, lay, info, groups, out, title, sh, today, built, public=None):
             born.setdefault(p, ci)
             last[p] = ci
     uncommitted = max(len(commits) - 1, 0)
-    names = {d["name"] for d in info.values()}
-    skip_prefixes, hist_prefixes = prefixes(lay)
+    hist_prefixes = _myco.history_prefixes(lay)
     gids = [g[0] for g in groups]
     hubs = hub_set(info, hist_prefixes)
     nodes = []
@@ -134,7 +103,7 @@ def build(root, lay, info, groups, out, title, sh, today, built, public=None):
         due = 0 if n["hist"] else due_count(d["text"], today)
         if due:
             n["due"] = due
-        miss = [] if n["hist"] else missing_refs(root, rel, d["text"], names, skip_prefixes)
+        miss = [] if n["hist"] else refs.missing(rel, d["text"])
         if miss:
             n["miss"] = miss[:4] + (["+%d more" % (len(miss) - 4)] if len(miss) > 4 else [])
         nodes.append(n)

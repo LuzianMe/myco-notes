@@ -65,6 +65,71 @@ def _data_dirs(conf_text):
     return []
 
 
+def references_agree(tmp, kit, label, notes_dir, conf_head, graph_data):
+    """One note per reference; the lint's missing notes, graph.html's and the wiki pages' must be the same set, as expected."""
+    root = os.path.join(tmp, "refs-" + notes_dir)
+    write(os.path.join(root, ".myco-notes.conf"), conf_head + 'DATA_DIRS="scripts other"\n')
+    for f in ("scripts/hermes/SOUL.md", "scripts/TWICE.md", "other/TWICE.md", "node_modules/pkg/vendored.md", notes_dir + "/plans/beside.md", notes_dir + "/plans/deeper/below.md"):
+        write(os.path.join(root, *f.split("/")), "# x\n")
+    write(os.path.join(root, notes_dir, "state.md"), "# State\n")
+    ignored = "accepted-gone.md"
+    write(os.path.join(root, ".myco-notes-lint-ignore"),
+          "# accepted by the owner\naccepted-gone\\.md\n^" + notes_dir + "/plans/twolines\\.md:2 reference to missing note `half-accepted\\.md`\n")
+    cases = [   # (note name, the reference, missing?, what it is)
+        ("bare-data", "SOUL.md", False, "a bare name that only a data folder holds"),
+        ("path-data", "scripts/hermes/SOUL.md", False, "a full path into a data folder"),
+        ("at-data", "@SOUL.md", False, "the same with a leading @"),
+        ("shared", "TWICE.md", False, "a bare name two files share (the lint calls it ambiguous, not missing)"),
+        ("bare-note", "beside.md", False, "a bare name of a note"),
+        ("relative", "deeper/below.md", False, "a path from the folder of the note itself"),
+        ("generated", notes_dir + "/map/raw/x.md" if conf_head else "notes-map/raw/x.md", False, "a page of the generated map"),
+        ("accepted", ignored, False, "a reference silenced in .myco-notes-lint-ignore"),
+        ("wrong-folder", "nowhere/state.md", True, "a wrong folder although a note has that name"),
+        ("wrong-case", notes_dir + "/State.md", True, "the wrong case of a real path (also on macOS and Windows)"),
+        ("vendored-path", "node_modules/pkg/vendored.md", True, "a path into another tool's folder"),
+        ("vendored-name", "vendored.md", True, "a name only another tool's folder holds"),
+        ("nothing", "ghost.md", True, "a name nothing has"),
+    ]
+    for name, tok, _missing, _why in cases:
+        write(os.path.join(root, notes_dir, "plans", name + ".md"), f"# {name}\nSee `{tok}`.\n")
+    write(os.path.join(root, notes_dir, "plans", "twolines.md"), "# Two lines\nAccepted here: `half-accepted.md`.\nBut not here: `half-accepted.md`.\n")
+    write(os.path.join(root, notes_dir, "plans", "fenced.md"), "# Fenced\n```\n`ghost-in-code.md`\n```\n")
+    cases += [("twolines", "half-accepted.md", True, "a reference accepted on one line only"), ("fenced", "ghost-in-code.md", False, "a name inside a code block")]
+    git(root, "init", "-q")
+    git(root, "add", "-A")
+    git(root, "commit", "-qm", "references fixture")
+    tool = lambda n, *a: run([sys.executable, os.path.join(kit, "tools", n), "--root", root, *a], root)
+    out_dir = os.path.join(tmp, "refs-out-" + notes_dir)
+
+    def lint_missing(text, name):
+        head = f"{notes_dir}/plans/{name}.md:"
+        return sorted({l.split("`")[1] for l in text.splitlines() if head in l and "reference to missing note" in l})
+
+    _rc, lint = tool("notes-lint.py")
+    rc, out = tool("build-notes-map.py", "--out", out_dir)
+    check(f"{label}: lint and map run on the fixture", "notes-lint:" in lint and rc == 0, lint + out)
+    _h, g = graph_data(out_dir, ".")
+    nodes = {n["rel"]: n for n in g["nodes"]}
+    rc, out = tool("build-notes-map.py", "--layout", "wiki", "--out", out_dir + "-wiki")
+    for name, tok, missing, why in cases:
+        want = [tok.lstrip("@")] if missing else []
+        rel = f"{notes_dir}/plans/{name}.md"
+        page = read(os.path.join(out_dir + "-wiki", "p", rel[:-3].replace("/", "-") + ".html"))
+        shown = re.findall(r"<code>([^<]+)</code>", page.split("<b>Missing references:</b>")[1].split("</p>")[0]) if "<b>Missing references:</b>" in page else []
+        got = (lint_missing(lint, name), nodes[rel].get("miss", []), shown)
+        check(f"{label}: {why}: {'missing' if missing else 'not missing'} in the lint, graph.html and the wiki", got == (want, want, want), f"lint, graph, wiki = {got}")
+    rc, out = tool("build-notes-map.py", "--public", "--out", out_dir + "-public")
+    public = read(os.path.join(out_dir + "-public", "graph.html"))
+    data = re.search(r'<script id="data" type="application/json">(.*?)</script>', public, re.S).group(1)
+    leaked = [w for w in ("SOUL", "TWICE", "ghost", "nowhere", "vendored", "half-accepted", '"miss"') if w in data]
+    check(f"{label}: the public graph holds no file name and no missing reference", rc == 0 and not leaked, str(leaked) + out)
+    write(os.path.join(root, ".myco-notes-lint-ignore"), "accepted-gone\\.md\n([unclosed\n")
+    rc, out = tool("build-notes-map.py", "--out", out_dir)
+    nodes = {n["rel"]: n for n in graph_data(out_dir, ".")[1]["nodes"]}
+    check(f"{label}: a broken ignore file stops the lint, while the map says so, builds and marks everything missing",
+          tool("notes-lint.py")[0] == 3 and rc == 0 and ".myco-notes-lint-ignore" in out and nodes[f"{notes_dir}/plans/accepted.md"].get("miss") == [ignored], out)
+
+
 def main():
     tmp = tempfile.mkdtemp(prefix="myco-native-")
     try:
@@ -208,6 +273,10 @@ def main():
         run(NC + ["Remove the graph test note"], proj)
         shutil.rmtree(os.path.join(proj, MY, "map"), ignore_errors=True)
         check("the map folder is still gitignored and the repository clean", git(proj, "status", "--porcelain")[1].strip() == "", git(proj, "status", "--porcelain")[1])
+
+        print("references: the map and the lint agree on what is missing")
+        for label, notes_dir, conf_head in (("myco-notes layout", MY, "MYCO_DIR=myco-notes\n"), ("flat layout", "notes", "")):
+            references_agree(tmp, kit, label, notes_dir, conf_head, graph_data)
 
         print("freshness header, resume, asof")
         import datetime as _dt
